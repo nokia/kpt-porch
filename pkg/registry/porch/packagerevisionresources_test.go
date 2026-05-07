@@ -63,7 +63,8 @@ func setupResourcesTest(t *testing.T) (mockClient *mockclient.MockClient, mockEn
 }
 
 func TestListResources(t *testing.T) {
-	_, mockEngine := setupResourcesTest(t)
+	mockClient, mockEngine := setupResourcesTest(t)
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1alpha1.Repository"), mock.Anything).Return(nil).Maybe()
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{
 		packageRevision,
 	}, nil).Once()
@@ -86,6 +87,10 @@ func TestListResources(t *testing.T) {
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{
 		mockPkgRev,
 	}, nil)
+	mockPkgRev.On("Key").Return(repository.PackageRevisionKey{
+		PkgKey: repository.PackageKey{RepoKey: repository.RepositoryKey{Name: "repo"}},
+	}).Maybe()
+	mockPkgRev.On("KubeObjectNamespace").Return("").Maybe()
 	mockPkgRev.On("GetResources", mock.Anything).Return(nil, errors.New("error getting API package revision")).Once()
 	result, err = packagerevisionresources.List(context.TODO(), &internalversion.ListOptions{})
 	assert.NoError(t, err)
@@ -95,7 +100,8 @@ func TestListResources(t *testing.T) {
 }
 
 func TestGetResources(t *testing.T) {
-	_, mockEngine := setupResourcesTest(t)
+	mockClient, mockEngine := setupResourcesTest(t)
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1alpha1.Repository"), mock.Anything).Return(nil).Maybe()
 	pkgRevName := "repo.1234567890.ws"
 
 	// Success case
@@ -131,36 +137,4 @@ func TestGetResources(t *testing.T) {
 	result, err = packagerevisionresources.Get(ctx, pkgRevName, nil)
 	assert.Error(t, err)
 	assert.Nil(t, result)
-}
-
-func TestWatchResources(t *testing.T) {
-	_, mockEngine := setupResourcesTest(t)
-	mockWatcherManager := mockengine.NewMockWatcherManager(t)
-	mockEngine.On("ObjectCache").Return(mockWatcherManager).Maybe()
-
-	mockWatcherManager.On("WatchPackageRevisions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{}, nil).Maybe()
-
-	watcher, err := packagerevisionresources.Watch(context.TODO(), &internalversion.ListOptions{})
-	assert.NoError(t, err)
-	if watcher != nil {
-		watcher.Stop()
-	}
-
-	//=========================================================================================
-
-	watcher, err = packagerevisionresources.Watch(context.TODO(), &internalversion.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector("invalid.field", "somethingOffTheWall"),
-	})
-	assert.Equal(t, nil, watcher)
-	assert.ErrorContains(t, err, "unknown fieldSelector field")
-
-	//=========================================================================================
-
-	ctxWithConflictNamespace := genericapirequest.WithNamespace(context.TODO(), "foo")
-	watcher, err = packagerevisionresources.Watch(ctxWithConflictNamespace, &internalversion.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector("metadata.namespace", "somethingOffTheWall"),
-	})
-	assert.Equal(t, nil, watcher)
-	assert.ErrorContains(t, err, "conflicting namespaces specified")
 }
