@@ -87,13 +87,12 @@ Copy an existing PackageRevision to create a new one:
 
 ```bash
 porchctl rpkg copy \
-  porch-test.my-app.v1 \
-  my-app \
-  --namespace default \
-  --workspace v2
+porch-test.my-app.v1 \
+--namespace default \
+--workspace v2
 ```
 
-This command creates a new PackageRevision based on `porch-test.my-app.v1` and names the new PackageRevision `my-app` (package name) while using `v2` as the workspace name (must be unique within the package). This PackageRevision starts in `Draft` lifecycle state. The command copies all resources from the source PackageRevision.
+This command creates a new PackageRevision based on `porch-test.my-app.v1` for the package `my-app` with `v2` as the workspace name (must be unique within the package). This PackageRevision starts in `Draft` lifecycle state. The command copies all resources from the source PackageRevision.
 
 Verify the copy was created:
 

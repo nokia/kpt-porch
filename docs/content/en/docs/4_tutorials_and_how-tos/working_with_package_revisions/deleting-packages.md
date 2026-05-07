@@ -184,7 +184,7 @@ If you want to proceed with the deletion, approve the deletion proposal:
 porchctl rpkg del porch-test.test-published-package.published-v1 --namespace=default
 ```
 
-This command permanently deletes the PackageRevision and emoves the Git tag and any associated branches.
+This command permanently deletes the PackageRevision and removes the Git tag and any associated branches.
 
 {{% alert title="Note" color="primary" %}}
 This cannot be undone once completed.
@@ -227,7 +227,7 @@ porchctl rpkg propose-delete porch-test.test-reject-delete.reject-v1 --namespace
 porchctl rpkg reject porch-test.test-reject-delete.reject-v1 --namespace=default
 ```
 
-These commands change lifecycle from `DeletionProposed` back to `Published`, which means that the PackageRevision returns to normal published state. The package can be used again normally.
+These commands change lifecycle from `DeletionProposed` back to `Published`, which means that the PackageRevision returns to normal published state. The revision can be used again normally.
 
 Verify the state change:
 
@@ -293,7 +293,7 @@ graph TD
 
 **Published PackageRevision Protection**
 
-The two-step deletion process prevents accidental removal: deletion proposals can be reviewed before approcal, and if a proposal is rejected the PackageRevision returns to the **Published** state.
+The two-step deletion process prevents accidental removal: deletion proposals can be reviewed before approval, and if a proposal is rejected the PackageRevision returns to the **Published** state.
 
 **Git Repository Impact**
 

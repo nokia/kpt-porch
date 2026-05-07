@@ -35,7 +35,7 @@ porchctl rpkg init my-first-package \
   --description="My first Porch package"
 ```
 
-This command creates a new PackageRevision named `my-first-package` and places it in the `porch-test` repository, using `v1` as the workspace name (must be unique within this package). The PackageRevision starts in `Draft` lifecycle state.
+This command creates a new package named `my-first-package` in the `porch-test` repository, initializing a PackageRevision with the workspace name of `v1` (this must be unique within this package). The PackageRevision starts in `Draft` lifecycle state.
 
 ![Diagram](/static/images/porch/guides/init-workflow.drawio.svg)
 
@@ -62,7 +62,7 @@ Download the package revision contents to your local filesystem:
 porchctl rpkg pull porch-test.my-first-package.v1 ./my-first-package --namespace default
 ```
 
-This command fetches all resources from the PackageRevision and saves them to the `./my-first-package` directory. This includes the Kptfile and any other resources.
+This command fetches all resources from the PackageRevision and saves them to the `./my-first-package` directory. This includes the Kptfile and all other resources.
 
 ![Diagram](/static/images/porch/guides/pull-workflow.drawio.svg)
 
@@ -72,7 +72,7 @@ Explore the package revision contents:
 ls -al ./my-first-package
 ```
 
-You should see the `Kptfile`, which contains PackageRevision metadata and pipeline configuration, as well as other YAML files, if any were created.
+You should see the `Kptfile`, which contains Package metadata and pipeline configuration, as well as the `.KptRevisionMetadata` file, which contains PackageRevision metadata. Additionally, you should see other YAML files, if any were created.
 
 ```bash
 total 24
@@ -129,7 +129,7 @@ pipeline:
         namespace: production
 ```
 
-This command adds a `set-namespace` function to the pipeline. This function will set the namespace to `production` for all resources. The functions are not rendered until the package is "pushed" to porch.
+This edit adds a `set-namespace` function to the pipeline. This function will set the namespace to `production` for all resources. The functions are not rendered until the package is "pushed" to Porch.
 
 Add new resource. First, create a new configmap:
 
@@ -168,7 +168,7 @@ This command updates the PackageRevision in Porch and triggers rendering (execut
 
 ![Diagram](/static/images/porch/guides/push-workflow.drawio.svg)
 
-Successful output should look like a following. This describes how the KRM function was run by porch and has updated the namespace in our new configmap.
+Successful output should look like a following. This describes how the KRM function was run by Porch and has updated the namespace in our new configmap.
 
 ```bash
 [RUNNING] "gcr.io/kpt-fn/set-namespace:v0.4.1"

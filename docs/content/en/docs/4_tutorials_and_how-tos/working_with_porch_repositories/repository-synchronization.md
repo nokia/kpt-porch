@@ -21,7 +21,7 @@ Force an immediate synchronization of a repository:
 porchctl repo sync porch-test --namespace default
 ```
 
-This command schedules a one-time sync (minimum 1-minute delay), updates packages from the repository. It is independent of periodic sync schedule
+This command schedules a one-time sync (minimum 1-minute delay), updates packages from the repository. This sync is independent of the periodic sync schedule.
 
 **Example output:**
 
@@ -73,7 +73,7 @@ porchctl repo sync porch-test --namespace default --run-once "2024-01-15T14:30:0
 ```
 
 {{% alert title="Note" color="primary" %}}
-The minimum delay is 1 minute from command execution and the `spec.sync.runOnceAt` field is updated in the Repository CR. This synch is independent of existing periodic sync schedule and past timestamps are automatically adjusted to minimum delay.
+The minimum delay is 1 minute from command execution and the `spec.sync.runOnceAt` field is updated in the Repository CR. This sync is independent of the existing periodic sync schedule and past timestamps are automatically adjusted to minimum delay.
 {{% /alert %}}
 
 ---

@@ -67,7 +67,7 @@ The name consists of the following components:
 - **Workspace Name**: Unique identifier within the package (maps to Git branch/tag)
 
 {{% alert title="Note" color="primary" %}}
-Workspace names must be unique within a package. Multiple PackageRevisions can share the same package name with different workspaces and published PackageRevisions get tagged in Git using the workspace name 
+Workspace names must be unique within a package. Multiple PackageRevisions can share the same package name with different workspaces and published PackageRevisions get tagged in Git using the workspace name.
 {{% /alert %}}
 
 ---
@@ -107,7 +107,7 @@ PackageRevisions are stored in Git repositories registered with Porch:
 - **Proposed**: Stored in `proposed/{workspace}` branch  
 - **Published**: Tagged as `{workspace}` and stored in main branch
 
-There are two repository types: Blueprint Repositories and Deployment Repositories. Blueprint Repositories contain upstream package templates for cloning, while Deployment Repositories store deployment-ready packages. These are marked with the `--deployment` flag.
+Porch differentiates two types of repositories: "blueprint" and "deployment". Blueprint repositories are meant to contain upstream package templates for cloning, while deployment repositories should store deployment-ready packages. The latter are marked with the `--deployment` flag.
 
 Porch automatically syncs with Git repositories, however you can perform a manual sync with the `porchctl repo sync <repository-name>` command. You can also configure periodic sync with cron expressions.
 
@@ -125,7 +125,7 @@ Common issues when working with PackageRevisions and their solutions:
 
 **Push fails with conflict?**
 
-- Pull the latest version first with the `porchctl rpkg pull <PACKAGE-REVISION> ./dir` command
+- Pull the latest version first with the `porchctl rpkg pull <PACKAGE-REVISION> <directory>` command
 - Check if the PackageRevision has been modified by someone else
 - Resolve conflicts locally and push again
 

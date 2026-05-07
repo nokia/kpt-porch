@@ -16,7 +16,7 @@ description: A group of guides outlining how to interact with Porch repositories
 
 ## Understanding Repositories
 
-Before Porch can manage packages, you must register repositories where those packages are stored. Repositories tell Porch where to find package blueprints, where to store deployment packages and how to authenticade with the repository.
+Before Porch can manage packages, you must register repositories where those packages are stored. Repositories tell Porch where to find package blueprints, where to store deployment packages and how to authenticate with the repository.
 
 Porch primarily supports **Git repositories** from providers like GitHub, GitLab, Gitea, Bitbucket, and other Git-compatible services.
 
@@ -76,13 +76,13 @@ Common issues when working with repositories and their solutions:
 - Ensure that the repository has been synchronized (check SYNC SCHEDULE or trigger manual sync)
 - Verify that the packages have valid Kptfile in repository
 - Check if the repository directory configuration matches package location
-- If you re-registering a previously unregistered repository, the packages in Git will reappear after sync
+- If you are re-registering a previously unregistered repository, the packages in Git will reappear after sync
 
 **Authentication failures?**
 
 - For GitHub: Ensure that the Personal Access Token has `repo` scope
 - For private repos: Verify that the credentials are correctly configured
-- Check if secret exists: `kubectl get secret <secret-name> -n <namespace>`
+- Check whether the secret exists: `kubectl get secret <secret-name> -n <namespace>`
 
 **Need to change repository configuration?**
 

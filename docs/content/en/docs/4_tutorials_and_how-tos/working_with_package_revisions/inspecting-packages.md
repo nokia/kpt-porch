@@ -21,7 +21,7 @@ Get all package revisions across all repositories in a namespace:
 porchctl rpkg get --namespace default
 ```
 
-This command queries Porch for all PackageRevisions in the specified namespace and displays a summary table with key information. It also shows PackageRevisions from all registered repositories.
+This command queries Porch for all PackageRevisions in the specified namespace and displays a summary table with key information. It shows PackageRevisions from all registered repositories in that namespace.
 
 {{% alert title="Note" color="primary" %}}
 `porchctl rpkg list` is an alias for `porchctl rpkg get` and can be used interchangeably: 
@@ -63,7 +63,7 @@ Get complete details about a specific PackageRevision:
 porchctl rpkg get porch-test.my-app.v1 --namespace default -o yaml
 ```
 
-This command retrieves the full PackageRevision resource and shows all metadata, spec, and status fields. Displayed in YAML format for easy reading.
+This command retrieves the full PackageRevision manifest, including all metadata, spec, and status fields. Displayed in YAML format for easy reading.
 
 Example output:
 
@@ -150,7 +150,7 @@ Read the actual contents of a PackageRevision:
 porchctl rpkg read porch-test.my-first-package.v1 --namespace default
 ```
 
-This command fetches PackageRevision resources and outputs to stdout and shows all KRM resources in ResourceList format. It displays the complete PackageRevision content.
+This command fetches PackageRevision resources and outputs to stdout, showing all KRM resources in ResourceList format. It displays the complete PackageRevision content.
 
 Example output:
 
