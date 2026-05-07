@@ -257,8 +257,8 @@ func (_c *MockCaDEngine_FindAllUpstreamReferencesInRepositories_Call) RunAndRetu
 }
 
 // ListPackageRevisions provides a mock function for the type MockCaDEngine
-func (_mock *MockCaDEngine) ListPackageRevisions(ctx context.Context, repositorySpec *v1alpha1.Repository, filter repository.ListPackageRevisionFilter) ([]repository.PackageRevision, error) {
-	ret := _mock.Called(ctx, repositorySpec, filter)
+func (_mock *MockCaDEngine) ListPackageRevisions(ctx context.Context, filter repository.ListPackageRevisionFilter) ([]repository.PackageRevision, error) {
+	ret := _mock.Called(ctx, filter)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListPackageRevisions")
@@ -266,18 +266,18 @@ func (_mock *MockCaDEngine) ListPackageRevisions(ctx context.Context, repository
 
 	var r0 []repository.PackageRevision
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.Repository, repository.ListPackageRevisionFilter) ([]repository.PackageRevision, error)); ok {
-		return returnFunc(ctx, repositorySpec, filter)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, repository.ListPackageRevisionFilter) ([]repository.PackageRevision, error)); ok {
+		return returnFunc(ctx, filter)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.Repository, repository.ListPackageRevisionFilter) []repository.PackageRevision); ok {
-		r0 = returnFunc(ctx, repositorySpec, filter)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, repository.ListPackageRevisionFilter) []repository.PackageRevision); ok {
+		r0 = returnFunc(ctx, filter)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]repository.PackageRevision)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *v1alpha1.Repository, repository.ListPackageRevisionFilter) error); ok {
-		r1 = returnFunc(ctx, repositorySpec, filter)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, repository.ListPackageRevisionFilter) error); ok {
+		r1 = returnFunc(ctx, filter)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -291,30 +291,24 @@ type MockCaDEngine_ListPackageRevisions_Call struct {
 
 // ListPackageRevisions is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repositorySpec *v1alpha1.Repository
 //   - filter repository.ListPackageRevisionFilter
-func (_e *MockCaDEngine_Expecter) ListPackageRevisions(ctx interface{}, repositorySpec interface{}, filter interface{}) *MockCaDEngine_ListPackageRevisions_Call {
-	return &MockCaDEngine_ListPackageRevisions_Call{Call: _e.mock.On("ListPackageRevisions", ctx, repositorySpec, filter)}
+func (_e *MockCaDEngine_Expecter) ListPackageRevisions(ctx interface{}, filter interface{}) *MockCaDEngine_ListPackageRevisions_Call {
+	return &MockCaDEngine_ListPackageRevisions_Call{Call: _e.mock.On("ListPackageRevisions", ctx, filter)}
 }
 
-func (_c *MockCaDEngine_ListPackageRevisions_Call) Run(run func(ctx context.Context, repositorySpec *v1alpha1.Repository, filter repository.ListPackageRevisionFilter)) *MockCaDEngine_ListPackageRevisions_Call {
+func (_c *MockCaDEngine_ListPackageRevisions_Call) Run(run func(ctx context.Context, filter repository.ListPackageRevisionFilter)) *MockCaDEngine_ListPackageRevisions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *v1alpha1.Repository
+		var arg1 repository.ListPackageRevisionFilter
 		if args[1] != nil {
-			arg1 = args[1].(*v1alpha1.Repository)
-		}
-		var arg2 repository.ListPackageRevisionFilter
-		if args[2] != nil {
-			arg2 = args[2].(repository.ListPackageRevisionFilter)
+			arg1 = args[1].(repository.ListPackageRevisionFilter)
 		}
 		run(
 			arg0,
 			arg1,
-			arg2,
 		)
 	})
 	return _c
@@ -325,7 +319,7 @@ func (_c *MockCaDEngine_ListPackageRevisions_Call) Return(packageRevisions []rep
 	return _c
 }
 
-func (_c *MockCaDEngine_ListPackageRevisions_Call) RunAndReturn(run func(ctx context.Context, repositorySpec *v1alpha1.Repository, filter repository.ListPackageRevisionFilter) ([]repository.PackageRevision, error)) *MockCaDEngine_ListPackageRevisions_Call {
+func (_c *MockCaDEngine_ListPackageRevisions_Call) RunAndReturn(run func(ctx context.Context, filter repository.ListPackageRevisionFilter) ([]repository.PackageRevision, error)) *MockCaDEngine_ListPackageRevisions_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -540,6 +534,92 @@ func (_c *MockCaDEngine_UpdatePackageResources_Call) Return(packageRevision repo
 }
 
 func (_c *MockCaDEngine_UpdatePackageResources_Call) RunAndReturn(run func(ctx context.Context, repositoryObj *v1alpha1.Repository, oldPackage repository.PackageRevision, old *v1alpha10.PackageRevisionResources, new *v1alpha10.PackageRevisionResources) (repository.PackageRevision, *v1alpha10.RenderStatus, error)) *MockCaDEngine_UpdatePackageResources_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdatePackageResourcesWithoutRender provides a mock function for the type MockCaDEngine
+func (_mock *MockCaDEngine) UpdatePackageResourcesWithoutRender(ctx context.Context, repositoryObj *v1alpha1.Repository, oldPackage repository.PackageRevision, old *v1alpha10.PackageRevisionResources, new *v1alpha10.PackageRevisionResources) (repository.PackageRevision, error) {
+	ret := _mock.Called(ctx, repositoryObj, oldPackage, old, new)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePackageResourcesWithoutRender")
+	}
+
+	var r0 repository.PackageRevision
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.Repository, repository.PackageRevision, *v1alpha10.PackageRevisionResources, *v1alpha10.PackageRevisionResources) (repository.PackageRevision, error)); ok {
+		return returnFunc(ctx, repositoryObj, oldPackage, old, new)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.Repository, repository.PackageRevision, *v1alpha10.PackageRevisionResources, *v1alpha10.PackageRevisionResources) repository.PackageRevision); ok {
+		r0 = returnFunc(ctx, repositoryObj, oldPackage, old, new)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(repository.PackageRevision)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *v1alpha1.Repository, repository.PackageRevision, *v1alpha10.PackageRevisionResources, *v1alpha10.PackageRevisionResources) error); ok {
+		r1 = returnFunc(ctx, repositoryObj, oldPackage, old, new)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockCaDEngine_UpdatePackageResourcesWithoutRender_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdatePackageResourcesWithoutRender'
+type MockCaDEngine_UpdatePackageResourcesWithoutRender_Call struct {
+	*mock.Call
+}
+
+// UpdatePackageResourcesWithoutRender is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repositoryObj *v1alpha1.Repository
+//   - oldPackage repository.PackageRevision
+//   - old *v1alpha10.PackageRevisionResources
+//   - new *v1alpha10.PackageRevisionResources
+func (_e *MockCaDEngine_Expecter) UpdatePackageResourcesWithoutRender(ctx interface{}, repositoryObj interface{}, oldPackage interface{}, old interface{}, new interface{}) *MockCaDEngine_UpdatePackageResourcesWithoutRender_Call {
+	return &MockCaDEngine_UpdatePackageResourcesWithoutRender_Call{Call: _e.mock.On("UpdatePackageResourcesWithoutRender", ctx, repositoryObj, oldPackage, old, new)}
+}
+
+func (_c *MockCaDEngine_UpdatePackageResourcesWithoutRender_Call) Run(run func(ctx context.Context, repositoryObj *v1alpha1.Repository, oldPackage repository.PackageRevision, old *v1alpha10.PackageRevisionResources, new *v1alpha10.PackageRevisionResources)) *MockCaDEngine_UpdatePackageResourcesWithoutRender_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1alpha1.Repository
+		if args[1] != nil {
+			arg1 = args[1].(*v1alpha1.Repository)
+		}
+		var arg2 repository.PackageRevision
+		if args[2] != nil {
+			arg2 = args[2].(repository.PackageRevision)
+		}
+		var arg3 *v1alpha10.PackageRevisionResources
+		if args[3] != nil {
+			arg3 = args[3].(*v1alpha10.PackageRevisionResources)
+		}
+		var arg4 *v1alpha10.PackageRevisionResources
+		if args[4] != nil {
+			arg4 = args[4].(*v1alpha10.PackageRevisionResources)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *MockCaDEngine_UpdatePackageResourcesWithoutRender_Call) Return(packageRevision repository.PackageRevision, err error) *MockCaDEngine_UpdatePackageResourcesWithoutRender_Call {
+	_c.Call.Return(packageRevision, err)
+	return _c
+}
+
+func (_c *MockCaDEngine_UpdatePackageResourcesWithoutRender_Call) RunAndReturn(run func(ctx context.Context, repositoryObj *v1alpha1.Repository, oldPackage repository.PackageRevision, old *v1alpha10.PackageRevisionResources, new *v1alpha10.PackageRevisionResources) (repository.PackageRevision, error)) *MockCaDEngine_UpdatePackageResourcesWithoutRender_Call {
 	_c.Call.Return(run)
 	return _c
 }

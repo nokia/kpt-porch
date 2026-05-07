@@ -1,4 +1,4 @@
-// Copyright 2022, 2024-2025 The kpt and Nephio Authors
+// Copyright 2022, 2024-2026 The kpt and Nephio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,10 +16,8 @@ package porch
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	unversionedapi "github.com/nephio-project/porch/api/porch"
 	porchapi "github.com/nephio-project/porch/api/porch/v1alpha1"
@@ -29,7 +27,6 @@ import (
 	context1 "github.com/nephio-project/porch/pkg/util/context"
 	"go.opentelemetry.io/otel/trace"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +36,11 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// isV1Alpha2Repo returns true if the repository is annotated for v1alpha2 CRD management.
+func isV1Alpha2Repo(repo *configapi.Repository) bool {
+	return repo.Annotations[configapi.AnnotationKeyV1Alpha2Migration] == configapi.AnnotationValueMigrationEnabled
+}
 
 const ConflictErrorMsgBase = "another request is already in progress %s"
 
@@ -53,130 +55,58 @@ type packageCommon struct {
 
 	cad engine.CaDEngine
 	// coreClient is a client back to the core kubernetes API server, useful for querying CRDs etc
-	coreClient               client.Client
-	gr                       schema.GroupResource
-	updateStrategy           SimpleRESTUpdateStrategy
-	createStrategy           SimpleRESTCreateStrategy
-	ListTimeoutPerRepository time.Duration
-	MaxConcurrentLists       int
+	coreClient     client.Client
+	gr             schema.GroupResource
+	updateStrategy SimpleRESTUpdateStrategy
+	createStrategy SimpleRESTCreateStrategy
 }
 
 func (r *packageCommon) listPackageRevisions(ctx context.Context, filter repository.ListPackageRevisionFilter,
 	callback func(ctx context.Context, p repository.PackageRevision) error) error {
 	ctx, span := tracer.Start(ctx, "packageCommon::listPackageRevisions", trace.WithAttributes())
 	defer span.End()
+	revisions, err := r.cad.ListPackageRevisions(ctx, filter)
+	if err != nil {
+		return err
+	}
 
-	var opts []client.ListOption
+	v1alpha2Repos := r.getV1Alpha2RepoSet(ctx, revisions)
 
-	namespace, namespaced := genericapirequest.NamespaceFrom(ctx)
-	if namespaced && namespace != "" {
-		if namespaceMatches, filteredNamespace := filter.MatchesNamespace(namespace); !namespaceMatches {
-			return fmt.Errorf("conflicting namespaces specified: %q and %q", namespace, filteredNamespace)
+	for _, rev := range revisions {
+		if v1alpha2Repos[rev.Key().RKey().Name] {
+			continue
 		}
-
-		opts = append(opts, client.InNamespace(namespace))
-	}
-
-	if filterRepo := filter.FilteredRepository(); filterRepo != "" {
-		opts = append(opts, client.MatchingFields(fields.Set{"metadata.name": filterRepo}))
-	}
-
-	var repoList configapi.RepositoryList
-	if err := r.coreClient.List(ctx, &repoList, opts...); err != nil {
-		return fmt.Errorf("error listing repository objects: %w", err)
-	}
-	repos := repoList.Items
-
-	type pkgRevResult struct {
-		Revisions []repository.PackageRevision
-		Err       error
-	}
-
-	repoCount := len(repos)
-	if repoCount == 0 {
-		return nil
-	}
-
-	workerCount := repoCount
-	if r.MaxConcurrentLists > 0 {
-		workerCount = min(r.MaxConcurrentLists, repoCount)
-	}
-
-	klog.V(3).Infof("Listing %d repositories with %d workers", repoCount, workerCount)
-
-	resultsCh := make(chan pkgRevResult, workerCount)
-	repoQueue := make(chan *configapi.Repository, repoCount)
-
-	for i := 0; i < workerCount; i++ {
-		go func() {
-			for repo := range repoQueue {
-				klog.V(3).Infof("[WORKER %d] Processing repository %s", i, repo.Name)
-				listCtx := ctx
-				var cancel context.CancelFunc
-				if r.ListTimeoutPerRepository != 0 {
-					listCtx, cancel = context.WithTimeout(ctx, r.ListTimeoutPerRepository)
-				}
-				revisions, err := r.cad.ListPackageRevisions(listCtx, repo, filter)
-				klog.V(3).Infof("[WORKER %d] ListPackageRevisions for %s done, len: %d, err: %v", i, repo.Name, len(revisions), err)
-				resultsCh <- pkgRevResult{Revisions: revisions, Err: err}
-				if cancel != nil {
-					cancel()
-				}
-			}
-		}()
-	}
-
-	for _, repo := range repos {
-		repoQueue <- &repo
-	}
-
-	innerCtx := ctx
-	if deadline, ok := ctx.Deadline(); ok {
-		const buffer = 5 * time.Second
-		if timeout := time.Until(deadline.Add(-buffer)); timeout > 0 {
-			var cancel context.CancelFunc
-			innerCtx, cancel = context.WithTimeout(ctx, timeout)
-			defer cancel()
+		if err := callback(ctx, rev); err != nil {
+			klog.Warningf("callback error for revision from repository: %+v", err)
+			continue
 		}
 	}
+	return nil
+}
 
-	received := 0
-
-	for {
-		select {
-		case <-innerCtx.Done():
-			klog.Warningf("Timeout reached — returning partial results")
-			close(repoQueue)
-			return nil
-
-		case res := <-resultsCh:
-			received++
-			klog.V(4).Infof("listPackageRevisions received %d repo", received)
-			if res.Err != nil {
-				klog.Warningf("error listing package revisions: %+v", res.Err)
-			}
-			for _, rev := range res.Revisions {
-				if err := callback(ctx, rev); err != nil {
-					klog.Warningf("callback error for revision from repository: %+v", err)
-					continue
-				}
-			}
-			if received == repoCount {
-				close(repoQueue)
-				return nil
-			}
+// getV1Alpha2RepoSet returns a set of repo names that are v1alpha2-managed,
+// deduplicating lookups by repo name. Uses the informer-cached coreClient.
+func (r *packageCommon) getV1Alpha2RepoSet(ctx context.Context, revisions []repository.PackageRevision) map[string]bool {
+	v1alpha2Repos := map[string]bool{}
+	for _, rev := range revisions {
+		repoName := rev.Key().RKey().Name
+		if _, checked := v1alpha2Repos[repoName]; checked {
+			continue
 		}
+		var repo configapi.Repository
+		if err := r.coreClient.Get(ctx, types.NamespacedName{Name: repoName, Namespace: rev.KubeObjectNamespace()}, &repo); err != nil {
+			v1alpha2Repos[repoName] = false // fail open
+			continue
+		}
+		v1alpha2Repos[repoName] = isV1Alpha2Repo(&repo)
 	}
+	return v1alpha2Repos
 }
 
 func (r *packageCommon) listPackages(ctx context.Context, filter repository.ListPackageFilter, callback func(p repository.Package) error) error {
 	var opts []client.ListOption
-	if ns, namespaced := genericapirequest.NamespaceFrom(ctx); namespaced {
+	if ns := filter.Key.RepoKey.Namespace; ns != "" {
 		opts = append(opts, client.InNamespace(ns))
-
-		if filter.Key.RKey().Namespace != "" && ns != filter.Key.RKey().Namespace {
-			return fmt.Errorf("conflicting namespaces specified: %q and %q", ns, filter.Key.RKey().Namespace)
-		}
 	}
 
 	// TODO: Filter on filter.Repository?
@@ -221,20 +151,35 @@ func (n *namespaceFilteringWatcher) OnPackageRevisionChange(eventType watch.Even
 	return n.delegate.OnPackageRevisionChange(eventType, obj)
 }
 
-func (r *packageCommon) watchPackages(ctx context.Context, filter repository.ListPackageRevisionFilter, callback engine.ObjectWatcher) error {
-	ns, namespaced := genericapirequest.NamespaceFrom(ctx)
-	wrappedCallback := callback
-	if namespaced && ns != "" {
-		wrappedCallback = &namespaceFilteringWatcher{
-			ns:       ns,
-			delegate: callback,
-		}
-	}
-	if err := r.cad.ObjectCache().WatchPackageRevisions(ctx, filter, wrappedCallback); err != nil {
-		return err
-	}
+// v1alpha2FilteringWatcher filters out watch events for v1alpha2-managed repositories.
+type v1alpha2FilteringWatcher struct {
+	coreClient client.Client
+	delegate   engine.ObjectWatcher
+}
 
-	return nil
+func (v *v1alpha2FilteringWatcher) OnPackageRevisionChange(eventType watch.EventType, obj repository.PackageRevision) bool {
+	repoName := obj.Key().RKey().Name
+	ns := obj.KubeObjectNamespace()
+	var repo configapi.Repository
+	if err := v.coreClient.Get(context.Background(), types.NamespacedName{Name: repoName, Namespace: ns}, &repo); err != nil {
+		// If we can't look up the repo, let the event through (fail open)
+		return v.delegate.OnPackageRevisionChange(eventType, obj)
+	}
+	if isV1Alpha2Repo(&repo) {
+		return true // skip, but keep watching
+	}
+	return v.delegate.OnPackageRevisionChange(eventType, obj)
+}
+
+func (r *packageCommon) watchPackages(ctx context.Context, filter repository.ListPackageRevisionFilter, callback engine.ObjectWatcher) error {
+	var watcher = callback
+
+	if ns, namespaced := genericapirequest.NamespaceFrom(ctx); namespaced && ns != "" {
+		watcher = &namespaceFilteringWatcher{ns: ns, delegate: watcher}
+	}
+	watcher = &v1alpha2FilteringWatcher{coreClient: r.coreClient, delegate: watcher}
+
+	return r.cad.ObjectCache().WatchPackageRevisions(ctx, filter, watcher)
 }
 
 func (r *packageCommon) getRepositoryObj(ctx context.Context, repositoryID types.NamespacedName) (*configapi.Repository, error) {
@@ -263,26 +208,12 @@ func (r *packageCommon) getRepoPkgRev(ctx context.Context, name string) (reposit
 	}
 
 	repositoryObj, err := r.getRepositoryObj(ctx, types.NamespacedName{Name: prKey.RKey().Name, Namespace: prKey.RKey().Namespace})
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if repository is being deleted
-	if repositoryObj.DeletionTimestamp != nil {
+	if err == nil && isV1Alpha2Repo(repositoryObj) {
 		return nil, apierrors.NewNotFound(r.gr, name)
 	}
 
-	var cancel context.CancelFunc
-	if r.ListTimeoutPerRepository != 0 {
-		ctx, cancel = context.WithTimeout(ctx, r.ListTimeoutPerRepository)
-		defer cancel()
-	}
-
-	revisions, err := r.cad.ListPackageRevisions(ctx, repositoryObj, repository.ListPackageRevisionFilter{Key: prKey})
+	revisions, err := r.cad.ListPackageRevisions(ctx, repository.ListPackageRevisionFilter{Key: prKey})
 	if err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, fmt.Errorf("%v: exceeded %v seconds trying to list package revisions", ctx.Err(), r.ListTimeoutPerRepository)
-		}
 		return nil, err
 	}
 	for _, rev := range revisions {
@@ -435,6 +366,10 @@ func (r *packageCommon) updatePackageRevision(ctx context.Context, name string, 
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting repository %v: %w", repositoryID, err))
 	}
 
+	if isV1Alpha2Repo(&repositoryObj) {
+		return nil, false, apierrors.NewGone(fmt.Sprintf("repository %q is managed by v1alpha2; use the v1alpha2 API", repositoryID.Name))
+	}
+
 	var parentPackage repository.PackageRevision
 	if newApiPkgRev.Spec.Parent != nil && newApiPkgRev.Spec.Parent.Name != "" {
 		p, err := r.getRepoPkgRev(ctx, newApiPkgRev.Spec.Parent.Name)
@@ -509,11 +444,31 @@ func getLifecycleTransition(oldPkgRev, newPkgRev *porchapi.PackageRevision) stri
 }
 
 func (r *packageCommon) validateDelete(ctx context.Context, deleteValidation rest.ValidateObjectFunc, obj runtime.Object, name, namespace string) (*configapi.Repository, error) {
+	// Check if the PackageRevision is Published and not in DeletionProposed state
+	if pkgRev, ok := obj.(*porchapi.PackageRevision); ok {
+		if pkgRev.Spec.Lifecycle == porchapi.PackageRevisionLifecyclePublished {
+			return nil, apierrors.NewForbidden(
+				porchapi.Resource("packagerevisions"),
+				name,
+				fmt.Errorf("published PackageRevisions must be proposed for deletion by setting spec.lifecycle to 'DeletionProposed' prior to deletion"))
+		}
+	}
+
 	if deleteValidation != nil {
 		err := deleteValidation(ctx, obj)
 		if err != nil {
 			klog.Infof("delete failed validation: %v", err)
 			return nil, err
+		}
+	}
+
+	// Check if the PackageRevision is Published and not in DeletionProposed state
+	if pkgRev, ok := obj.(*porchapi.PackageRevision); ok {
+		if pkgRev.Spec.Lifecycle == porchapi.PackageRevisionLifecyclePublished {
+			return nil, apierrors.NewForbidden(
+				porchapi.Resource("packagerevisions"),
+				name,
+				fmt.Errorf("published PackageRevisions must be proposed for deletion by setting spec.lifecycle to 'DeletionProposed' prior to deletion"))
 		}
 	}
 

@@ -1,4 +1,4 @@
-// Copyright 2025 The Nephio Authors
+// Copyright 2025,2026 The Nephio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,10 @@ const (
 )
 
 func NewCommand(ctx context.Context, rcg *genericclioptions.ConfigFlags) *cobra.Command {
-	return newRunner(ctx, rcg).Command
+	v1 := newRunner(ctx, rcg)
+	v2 := newV1Alpha2Runner(ctx, rcg)
+	cliutils.WrapVersionDispatch(v1.Command, v2.preRunE, v2.runE)
+	return v1.Command
 }
 
 func newRunner(ctx context.Context, rcg *genericclioptions.ConfigFlags) *runner {
@@ -386,6 +389,9 @@ func (r *runner) findUpstreamName(pr *porchapi.PackageRevision) string {
 			return n
 		}
 		if pr.Status.UpstreamLock != nil {
+			if err := r.listPackageRevisions(); err != nil {
+				return ""
+			}
 			if up := r.findUpstreamByLock(pr.Status.UpstreamLock); up != nil {
 				return up.Name
 			}
@@ -402,18 +408,25 @@ func (r *runner) findEditOrigin(currentPr *porchapi.PackageRevision) string {
 	pr := currentPr
 	for pr != nil && pr.Spec.Tasks[0].Type == porchapi.TaskTypeEdit {
 		sourceName := pr.Spec.Tasks[0].Edit.Source.Name
-		pr = nil
-		for _, p := range r.prs {
-			if p.Name == sourceName {
-				pr = &p
-				break
-			}
-		}
+		pr = r.findPackageRevision(sourceName)
 	}
 	if pr != nil {
 		return r.findUpstreamName(pr)
 	}
 	return ""
+}
+
+func (r *runner) listPackageRevisions() error {
+	packageRevisionList := porchapi.PackageRevisionList{}
+	listOpts := []client.ListOption{}
+	if r.cfg.Namespace != nil && *r.cfg.Namespace != "" {
+		listOpts = append(listOpts, client.InNamespace(*r.cfg.Namespace))
+	}
+	if err := r.client.List(r.ctx, &packageRevisionList, listOpts...); err != nil {
+		return err
+	}
+	r.prs = packageRevisionList.Items
+	return nil
 }
 
 func (r *runner) findUpstreamByLock(lock *porchapi.Locator) *porchapi.PackageRevision {

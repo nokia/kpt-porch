@@ -21,27 +21,23 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
 	pb "github.com/nephio-project/porch/func/evaluator"
-	"github.com/regclient/regclient"
-	regclientconfig "github.com/regclient/regclient/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -135,9 +131,6 @@ func TestPodManager(t *testing.T) {
 		Namespace: defaultNamespace,
 		Labels: map[string]string{
 			krmFunctionImageLabel: defaultFunctionImageLabel,
-		},
-		Annotations: map[string]string{
-			templateVersionAnnotation: inlineTemplateVersionv1,
 		},
 	}
 
@@ -259,99 +252,8 @@ func TestPodManager(t *testing.T) {
 		},
 	}
 
-	dummySecretTemplate := &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-secret",
-			Namespace: "test-namespace",
-		},
-		Data: map[string][]byte{
-			"test-key": []byte("test-value"),
-		},
-	}
-
-	basePodTemplate := &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				"cluster-autoscaler.kubernetes.io/safe-to-evict": "true",
-			},
-		},
-		Spec: corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				{
-					Name:  "copy-wrapper-server",
-					Image: "wrapper-server-init",
-					Command: []string{
-						"cp",
-						"-a",
-						"/home/nonroot/wrapper-server/.",
-						volumeMountPath,
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      volumeName,
-							MountPath: volumeMountPath,
-						},
-					},
-				},
-			},
-			Containers: []corev1.Container{
-				{
-					Name:    functionContainerName,
-					Image:   "to-be-replaced",
-					Command: []string{filepath.Join(volumeMountPath, wrapperServerBin)},
-					ReadinessProbe: &corev1.Probe{
-						ProbeHandler: corev1.ProbeHandler{
-							// TODO: use the k8s native GRPC prober when it has been rolled out in GKE.
-							// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-grpc-liveness-probe
-							Exec: &corev1.ExecAction{
-								Command: []string{
-									filepath.Join(volumeMountPath, gRPCProbeBin),
-									"-addr", net.JoinHostPort("localhost", defaultWrapperServerPort),
-								},
-							},
-						},
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      volumeName,
-							MountPath: volumeMountPath,
-						},
-					},
-				},
-			},
-			Volumes: []corev1.Volume{
-				{
-					Name: volumeName,
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				},
-			},
-		},
-	}
-
-	baseServiceTemplate := &corev1.Service{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Service",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      defaultServiceName,
-			Namespace: defaultNamespace,
-		},
-		Spec: corev1.ServiceSpec{
-			Type:      corev1.ServiceTypeClusterIP,
-			ClusterIP: defaultServiceIP,
-		},
-	}
+	basePodTemplate := inlineBasePodTemplate.DeepCopy()
+	baseServiceTemplate := inlineBaseServiceTemplate.DeepCopy()
 
 	// Fake client. When Pod creation is invoked, it creates the Pod if not present
 	// When Service creation is invoked, it creates endpoint object in additon to service
@@ -396,19 +298,22 @@ func TestPodManager(t *testing.T) {
 		return nil
 	}
 
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = configapi.AddToScheme(scheme)
+
 	tests := []struct {
-		name                    string
-		expectFail              bool
-		skip                    bool
-		kubeClient              client.WithWatch
-		namespace               string
-		wrapperServerImage      string
-		imageMetadataCache      map[string]*digestAndEntrypoint
-		evalFunc                func(ctx context.Context, req *pb.EvaluateFunctionRequest) (*pb.EvaluateFunctionResponse, error)
-		functionImage           string
-		functionPodTemplateName string
-		managerNamespace        string
-		podPatchAfter           time.Duration
+		name               string
+		expectFail         bool
+		skip               bool
+		kubeClient         client.WithWatch
+		namespace          string
+		wrapperServerImage string
+		imageMetadataCache map[string]*digestAndEntrypoint
+		evalFunc           func(ctx context.Context, req *pb.EvaluateFunctionRequest) (*pb.EvaluateFunctionResponse, error)
+		functionImage      string
+		managerNamespace   string
+		podPatchAfter      time.Duration
 	}{
 		{
 			name:          "Pod is in deleting state",
@@ -433,10 +338,14 @@ func TestPodManager(t *testing.T) {
 			skip:          false,
 			expectFail:    false,
 			functionImage: defaultImageName,
-			kubeClient: fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-				Create: fakeClientCreateFixInterceptor,
-				Get:    withGetInterceptor(podStatusRunning),
-			}).WithStatusSubresource(&corev1.Pod{}).Build(),
+			kubeClient: fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Create: fakeClientCreateFixInterceptor,
+					Get:    withGetInterceptor(podStatusRunning),
+				}).
+				WithStatusSubresource(&corev1.Pod{}).
+				Build(),
 			namespace:          defaultNamespace,
 			wrapperServerImage: defaultWrapperServerImage,
 			imageMetadataCache: defaultImageMetadataCache,
@@ -584,156 +493,61 @@ func TestPodManager(t *testing.T) {
 			evalFunc:           defaultSuccessEvalFunc,
 		},
 		{
-			name:                    "Function template configmap not found",
-			skip:                    false,
-			expectFail:              true,
-			functionImage:           defaultImageName,
-			kubeClient:              fake.NewClientBuilder().Build(),
-			namespace:               defaultNamespace,
-			wrapperServerImage:      defaultWrapperServerImage,
-			imageMetadataCache:      defaultImageMetadataCache,
-			evalFunc:                defaultSuccessEvalFunc,
-			functionPodTemplateName: defaultFunctionPodTemplateName,
-			managerNamespace:        defaultManagerNamespace,
-		},
-		{
-			name:          "Function template invalid resource type",
-			skip:          false,
-			expectFail:    true,
-			functionImage: defaultImageName,
-			kubeClient: fake.NewClientBuilder().WithObjects([]client.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      defaultFunctionPodTemplateName,
-					Namespace: defaultManagerNamespace,
-				},
-				Data: map[string]string{
-					"template":        string(marshalToYamlOrPanic(dummySecretTemplate)),
-					"serviceTemplate": string(marshalToYamlOrPanic(baseServiceTemplate)),
-				},
-			}}...).Build(),
-			namespace:               defaultNamespace,
-			wrapperServerImage:      defaultWrapperServerImage,
-			imageMetadataCache:      defaultImageMetadataCache,
-			evalFunc:                defaultSuccessEvalFunc,
-			functionPodTemplateName: defaultFunctionPodTemplateName,
-			managerNamespace:        defaultManagerNamespace,
-		},
-		{
-			name:          "Service template invalid resource type",
-			skip:          false,
-			expectFail:    true,
-			functionImage: defaultImageName,
-			kubeClient: fake.NewClientBuilder().WithObjects([]client.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      defaultFunctionPodTemplateName,
-					Namespace: defaultManagerNamespace,
-				},
-				Data: map[string]string{
-					"template":        string(marshalToYamlOrPanic(basePodTemplate)),
-					"serviceTemplate": string(marshalToYamlOrPanic(dummySecretTemplate)),
-				},
-			}}...).Build(),
-			namespace:               defaultNamespace,
-			wrapperServerImage:      defaultWrapperServerImage,
-			imageMetadataCache:      defaultImageMetadataCache,
-			evalFunc:                defaultSuccessEvalFunc,
-			functionPodTemplateName: defaultFunctionPodTemplateName,
-			managerNamespace:        defaultManagerNamespace,
-		},
-		{
-			name:          "Function template under invalid key",
-			skip:          false,
-			expectFail:    true,
-			functionImage: defaultImageName,
-			kubeClient: fake.NewClientBuilder().WithObjects([]client.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      defaultFunctionPodTemplateName,
-					Namespace: defaultManagerNamespace,
-				},
-				Data: map[string]string{
-					"not-template": string(marshalToYamlOrPanic(basePodTemplate)),
-				},
-			}}...).Build(),
-			namespace:               defaultNamespace,
-			wrapperServerImage:      defaultWrapperServerImage,
-			imageMetadataCache:      defaultImageMetadataCache,
-			evalFunc:                defaultSuccessEvalFunc,
-			functionPodTemplateName: defaultFunctionPodTemplateName,
-			managerNamespace:        defaultManagerNamespace,
-		},
-		{
-			name:          "Function template present but Service template missing",
-			skip:          false,
-			expectFail:    true,
-			functionImage: defaultImageName,
-			kubeClient: fake.NewClientBuilder().WithObjects([]client.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      defaultFunctionPodTemplateName,
-					Namespace: defaultManagerNamespace,
-				},
-				Data: map[string]string{
-					"template": string(marshalToYamlOrPanic(basePodTemplate)),
-				},
-			}}...).Build(),
-			namespace:               defaultNamespace,
-			wrapperServerImage:      defaultWrapperServerImage,
-			imageMetadataCache:      defaultImageMetadataCache,
-			evalFunc:                defaultSuccessEvalFunc,
-			functionPodTemplateName: defaultFunctionPodTemplateName,
-			managerNamespace:        defaultManagerNamespace,
+			name:               "Function template configmap not found",
+			skip:               false,
+			expectFail:         true,
+			functionImage:      defaultImageName,
+			kubeClient:         fake.NewClientBuilder().Build(),
+			namespace:          defaultNamespace,
+			wrapperServerImage: defaultWrapperServerImage,
+			imageMetadataCache: defaultImageMetadataCache,
+			evalFunc:           defaultSuccessEvalFunc,
+			managerNamespace:   defaultManagerNamespace,
 		},
 		{
 			name:          "Function template generates pod",
 			skip:          false,
 			expectFail:    false,
 			functionImage: defaultImageName,
-			kubeClient: fake.NewClientBuilder().WithObjects([]client.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      defaultFunctionPodTemplateName,
-					Namespace: defaultManagerNamespace,
-				},
-				Data: map[string]string{
-					"template":        string(marshalToYamlOrPanic(basePodTemplate)),
-					"serviceTemplate": string(marshalToYamlOrPanic(baseServiceTemplate)),
-				},
-			},
-				defaultEndpointObject,
-			}...).WithInterceptorFuncs(interceptor.Funcs{
-				Get: withGetInterceptor(podStatusRunning),
-			}).Build(),
-			namespace:               defaultNamespace,
-			wrapperServerImage:      defaultWrapperServerImage,
-			imageMetadataCache:      defaultImageMetadataCache,
-			evalFunc:                defaultSuccessEvalFunc,
-			functionPodTemplateName: defaultFunctionPodTemplateName,
-			managerNamespace:        defaultManagerNamespace,
+			kubeClient: fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(
+					basePodTemplate,
+					baseServiceTemplate,
+					defaultEndpointObject,
+				).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Get: withGetInterceptor(podStatusRunning),
+				}).
+				Build(),
+			namespace:          defaultNamespace,
+			wrapperServerImage: defaultWrapperServerImage,
+			imageMetadataCache: defaultImageMetadataCache,
+			evalFunc:           defaultSuccessEvalFunc,
+			managerNamespace:   defaultManagerNamespace,
 		},
 		{
 			name:          "Function template update is applied when pod is requested",
 			skip:          false,
 			expectFail:    false,
 			functionImage: defaultImageName,
-			kubeClient: fake.NewClientBuilder().WithObjects([]client.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      defaultFunctionPodTemplateName,
-					Namespace: defaultManagerNamespace,
-				},
-				Data: map[string]string{
-					"template":        string(marshalToYamlOrPanic(basePodTemplate)),
-					"serviceTemplate": string(marshalToYamlOrPanic(baseServiceTemplate)),
-				},
-			},
-				defaultPodObject,
-				defaultEndpointObject,
-			}...).WithInterceptorFuncs(interceptor.Funcs{
-				Get: withGetInterceptor(podStatusRunning),
-			}).Build(),
-			namespace:               defaultNamespace,
-			wrapperServerImage:      defaultWrapperServerImage,
-			imageMetadataCache:      defaultImageMetadataCache,
-			evalFunc:                defaultSuccessEvalFunc,
-			functionPodTemplateName: defaultFunctionPodTemplateName,
-			managerNamespace:        defaultManagerNamespace,
+			kubeClient: fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(
+					basePodTemplate,
+					baseServiceTemplate,
+					defaultPodObject,
+					defaultEndpointObject,
+				).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Get: withGetInterceptor(podStatusRunning),
+				}).
+				Build(),
+			namespace:          defaultNamespace,
+			wrapperServerImage: defaultWrapperServerImage,
+			imageMetadataCache: defaultImageMetadataCache,
+			evalFunc:           defaultSuccessEvalFunc,
+			managerNamespace:   defaultManagerNamespace,
 		},
 		{
 			name:          "Failed pod is deleted and new one is created",
@@ -778,14 +592,13 @@ func TestPodManager(t *testing.T) {
 			//Set up the pod manager
 			podReadyCh := make(chan *podReadyResponse)
 			pm := &podManager{
-				kubeClient:              tt.kubeClient,
-				namespace:               tt.namespace,
-				wrapperServerImage:      tt.wrapperServerImage,
-				imageMetadataCache:      sync.Map{},
-				podReadyCh:              podReadyCh,
-				podReadyTimeout:         5 * time.Second,
-				functionPodTemplateName: tt.functionPodTemplateName,
-				managerNamespace:        tt.managerNamespace,
+				kubeClient:         tt.kubeClient,
+				namespace:          tt.namespace,
+				wrapperServerImage: tt.wrapperServerImage,
+				imageMetadataCache: sync.Map{},
+				podReadyCh:         podReadyCh,
+				podReadyTimeout:    5 * time.Second,
+				managerNamespace:   tt.managerNamespace,
 
 				maxGrpcMessageSize: 4 * 1024 * 1024,
 
@@ -803,7 +616,7 @@ func TestPodManager(t *testing.T) {
 
 			fakeServer.evalFunc = tt.evalFunc
 
-			podConfig := podCacheConfigEntry{}
+			podConfig := &configapi.PodExecutorConfig{}
 
 			//Execute the function under test
 			go pm.getFuncEvalPodClient(ctx, tt.functionImage, 1, podConfig, false)
@@ -998,311 +811,6 @@ func TestMultipleEndpointsWithStuckPod(t *testing.T) {
 		assert.Len(t, finalEndpoint.Subsets[0].Addresses, 1, "Expected endpoint to have exactly 1 address")
 		assert.Equal(t, newPodIP, finalEndpoint.Subsets[0].Addresses[0].IP, "Expected endpoint IP to match new pod IP")
 	}
-}
-
-func TestListRepositoryTags(t *testing.T) {
-	t.Run("custom listRepositoryTagsFunc usage", func(t *testing.T) {
-		ctx := t.Context()
-		podManager := &podManager{
-			// Passing a listRepositoryTagsFunc will return the tags based
-			// on the custom function logic instead of trying to access a registry
-			listRepositoryTagsFunc: func(ctx context.Context, imageName string) ([]string, error) {
-				if imageName == defaultImageName {
-					return []string{"tag1", "tag2"}, nil
-				}
-				return nil, fmt.Errorf("unexpected image name: %s", imageName)
-			},
-		}
-		tags, err := podManager.listRepositoryTags(ctx, defaultImageName)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"tag1", "tag2"}, tags)
-	})
-	t.Run("failed to parse repository", func(t *testing.T) {
-		ctx := t.Context()
-		podManager := &podManager{}
-		// Passing an empty image name should cause a parsing error
-		_, err := podManager.listRepositoryTags(ctx, "")
-		assert.ErrorContains(t, err, "failed to parse repository")
-	})
-	t.Run("private registry - ensureCustomAuthSecret fails", func(t *testing.T) {
-		// API server failure simulation for authentication secret handling when pulling
-		// images from private registries
-
-		authDir := t.TempDir()
-		authPath := filepath.Join(authDir, ".dockerconfigjson")
-		err := os.WriteFile(authPath, []byte(`{"auths":{}}`), 0600)
-		require.NoError(t, err, "failed to write auth file")
-
-		kubeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-				return apierrors.NewInternalError(fmt.Errorf("simulated API server error"))
-			},
-		}).Build()
-
-		ctx := t.Context()
-		pm := &podManager{
-			enablePrivateRegistries: true,
-			registryAuthSecretPath:  authPath,
-			registryAuthSecretName:  defaultRegistryAuthSecret,
-			namespace:               defaultNamespace,
-			kubeClient:              kubeClient,
-		}
-		_, err = pm.listRepositoryTags(ctx, testImageName)
-		assert.ErrorContains(t, err, "simulated API server error")
-	})
-	t.Run("private registry - error reading authentication file", func(t *testing.T) {
-		// registryAuthSecretPath points to a file that does not exist.
-		// -> The secret used for pulling images from private registry cannot be created
-		// because the code cannot read the auth file to populate the secret data.
-
-		kubeClient := fake.NewClientBuilder().Build()
-
-		ctx := t.Context()
-		pm := &podManager{
-			enablePrivateRegistries: true,
-			registryAuthSecretPath:  filepath.Join(t.TempDir(), "nonexistent"),
-			registryAuthSecretName:  defaultRegistryAuthSecret,
-			namespace:               defaultNamespace,
-			kubeClient:              kubeClient,
-		}
-		_, err := pm.listRepositoryTags(ctx, testImageName)
-		assert.ErrorContains(t, err, "no such file or directory")
-	})
-	t.Run("private registry - error unmarshaling authentication file", func(t *testing.T) {
-		// Auth file contains invalid JSON -> The code fails to unmarshal the auth
-		// file content when trying to create the secret for private registry authentication.
-		invalidJSON := []byte(`not valid json`)
-
-		authDir := t.TempDir()
-		authPath := filepath.Join(authDir, ".dockerconfigjson")
-		err := os.WriteFile(authPath, invalidJSON, 0600)
-		require.NoError(t, err, "failed to write auth file")
-
-		existingSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      defaultRegistryAuthSecret,
-				Namespace: defaultNamespace,
-			},
-			Data: map[string][]byte{
-				".dockerconfigjson": invalidJSON,
-			},
-			Type: corev1.SecretTypeDockerConfigJson,
-		}
-		kubeClient := fake.NewClientBuilder().WithObjects(existingSecret).Build()
-
-		ctx := t.Context()
-		pm := &podManager{
-			enablePrivateRegistries: true,
-			registryAuthSecretPath:  authPath,
-			registryAuthSecretName:  defaultRegistryAuthSecret,
-			namespace:               defaultNamespace,
-			kubeClient:              kubeClient,
-		}
-		_, err = pm.listRepositoryTags(ctx, testImageName)
-		assert.ErrorContains(t, err, "error unmarshaling authentication file")
-	})
-	t.Run("private registry - TLS certs not found", func(t *testing.T) {
-		// Both ca.crt and ca.pem are missing from tlsSecretPath, which causes
-		// loadTLSConfig to fail when trying to pull images from private registry with TLS.
-		authData := []byte(`{"auths":{"myregistry.io":{"username":"u","password":"p"}}}`)
-
-		authDir := t.TempDir()
-		authPath := filepath.Join(authDir, ".dockerconfigjson")
-		err := os.WriteFile(authPath, authData, 0600)
-		require.NoError(t, err, "failed to write auth file")
-		existingSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      defaultRegistryAuthSecret,
-				Namespace: defaultNamespace,
-			},
-			Data: map[string][]byte{
-				".dockerconfigjson": authData,
-			},
-			Type: corev1.SecretTypeDockerConfigJson,
-		}
-		kubeClient := fake.NewClientBuilder().WithObjects(existingSecret).Build()
-
-		ctx := t.Context()
-		pm := &podManager{
-			enablePrivateRegistries:    true,
-			enablePrivateRegistriesTls: true,
-			registryAuthSecretPath:     authPath,
-			registryAuthSecretName:     defaultRegistryAuthSecret,
-			tlsSecretPath:              t.TempDir(),
-			namespace:                  defaultNamespace,
-			kubeClient:                 kubeClient,
-		}
-		_, err = pm.listRepositoryTags(ctx, testImageName)
-		assert.ErrorContains(t, err, "ca.crt not found")
-		assert.ErrorContains(t, err, "ca.pem also not found")
-	})
-	t.Run("private registry - TLS ca.crt invalid PEM", func(t *testing.T) {
-		// ca.crt exists in tlsSecretPath, but its content is not valid PEM.
-		// Cannot be parsed any certificates from the data.
-		authData := []byte(`{"auths":{"myregistry.io":{"username":"u","password":"p"}}}`)
-
-		authDir := t.TempDir()
-		authPath := filepath.Join(authDir, ".dockerconfigjson")
-		err := os.WriteFile(authPath, authData, 0600)
-		require.NoError(t, err, "failed to write auth file")
-
-		existingSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      defaultRegistryAuthSecret,
-				Namespace: defaultNamespace,
-			},
-			Data: map[string][]byte{
-				".dockerconfigjson": authData,
-			},
-			Type: corev1.SecretTypeDockerConfigJson,
-		}
-		kubeClient := fake.NewClientBuilder().WithObjects(existingSecret).Build()
-
-		tlsDir := t.TempDir()
-		err = os.WriteFile(filepath.Join(tlsDir, "ca.crt"), []byte("not a valid cert"), 0600)
-		require.NoError(t, err, "failed to write ca.crt")
-
-		ctx := t.Context()
-		pm := &podManager{
-			enablePrivateRegistries:    true,
-			enablePrivateRegistriesTls: true,
-			registryAuthSecretPath:     authPath,
-			registryAuthSecretName:     defaultRegistryAuthSecret,
-			tlsSecretPath:              tlsDir,
-			namespace:                  defaultNamespace,
-			kubeClient:                 kubeClient,
-		}
-		_, err = pm.listRepositoryTags(ctx, testImageName)
-		assert.ErrorContains(t, err, "failed to load TLS config")
-	})
-	t.Run("private registry - TLS ca.pem fallback invalid PEM", func(t *testing.T) {
-		// ca.crt is missing, so the code falls back to ca.pem. ca.pem exists
-		// but contains invalid PEM data, causing loadTLSConfig to fail.
-		authData := []byte(`{"auths":{"myregistry.io":{"username":"u","password":"p"}}}`)
-
-		authDir := t.TempDir()
-		authPath := filepath.Join(authDir, ".dockerconfigjson")
-		err := os.WriteFile(authPath, authData, 0600)
-		require.NoError(t, err, "failed to write auth file")
-		existingSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      defaultRegistryAuthSecret,
-				Namespace: defaultNamespace,
-			},
-			Data: map[string][]byte{
-				".dockerconfigjson": authData,
-			},
-			Type: corev1.SecretTypeDockerConfigJson,
-		}
-		kubeClient := fake.NewClientBuilder().WithObjects(existingSecret).Build()
-
-		tlsDir := t.TempDir()
-		err = os.WriteFile(filepath.Join(tlsDir, "ca.pem"), []byte("not a valid cert"), 0600)
-		require.NoError(t, err, "failed to write ca.crt")
-		ctx := t.Context()
-		pm := &podManager{
-			enablePrivateRegistries:    true,
-			enablePrivateRegistriesTls: true,
-			registryAuthSecretPath:     authPath,
-			registryAuthSecretName:     defaultRegistryAuthSecret,
-			tlsSecretPath:              tlsDir,
-			namespace:                  defaultNamespace,
-			kubeClient:                 kubeClient,
-		}
-		_, err = pm.listRepositoryTags(ctx, testImageName)
-		assert.ErrorContains(t, err, "failed to load TLS config")
-	})
-	t.Run("private registry - valid auth without TLS", func(t *testing.T) {
-		// Valid auth file with proper Docker config JSON. However, still we face with error
-		// as there is no real registry to connect to. The error should NOT come from auth
-		// resolution or file parsing.
-		authData := []byte(`{"auths":{"myregistry.io":{"username":"u","password":"p"}}}`)
-
-		authDir := t.TempDir()
-		authPath := filepath.Join(authDir, ".dockerconfigjson")
-		err := os.WriteFile(authPath, authData, 0600)
-		require.NoError(t, err, "failed to write auth file")
-
-		existingSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      defaultRegistryAuthSecret,
-				Namespace: defaultNamespace,
-			},
-			Data: map[string][]byte{
-				".dockerconfigjson": authData,
-			},
-			Type: corev1.SecretTypeDockerConfigJson,
-		}
-		kubeClient := fake.NewClientBuilder().WithObjects(existingSecret).Build()
-
-		ctx := t.Context()
-		pm := &podManager{
-			enablePrivateRegistries: true,
-			registryAuthSecretPath:  authPath,
-			registryAuthSecretName:  defaultRegistryAuthSecret,
-			namespace:               defaultNamespace,
-			kubeClient:              kubeClient,
-		}
-		_, err = pm.listRepositoryTags(ctx, testImageName)
-		assert.Error(t, err)
-		assert.NotContains(t, err.Error(), "error resolving default keychain")
-		assert.NotContains(t, err.Error(), "error reading authentication file")
-		assert.NotContains(t, err.Error(), "error unmarshaling authentication file")
-	})
-	t.Run("authentication issue during tag listing", func(t *testing.T) {
-		// A local HTTP server simulates a Docker v2 registry that requires
-		// authentication. All requests return 401 Unauthorized so that
-		// regclient must attempt credential resolution.
-
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Docker-Distribution-Api-Version", "registry/2.0")
-			w.Header().Set("WWW-Authenticate", `Basic realm="test-registry"`)
-			w.WriteHeader(http.StatusUnauthorized)
-		}))
-		defer ts.Close()
-
-		registryAddr := strings.TrimPrefix(ts.URL, "http://")
-
-		ctx := t.Context()
-		pm := &podManager{
-			regclientExtraOpts: []regclient.Opt{
-				regclient.WithConfigHost(regclientconfig.Host{
-					Name:     registryAddr,
-					Hostname: registryAddr,
-					// disabling TLS for the local host so regclient
-					// connects over plain HTTP instead of HTTPS, avoiding DNS resolution
-					TLS: regclientconfig.TLSDisabled,
-				}),
-			},
-		}
-		_, err := pm.listRepositoryTags(ctx, registryAddr+"/"+testImageName)
-		assert.ErrorContains(t, err, "unauthorized")
-	})
-	t.Run("successful execution", func(t *testing.T) {
-		// A local HTTP server simulates a Docker v2 registry
-
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Docker-Distribution-Api-Version", "registry/2.0")
-			w.Header().Set("WWW-Authenticate", `Basic realm="test-registry"`)
-			//w.WriteHeader(http.StatusUnauthorized)
-		}))
-		defer ts.Close()
-
-		registryAddr := strings.TrimPrefix(ts.URL, "http://")
-
-		ctx := t.Context()
-		pm := &podManager{
-			regclientExtraOpts: []regclient.Opt{
-				regclient.WithConfigHost(regclientconfig.Host{
-					Name:     registryAddr,
-					Hostname: registryAddr,
-					TLS:      regclientconfig.TLSDisabled,
-				}),
-			},
-		}
-		_, err := pm.listRepositoryTags(ctx, registryAddr+"/"+testImageName)
-		assert.NoError(t, err)
-	})
 }
 
 // Fake client handles pod patches incorrectly in case the pod doesn't exist

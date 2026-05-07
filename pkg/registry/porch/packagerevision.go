@@ -1,4 +1,4 @@
-// Copyright 2022, 2024 The kpt and Nephio Authors
+// Copyright 2022, 2024-2026 The kpt and Nephio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,6 +78,8 @@ func (r *packageRevisions) List(ctx context.Context, options *metainternalversio
 
 	klog.V(3).InfoS("[API] List operation started for PackageRevisions", context1.LogMetadataFrom(ctx)...)
 
+	ns, _ := genericapirequest.NamespaceFrom(ctx)
+
 	result := &porchapi.PackageRevisionList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PackageRevisionList",
@@ -85,7 +87,7 @@ func (r *packageRevisions) List(ctx context.Context, options *metainternalversio
 		},
 	}
 
-	filter, err := parsePackageRevisionFieldSelector(options)
+	filter, err := parsePackageRevisionFieldSelector(options, ns)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +177,10 @@ func (r *packageRevisions) Create(ctx context.Context, runtimeObject runtime.Obj
 	repositoryObj, err := r.getRepositoryObj(ctx, types.NamespacedName{Name: repositoryName, Namespace: ns})
 	if err != nil {
 		return nil, err
+	}
+
+	if isV1Alpha2Repo(repositoryObj) {
+		return nil, apierrors.NewGone(fmt.Sprintf("repository %q is managed by v1alpha2; use the v1alpha2 API", repositoryName))
 	}
 
 	fieldErrors := r.createStrategy.Validate(ctx, runtimeObject)
@@ -278,7 +284,11 @@ func (r *packageRevisions) Update(ctx context.Context, name string, objInfo rest
 
 	ctx = context1.WithNewRequestIDAndPackageRevision(ctx, name)
 
-	return r.updatePackageRevision(ctx, name, objInfo, createValidation, updateValidation, forceAllowCreate)
+	runTimeObj, ok, err := r.updatePackageRevision(ctx, name, objInfo, createValidation, updateValidation, forceAllowCreate)
+	if err != nil {
+		klog.ErrorS(err, "[API] PackageRevision update operation failed", context1.LogMetadataFrom(ctx)...)
+	}
+	return runTimeObj, ok, err
 }
 
 // Delete implements the GracefulDeleter interface.

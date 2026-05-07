@@ -15,14 +15,19 @@
 package repository
 
 import (
+	"context"
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	porchapi "github.com/nephio-project/porch/api/porch/v1alpha1"
+	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
 	"github.com/nephio-project/porch/pkg/util"
+	pkgerrors "github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 func ToAPIReadinessGates(kf kptfilev1.KptFile) []porchapi.ReadinessGate {
@@ -187,4 +192,52 @@ func PathsOverlap(path1, path2 string) bool {
 		return true
 	}
 	return false
+}
+
+func PackageRevisionIsPlaceholder(ctx context.Context, namespace string, referenceResolver ReferenceResolver, packageRevision PackageRevision) (bool, error) {
+	if packageRevision.Key().Revision != -1 {
+		return false, nil
+	}
+
+	var upstreamRepo configapi.Repository
+	err := referenceResolver.ResolveReference(ctx, namespace, packageRevision.Key().RKey().Name, &upstreamRepo)
+	if err != nil {
+		return false, pkgerrors.Wrapf(err, "failed to resolve repository reference for %q when checking placeholder revision: %v", packageRevision.Key().RKey().Name, err)
+	}
+
+	if upstreamRepo.Spec.Git != nil && packageRevision.Key().WorkspaceName == upstreamRepo.Spec.Git.Branch {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func WriteResourcesToFS(fs filesys.FileSystem, rootDir string, resources map[string]string) (string, error) {
+	if rootDir != "" {
+		if err := fs.MkdirAll(rootDir); err != nil {
+			return "", err
+		}
+	}
+
+	var packageDir string
+	for k, v := range resources {
+		dir := path.Dir(k)
+		if dir == "." {
+			dir = "/"
+		}
+
+		fullDir := path.Join(rootDir, dir)
+		if err := fs.MkdirAll(fullDir); err != nil {
+			return "", err
+		}
+		if err := fs.WriteFile(path.Join(fullDir, path.Base(k)), []byte(v)); err != nil {
+			return "", err
+		}
+		if path.Base(k) == "Kptfile" {
+			if packageDir == "" || dir == "/" || strings.HasPrefix(packageDir, dir+"/") {
+				packageDir = dir
+			}
+		}
+	}
+	return packageDir, nil
 }

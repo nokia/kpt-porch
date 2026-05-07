@@ -1,4 +1,4 @@
-// Copyright 2022, 2026 The kpt and Nephio Authors
+// Copyright 2022 The kpt and Nephio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,70 +18,90 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
 
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	"github.com/kptdev/kpt/pkg/fn"
+	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
+	"github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
 	pb "github.com/nephio-project/porch/func/evaluator"
+	"github.com/nephio-project/porch/pkg/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
 )
 
 const (
-	baseConfigFile         = "testdata/config.yaml"
-	badFormattedConfigFile = "testdata/config_bad_format.yaml"
-	defaultKRMImagePrefix  = "ghcr.io/kptdev/krm-functions-catalog/"
-	setImageFunction       = "set-image"
-	testCacheDir           = "/tmp/func_cache"
+	defaultKRMImagePrefix = "ghcr.io/kptdev/krm-functions-catalog/"
+	setImageFunction      = "set-image"
+	starlarkFunction      = "starlark"
 )
 
+func getFunctionConfigStore(binaryDir string) *reconciler.FunctionConfigStore {
+	starlarkConfig := &configapi.FunctionConfig{
+		Spec: configapi.FunctionConfigSpec{
+			Image: starlarkFunction,
+			Prefixes: []string{
+				"",
+			},
+			BinaryExecutor: &configapi.BinaryExecutorConfig{
+				Tags: []string{
+					"v0.5.2",
+					"v0.5.3",
+				},
+				Path: starlarkFunction,
+			},
+		},
+	}
+	setImageConfig := &configapi.FunctionConfig{
+		Spec: configapi.FunctionConfigSpec{
+			Image: setImageFunction,
+			Prefixes: []string{
+				"",
+			},
+			BinaryExecutor: &configapi.BinaryExecutorConfig{
+				Tags: []string{
+					"v0.1.2",
+					"v0.1.3",
+				},
+				Path: setImageFunction,
+			},
+		},
+	}
+	fstore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, binaryDir)
+	fstore.UpdateBinaryCache(starlarkFunction, starlarkConfig)
+	fstore.UpdateBinaryCache(setImageFunction, setImageConfig)
+	return fstore
+}
+
 func TestNewExecutableEvaluator(t *testing.T) {
-	t.Run("failed to read configuration file", func(t *testing.T) {
-		executableEvaluatorOptions := ExecutableEvaluatorOptions{
-			ConfigFileName:   "testdata/executable_evaluator_config.yaml",
-			FunctionCacheDir: testCacheDir,
-		}
-
-		_, err := NewExecutableEvaluator(executableEvaluatorOptions)
-		assert.ErrorContains(t, err, "failed to read configuration file")
-	})
-	t.Run("failed to parse configuration file", func(t *testing.T) {
-		executableEvaluatorOptions := ExecutableEvaluatorOptions{
-			ConfigFileName:   badFormattedConfigFile,
-			FunctionCacheDir: testCacheDir,
-		}
-
-		_, err := NewExecutableEvaluator(executableEvaluatorOptions)
-		assert.ErrorContains(t, err, "failed to parse configuration file")
-	})
+	const tempCacheDir = "/tmp/func_cache"
 	t.Run("no errors", func(t *testing.T) {
 		executableEvaluatorOptions := ExecutableEvaluatorOptions{
-			ConfigFileName:   baseConfigFile,
-			FunctionCacheDir: testCacheDir,
+			FunctionCacheDir: tempCacheDir,
 		}
-
-		_, err := NewExecutableEvaluator(executableEvaluatorOptions)
+		fStore := getFunctionConfigStore(executableEvaluatorOptions.FunctionCacheDir)
+		_, err := NewExecutableEvaluator(fStore)
 		assert.NoError(t, err)
 	})
 }
 
 func TestEvaluateExecutableFunction(t *testing.T) {
+	const tempCacheDir = "/tmp/func_cache"
 	t.Run("invalid semver constraint will cause function not found error", func(t *testing.T) {
 		ctx := t.Context()
 		executableEvaluatorOptions := ExecutableEvaluatorOptions{
-			ConfigFileName:   baseConfigFile,
-			FunctionCacheDir: testCacheDir,
+			FunctionCacheDir: tempCacheDir,
 		}
 
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte("req-rl"),
-			Image:        defaultKRMImagePrefix + testImageName,
-			Tag:          ">> 1.2.3 < 1.3.0", // Invalid semver constraint, '>>' is not a valid operator
+			Image:        util.ImageJoin(defaultKRMImagePrefix, testImageName),
+			Tag:          ">> 0.1.3 < 0.2.0", // Invalid semver constraint, '>>' is not a valid operator
 		}
 
-		evaluator, _ := NewExecutableEvaluator(executableEvaluatorOptions)
+		fStore := getFunctionConfigStore(executableEvaluatorOptions.FunctionCacheDir)
+		evaluator, _ := NewExecutableEvaluator(fStore)
 		resp, err := evaluator.EvaluateFunction(ctx, req)
 
 		assert.Nil(t, resp)
@@ -89,57 +109,56 @@ func TestEvaluateExecutableFunction(t *testing.T) {
 			Function: kptfilev1.Function{Image: req.Image},
 		}, err)
 	})
-	t.Run("function not found", func(t *testing.T) {
+	t.Run("function is not included in the config", func(t *testing.T) {
 		ctx := t.Context()
 		executableEvaluatorOptions := ExecutableEvaluatorOptions{
-			ConfigFileName:   baseConfigFile,
-			FunctionCacheDir: testCacheDir,
+			FunctionCacheDir: tempCacheDir,
 		}
 
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte("req-rl"),
 			// This image is not included in the config.yaml -> function not found
-			Image: defaultKRMImagePrefix + testImageName,
-			Tag:   "> 1.2.3 < 1.3.0", // This is a valid semver constraint syntax
+			Image: util.ImageJoin(defaultKRMImagePrefix, testImageName),
+			Tag:   "> 0.1.3 < 0.2.0", // This is a valid semver constraint syntax
 		}
 
-		evaluator, _ := NewExecutableEvaluator(executableEvaluatorOptions)
+		fStore := getFunctionConfigStore(executableEvaluatorOptions.FunctionCacheDir)
+		evaluator, _ := NewExecutableEvaluator(fStore)
 		_, err := evaluator.EvaluateFunction(ctx, req)
 		assert.Equal(t, fmt.Sprintf("function \"%s\" not found", req.Image), err.Error())
 	})
 	t.Run("function does not match the semantic version constraints", func(t *testing.T) {
 		ctx := t.Context()
 		executableEvaluatorOptions := ExecutableEvaluatorOptions{
-			ConfigFileName:   baseConfigFile,
-			FunctionCacheDir: testCacheDir,
+			FunctionCacheDir: tempCacheDir,
 		}
 
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte("req-rl"),
-			Image:        defaultKRMImagePrefix + setImageFunction,
+			Image:        util.ImageJoin(defaultKRMImagePrefix, setImageFunction),
 			Tag:          "> 0.1.3 < 0.2.0",
 		}
 
-		evaluator, _ := NewExecutableEvaluator(executableEvaluatorOptions)
+		fStore := getFunctionConfigStore(executableEvaluatorOptions.FunctionCacheDir)
+		evaluator, _ := NewExecutableEvaluator(fStore)
 		_, err := evaluator.EvaluateFunction(ctx, req)
 		assert.ErrorContains(t, err, fmt.Sprintf("function \"%s\" not found", req.Image), err.Error())
 	})
-
 	t.Run("failed to execute function", func(t *testing.T) {
 		ctx := t.Context()
 		executableEvaluatorOptions := ExecutableEvaluatorOptions{
-			ConfigFileName: baseConfigFile,
-			// Cache dir does not contain the executable binary -> execution will fail
-			FunctionCacheDir: testCacheDir,
+			FunctionCacheDir: tempCacheDir, // function cache dir is not exist
 		}
 
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte("req-rl"),
-			Image:        defaultKRMImagePrefix + setImageFunction,
+			Image:        util.ImageJoin(defaultKRMImagePrefix, setImageFunction),
 			Tag:          ">= 0.1.2 < 0.2.0",
 		}
 
-		evaluator, _ := NewExecutableEvaluator(executableEvaluatorOptions)
+		fStore := getFunctionConfigStore(executableEvaluatorOptions.FunctionCacheDir)
+
+		evaluator, _ := NewExecutableEvaluator(fStore)
 		_, err := evaluator.EvaluateFunction(ctx, req)
 		assert.ErrorContains(t, err, fmt.Sprintf("Failed to execute function \"%s\":", req.Image))
 	})
@@ -150,8 +169,7 @@ func TestEvaluateExecutableFunction(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create a simple test executable that echoes input as a valid KRM function
-		testBinary := filepath.Join(tmpDir, setImageFunction)
-
+		testBinary := util.ImageJoin(tmpDir, setImageFunction)
 		const testScript = `#!/bin/sh
 # Emulating the KRM function execution by running this shell script
 cat
@@ -161,7 +179,6 @@ exit 0
 		assert.NoError(t, err)
 
 		executableEvaluatorOptions := ExecutableEvaluatorOptions{
-			ConfigFileName:   baseConfigFile,
 			FunctionCacheDir: tmpDir,
 		}
 
@@ -175,7 +192,7 @@ items: []
 		// We expect v0.1.3 to be selected as it's the greatest version
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte(resourceList),
-			Image:        defaultKRMImagePrefix + setImageFunction,
+			Image:        util.ImageJoin(defaultKRMImagePrefix, setImageFunction),
 			Tag:          ">= 0.1.2 < 0.2.0",
 		}
 
@@ -184,7 +201,8 @@ items: []
 		r, w, _ := os.Pipe()
 		os.Stderr = w
 
-		evaluator, err := NewExecutableEvaluator(executableEvaluatorOptions)
+		fStore := getFunctionConfigStore(executableEvaluatorOptions.FunctionCacheDir)
+		evaluator, err := NewExecutableEvaluator(fStore)
 		require.NoError(t, err)
 
 		resp, err := evaluator.EvaluateFunction(ctx, req)
@@ -214,7 +232,7 @@ items: []
 		tmpDir := t.TempDir()
 
 		// Create a simple test executable that echoes input as a valid KRM function
-		testBinary := filepath.Join(tmpDir, setImageFunction)
+		testBinary := util.ImageJoin(tmpDir, setImageFunction)
 		const testScript = `#!/bin/sh
 # Emulating the KRM function execution by running this shell script
 cat
@@ -224,7 +242,6 @@ exit 0
 		require.NoError(t, err)
 
 		executableEvaluatorOptions := ExecutableEvaluatorOptions{
-			ConfigFileName:   baseConfigFile,
 			FunctionCacheDir: tmpDir,
 		}
 
@@ -237,7 +254,7 @@ items: []
 		// Explicit tagging
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte(resourceList),
-			Image:        defaultKRMImagePrefix + setImageFunction + ":v0.1.3",
+			Image:        util.ImageJoin(defaultKRMImagePrefix, setImageFunction) + ":v0.1.3",
 		}
 
 		// Capture klog output by redirecting stderr
@@ -245,7 +262,8 @@ items: []
 		r, w, _ := os.Pipe()
 		os.Stderr = w
 
-		evaluator, err := NewExecutableEvaluator(executableEvaluatorOptions)
+		fStore := getFunctionConfigStore(executableEvaluatorOptions.FunctionCacheDir)
+		evaluator, err := NewExecutableEvaluator(fStore)
 		require.NoError(t, err)
 
 		resp, err := evaluator.EvaluateFunction(ctx, req)
@@ -273,7 +291,7 @@ items: []
 		tmpDir := t.TempDir()
 
 		// Create a simple test executable that echoes input as a valid KRM function
-		testBinary := filepath.Join(tmpDir, setImageFunction)
+		testBinary := util.ImageJoin(tmpDir, setImageFunction)
 		const testScript = `#!/bin/sh
 # Emulating the KRM function execution by running this shell script
 cat
@@ -283,7 +301,6 @@ exit 0
 		require.NoError(t, err)
 
 		executableEvaluatorOptions := ExecutableEvaluatorOptions{
-			ConfigFileName:   baseConfigFile,
 			FunctionCacheDir: tmpDir,
 		}
 
@@ -295,7 +312,7 @@ items: []
 
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte(resourceList),
-			Image:        defaultKRMImagePrefix + setImageFunction + ":v0.0.1",
+			Image:        util.ImageJoin(defaultKRMImagePrefix, setImageFunction) + ":v0.0.1",
 			Tag:          ">= 0.1.2 < 0.2.0",
 		}
 
@@ -304,7 +321,8 @@ items: []
 		r, w, _ := os.Pipe()
 		os.Stderr = w
 
-		evaluator, err := NewExecutableEvaluator(executableEvaluatorOptions)
+		fStore := getFunctionConfigStore(executableEvaluatorOptions.FunctionCacheDir)
+		evaluator, err := NewExecutableEvaluator(fStore)
 		require.NoError(t, err)
 
 		resp, err := evaluator.EvaluateFunction(ctx, req)

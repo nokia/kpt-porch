@@ -241,11 +241,12 @@ func (r *dbRepository) CreatePackageRevisionDraft(ctx context.Context, newPR *po
 			Revision:      0,
 			WorkspaceName: newPR.Spec.WorkspaceName,
 		},
-		meta:      newPR.ObjectMeta,
-		spec:      &newPR.Spec,
-		lifecycle: porchapi.PackageRevisionLifecycleDraft,
-		updated:   time.Now(),
-		updatedBy: getCurrentUser(),
+		meta:       newPR.ObjectMeta,
+		spec:       &newPR.Spec,
+		lifecycle:  porchapi.PackageRevisionLifecycleDraft,
+		updated:    time.Now(),
+		updatedBy:  getCurrentUser(),
+		deployment: r.deployment,
 	}
 
 	dbPkgRev.meta.CreationTimestamp = metav1.Time{Time: time.Now()}
@@ -377,6 +378,10 @@ func (r *dbRepository) UpdatePackageRevision(ctx context.Context, updatePR repos
 	updatePkgRev, ok := updatePR.(*dbPackageRevision)
 	if !ok {
 		return nil, fmt.Errorf("cannot update DB package revision %T", updatePR)
+	}
+
+	if updatePkgRev.repo == nil {
+		updatePkgRev.repo = r
 	}
 
 	if err := updatePkgRev.UpdatePackageRevision(ctx); err != nil {

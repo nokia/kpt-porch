@@ -84,6 +84,7 @@ type dbPackageRevision struct {
 	lifecycle     porchapi.PackageRevisionLifecycle
 	extPRID       kptfile.Locator
 	latest        bool
+	deployment    bool
 	tasks         []porchapi.Task
 	resources     map[string]string
 	kptfileStatus kptfileStatus
@@ -129,7 +130,7 @@ func (pr *dbPackageRevision) savePackageRevision(ctx context.Context, saveResour
 	_, span := tracer.Start(ctx, "dbPackageRevision::savePackageRevision", trace.WithAttributes())
 	defer span.End()
 
-	if saveResources && pr.repo.deployment {
+	if saveResources && pr.deployment {
 		pr.updated = time.Now()
 		pr.updatedBy = getCurrentUser()
 	}
@@ -230,18 +231,13 @@ func (pr *dbPackageRevision) GetPackageRevision(ctx context.Context) (*porchapi.
 		return nil, fmt.Errorf("invalid package revision: nil object")
 	}
 
-	if pr.repo == nil {
-		klog.Warningf("package revision %+v has nil repository, skipping", pr.Key())
-		return nil, fmt.Errorf("package revision %s has no associated repository (may be deleted or not yet cached)", pr.KubeObjectName())
-	}
-
 	_, upstreamLock, _ := pr.GetUpstreamLock(ctx)
 	_, selfLock, _ := pr.GetLock(ctx)
 
 	status := porchapi.PackageRevisionStatus{
 		UpstreamLock: repository.KptUpstreamLock2APIUpstreamLock(upstreamLock),
 		SelfLock:     repository.KptUpstreamLock2APIUpstreamLock(selfLock),
-		Deployment:   pr.repo.deployment,
+		Deployment:   pr.deployment,
 		Conditions:   pr.kptfileStatus.Conditions,
 	}
 
@@ -357,6 +353,7 @@ func (pr *dbPackageRevision) ToMainPackageRevision(ctx context.Context) reposito
 		lifecycle:     pr.lifecycle,
 		extPRID:       pr.extPRID,
 		latest:        false,
+		deployment:    pr.deployment,
 		tasks:         pr.tasks,
 		resources:     pr.resources,
 		kptfileStatus: pr.kptfileStatus,
@@ -387,6 +384,10 @@ func (pr *dbPackageRevision) SetMeta(ctx context.Context, meta metav1.ObjectMeta
 
 func (pr *dbPackageRevision) IsLatestRevision() bool {
 	return pr.latest
+}
+
+func (pr *dbPackageRevision) GetCommitInfo() (time.Time, string) {
+	return pr.updated, pr.updatedBy
 }
 
 func (pr *dbPackageRevision) GetKptfile(ctx context.Context) (kptfile.KptFile, error) {
@@ -455,6 +456,10 @@ func (pr *dbPackageRevision) copyToThis(otherPr *dbPackageRevision) {
 func (pr *dbPackageRevision) UpdateResources(ctx context.Context, new *porchapi.PackageRevisionResources, change *porchapi.Task) error {
 	_, span := tracer.Start(ctx, "dbPackageRevision::UpdateResources", trace.WithAttributes())
 	defer span.End()
+
+	if pr.repo == nil {
+		return fmt.Errorf("cannot update resources for package revision %s: no associated repository", pr.KubeObjectName())
+	}
 
 	if pr.repo.pushDraftsToGit && pr.gitPRDraft != nil {
 		klog.InfoS("[DB Cache] Updating resources in memory and in Git draft for PackageRevision", context1.LogMetadataFrom(ctx)...)

@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kptdev/kpt/pkg/fn/runtime"
 	pb "github.com/nephio-project/porch/func/evaluator"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -109,6 +110,11 @@ func TestPodEvaluatorExecutionParallel(t *testing.T) {
 
 	pe := &podEvaluator{
 		requestCh: reqCh,
+		podCacheManager: &podCacheManager{
+			podManager: &podManager{
+				tagResolver: runtime.TagResolver{},
+			},
+		},
 	}
 
 	req := &pb.EvaluateFunctionRequest{ResourceList: []byte(`{}`), Image: "test-image"}
