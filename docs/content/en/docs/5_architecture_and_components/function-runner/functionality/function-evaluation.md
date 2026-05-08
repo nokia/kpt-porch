@@ -8,7 +8,7 @@ description: |
 
 ## Overview
 
-Function evaluation is the core responsibility of the Function Runner - executing KRM (Kubernetes Resource Model) functions through pluggable evaluator strategies. The system uses a strategy pattern where different evaluators handle function execution in different ways (pod-based, executable, or chained), all conforming to a common interface.
+Function evaluation is the core responsibility of the Function Runner - executing KRM (Kubernetes Resource Model) functions through pluggable evaluator strategies. The system uses a strategy pattern where different evaluators handle function execution in different ways (pod-based, executable, or chained), all conforming to a common interface. Configuration is managed via FunctionConfig CRDs that define image matching rules and executor-specific settings.
 
 ### High-Level Architecture
 
@@ -17,13 +17,22 @@ Function evaluation is the core responsibility of the Function Runner - executin
 │           Function Evaluation System                    │
 │                                                         │
 │  ┌──────────────────┐      ┌──────────────────┐         │
-│  │   Evaluator      │      │   Execution      │         │
-│  │   Interface      │ ───> │   Strategies     │         │
+│  │  FunctionConfig  │      │   Execution      │         │
+│  │      CRDs        │ ───> │   Strategies     │         │
 │  │                  │      │                  │         │
-│  │  • Common        │      │  • Pod Evaluator │         │
-│  │    Contract      │      │  • Exec Evaluator│         │
-│  │  • Pluggable     │      │  • Multi Eval    │         │
-│  └──────────────────┘      └──────────────────┘         │
+│  │  • Image Match   │      │  • Pod Evaluator │         │
+│  │  • Executor Type │      │  • Exec Evaluator│         │
+│  │  • Configuration │      │  • Multi Eval    │         │
+│  └────────┬─────────┘      └──────────────────┘         │
+│           │                         │                   │
+│           ↓                         │                   │
+│  ┌──────────────────┐               │                   │
+│  │   Reconciler     │               │                   │
+│  │                  │               │                   │
+│  │  • Watch CRDs    │               │                   │
+│  │  • Populate      │               │                   │
+│  │    Cache         │               │                   │
+│  └────────┬─────────┘               │                   │
 │           │                         │                   │
 │           └────────┬────────────────┘                   │
 │                    ↓                                    │
@@ -70,12 +79,14 @@ Three evaluator implementations provide different execution strategies:
 - Uses wrapper server for gRPC interface
 - Manages pod cache with TTL-based expiration
 - Handles service mesh compatibility via ClusterIP services
+- Configuration driven by FunctionConfig PodExecutor settings
 
 **Executable Evaluator:**
 - Executes pre-cached function binaries locally
-- Configuration file maps images to binary paths
+- FunctionConfig CRDs map images to binary paths
 - Fast execution without pod overhead
 - Returns NotFoundError for uncached functions
+- Configuration driven by FunctionConfig BinaryExecutor settings
 
 **Multi-Evaluator:**
 - Chains multiple evaluators together
@@ -85,7 +96,51 @@ Three evaluator implementations provide different execution strategies:
 
 ## Pod Evaluator
 
-Executes functions in Kubernetes pods with caching and lifecycle management.
+Executes functions in Kubernetes pods with caching and lifecycle management. Pod configuration is now driven by FunctionConfig CRDs.
+
+### FunctionConfig-Based Pod Configuration
+
+The pod evaluator uses FunctionConfig CRDs to determine pod execution parameters:
+
+**Configuration structure:**
+- FunctionConfig CRDs define pod execution settings
+- PodExecutor section specifies TTL, templates, and resources
+- Multiple tags can share pod configuration
+- Template overrides customize pod and container specs
+
+**Pod configuration options:**
+- **TimeToLive**: Duration pods remain cached before cleanup
+- **TemplateOverrides**: Customize pod and container settings
+  - ServiceAccountName: Override service account
+  - SecurityContext: Pod security settings
+  - Container resources, env, envFrom: Container customizations
+  - InitContainer resources, env, envFrom: Init container customizations
+
+**Example FunctionConfig for pod executor:**
+
+```yaml
+apiVersion: config.porch.kpt.dev/v1alpha1
+kind: FunctionConfig
+metadata:
+  name: apply-setters
+  namespace: porch-fn-system
+spec:
+  image: apply-setters
+  prefixes:
+    - ""
+    - ghcr.io/kptdev/krm-functions-catalog
+  podExecutor:
+    tags:
+      - v0.2.2
+    timeToLive: 30m
+    templateOverrides:
+      container:
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            memory: 256Mi
+```
 
 ### Channel-Based Communication
 
@@ -164,26 +219,44 @@ Executes pre-cached function binaries locally for fast execution.
 
 ### Configuration-Based Caching
 
-The executable evaluator uses a configuration file to map images to binaries:
+The executable evaluator uses FunctionConfig CRDs to map images to binaries:
 
 **Configuration structure:**
-- YAML file with functions array
-- Each function has name and images list
-- Images map to binary in cache directory
+- FunctionConfig CRDs define image matching rules
+- Each FunctionConfig specifies image name, prefixes, and tags
+- BinaryExecutor section maps specific tags to local binary paths
+- Embedded reconciler watches FunctionConfigs and populates internal cache
 
 **Configuration benefits:**
 - Explicit control over cached functions
 - No automatic caching (predictable behavior)
-- Simple file-based configuration
-- Easy to update without restart
+- Dynamic updates via Kubernetes API
+- Cache automatically syncs with CRD changes
 
 ### Function Cache Lookup
 
 **Lookup characteristics:**
-- Simple map lookup by image name
+- Cache queried with full image reference
+- Best matching FunctionConfig entry selected
 - Fast O(1) operation
 - NotFoundError triggers fallback in multi-evaluator
-- No network or Kubernetes API calls
+- No network or Kubernetes API calls during lookup
+
+### FunctionConfig Reconciler
+
+The function-runner includes an embedded FunctionConfig reconciler:
+
+**Reconciler responsibilities:**
+- Watches FunctionConfig CRDs in function namespace
+- Populates internal cache on FunctionConfig changes
+- Maps image references to executor configurations
+- Updates status to indicate successful application
+
+**Cache structure:**
+- Map from full image reference to binary path
+- Includes image prefix resolution
+- Handles multiple tags per function
+- Prevents duplicate image registrations
 
 ### Local Execution
 
@@ -202,6 +275,27 @@ Binary execution happens in-process:
 - No Kubernetes API overhead
 - Millisecond execution times
 - Predictable performance
+
+**Example FunctionConfig for binary executor:**
+
+```yaml
+apiVersion: config.porch.kpt.dev/v1alpha1
+kind: FunctionConfig
+metadata:
+  name: apply-setters
+  namespace: porch-fn-system
+spec:
+  image: apply-setters
+  prefixes:
+    - ""
+    - ghcr.io/kptdev/krm-functions-catalog
+  binaryExecutor:
+    tags:
+      - v0.2.0
+    path: apply-setters
+```
+
+This configuration maps `apply-setters:v0.2.0` to the local binary at `./functions/apply-setters`.
 
 ## Multi-Evaluator
 
@@ -232,6 +326,36 @@ Chains multiple evaluators with fallback logic.
 - Other errors indicate actual execution problems
 - Fallback only makes sense for missing functions
 - Prevents masking real errors
+
+### Multi-Executor FunctionConfig
+
+A single FunctionConfig can define multiple executor types for different tags:
+
+```yaml
+apiVersion: config.porch.kpt.dev/v1alpha1
+kind: FunctionConfig
+metadata:
+  name: apply-setters
+  namespace: porch-fn-system
+spec:
+  image: apply-setters
+  prefixes:
+    - ""
+    - ghcr.io/kptdev/krm-functions-catalog
+  binaryExecutor:
+    tags:
+      - v0.2.0
+    path: apply-setters
+  podExecutor:
+    tags:
+      - v0.2.2
+    timeToLive: 30m
+```
+
+In this example:
+- `apply-setters:v0.2.0` executes via binary executor
+- `apply-setters:v0.2.2` executes in a pod
+- Other tags fall back to pod executor if available
 
 ## Wrapper Server
 
@@ -421,7 +545,7 @@ The evaluation system employs several performance strategies.
 
 **Warming strategy:**
 - Pre-create pods for frequently-used functions
-- Configuration file specifies functions and TTLs
+- FunctionConfig CRDs specify functions and TTLs
 - Concurrent pod creation at startup
 - Reduces first-request latency
 
@@ -460,7 +584,93 @@ The evaluation system employs several performance strategies.
 - Affects concurrent execution capacity
 
 **Performance tuning:**
-- Adjust pod TTL for reuse frequency
-- Configure cache warming for hot functions
+- Adjust pod TTL via FunctionConfig for reuse frequency
+- Configure cache warming via FunctionConfig for hot functions
 - Use executable evaluator for critical path
 - Monitor pod resource usage
+
+## FunctionConfig CRD
+
+The FunctionConfig CRD is the central configuration mechanism for function evaluation in both function-runner and porch-server.
+
+### CRD Structure
+
+**Core fields:**
+- **image**: Base image name (without prefix or tag)
+- **prefixes**: List of registry prefixes to match
+- **binaryExecutor**: Configuration for binary execution
+- **podExecutor**: Configuration for pod execution
+- **goExecutor**: Configuration for native Go execution (porch-server only)
+
+### Executor Types
+
+**Binary Executor:**
+- Maps specific image tags to local binary executables
+- **tags**: List of image tags to handle
+- **path**: Absolute or relative path to binary
+- Used by function-runner for fast local execution
+
+**Pod Executor:**
+- Runs functions in containers with configurable settings
+- **tags**: List of image tags to handle
+- **timeToLive**: Duration pods remain cached (default: 30m)
+- **templateOverrides**: Customize pod/container specifications
+- Used by function-runner for containerized execution
+
+**Go Executor:**
+- Executes functions as native Go calls
+- **tags**: List of image tags to handle
+- **id**: Registration ID for Go function (defaults to image name)
+- Used by porch-server for built-in functions
+
+### Configuration Reconciliation
+
+Both function-runner and porch-server embed a FunctionConfig reconciler:
+
+**Reconciler behavior:**
+- Watches FunctionConfig CRDs in the function namespace
+- Populates internal cache on create/update/delete
+- Maps full image references (with prefix and tag) to executor configurations
+- Updates status with observedGeneration for each component
+
+**Cache lookup during evaluation:**
+1. Function requested with image reference
+2. Image prefix resolved (if needed)
+3. Cache queried with full image reference
+4. Best matching FunctionConfig entry selected
+5. Executor and configuration determined
+6. Fallback to next evaluator on NotFoundError
+
+**Example: Multi-tag configuration:**
+
+```yaml
+apiVersion: config.porch.kpt.dev/v1alpha1
+kind: FunctionConfig
+metadata:
+  name: set-namespace
+  namespace: porch-fn-system
+spec:
+  image: set-namespace
+  prefixes:
+    - ""
+    - ghcr.io/kptdev/krm-functions-catalog
+  binaryExecutor:
+    tags:
+      - v0.4.2
+    path: set-namespace
+  podExecutor:
+    tags:
+      - v0.4.1
+    timeToLive: 30m
+  goExecutor:
+    id: set-namespace
+    tags:
+      - v0.4
+      - v0.4.5
+```
+
+This configuration supports:
+- Binary execution for `set-namespace:v0.4.2`
+- Pod execution for `set-namespace:v0.4.1`
+- Native Go execution for `set-namespace:v0.4` and `v0.4.5` (porch-server only)
+- Automatic prefix resolution for both qualified and unqualified images

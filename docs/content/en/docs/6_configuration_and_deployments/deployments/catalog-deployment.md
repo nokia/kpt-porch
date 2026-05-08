@@ -87,6 +87,11 @@ kpt live init porch
 kpt live apply porch
 ```
 
+The catalog package includes:
+- FunctionConfig and ServiceTemplate CRDs for configuring KRM function execution
+- Multiple pre-configured FunctionConfig resources for common KRM functions (apply-replacements, set-namespace, starlark, etc.)
+- Pod and service templates for pod-based function execution
+
 ## Verification
 
 ### Check Pod Status
@@ -114,6 +119,32 @@ Confirm Porch CRDs are registered:
 kubectl api-resources | grep porch
 ```
 
+### Check FunctionConfig Resources
+
+Verify FunctionConfig resources are deployed:
+
+```bash
+kubectl get functionconfigs -n porch-fn-system
+```
+
+You should see several pre-configured function configurations for common KRM functions such as:
+- `apply-replacements`
+- `set-namespace`
+- `starlark`
+- `apply-setters`
+- `set-labels`
+
+These FunctionConfig resources define how KRM functions are executed (using pod, binary, or go executors) and streamline function configuration compared to the older ConfigMap-based approach.
+
+### Check ServiceTemplate Resources
+
+Verify ServiceTemplate CRDs are available:
+
+```bash
+kubectl get crd servicetemplates.config.porch.kpt.dev
+```
+
+ServiceTemplate resources define pod and service templates for pod-based function execution.
 
 ## Troubleshooting
 
@@ -130,8 +161,27 @@ kubectl logs -n porch-system -l app=porch-server
 kubectl get crd | grep porch
 ```
 
+**FunctionConfig resources not applied:**
+
+Ensure FunctionConfig resources are created in the `porch-fn-system` namespace:
+```bash
+kubectl get functionconfigs -n porch-fn-system
+```
+
+Check if the FunctionConfig reconciler is running in function-runner and porch-server pods:
+```bash
+kubectl logs -n porch-system -l app=function-runner | grep -i functionconfig
+kubectl logs -n porch-system -l app=porch-server | grep -i functionconfig
+```
+
+View FunctionConfig status to see which components have applied the configuration:
+```bash
+kubectl get functionconfigs -n porch-fn-system -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status}{"\n"}{end}'
+```
+
 ### Getting Help
 
 For additional support:
 - Check the [Porch GitHub issues](https://github.com/nephio-project/porch/issues)
 - Join the [Nephio community](https://nephio.org/community/)
+- See [FunctionConfig documentation]({{% relref "../configurations/components/function-runner-config" %}}) for customizing function execution

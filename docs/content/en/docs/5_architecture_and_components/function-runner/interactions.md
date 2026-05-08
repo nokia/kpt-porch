@@ -8,32 +8,136 @@ description: |
 
 ## Overview
 
-The Function Runner is a **separate gRPC service** that interacts with multiple systems: the Task Handler (via gRPC), Kubernetes API (for pod management), container registries (for image metadata), and wrapper servers (for function execution). It operates independently from the Porch server, enabling isolated function execution.
+The Function Runner is a **separate gRPC service** that interacts with multiple systems: the Task Handler (via gRPC), Kubernetes API (for pod management and FunctionConfig CRDs), container registries (for image metadata), and wrapper servers (for function execution). It operates independently from the Porch server, enabling isolated function execution.
+
+The Function Runner includes an **embedded FunctionConfig reconciler** that watches FunctionConfig CRDs and populates an internal cache. This cache determines which executor (pod, binary, or Go) to use for each function image.
 
 ### High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│              Function Runner Service                    │
-│                                                         │
-│  ┌──────────────┐      ┌──────────────┐      ┌──────┐   │
-│  │ Task Handler │ ───> │    gRPC      │ ───> │ Eval │   │
-│  │  (in Porch)  │      │   Server     │      │uators│   │
-│  └──────────────┘      └──────────────┘      └──────┘   │
-│         ↑                      │                │       │
-│         │                      ↓                ↓       │
-│         │              ┌──────────────┐      ┌──────┐   │
-│         └──────────────│  Kubernetes  │      │Image │   │
-│                        │     API      │      │Cache │   │
-│                        └──────────────┘      └──────┘   │
-│                               │                │        │
-│                               ↓                ↓        │
-│                        ┌──────────────┐    ┌─────────┐  │
-│                        │ Function Pods│    │Registry │  │
-│                        │  + Services  │    │  APIs   │  │
-│                        └──────────────┘    └─────────┘  │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│              Function Runner Service                         │
+│                                                              │
+│  ┌──────────────┐      ┌──────────────┐      ┌────────────┐  │
+│  │ Task Handler │ ───> │    gRPC      │ ───> │ Evaluators │  │
+│  │  (in Porch)  │      │   Server     │      │            │  │
+│  └──────────────┘      └──────────────┘      └────────────┘  │
+│         ↑                      │                  │          │
+│         │                      ↓                  ↓          │
+│         │              ┌───────────────┐     ┌──────────┐    │
+│         │              │ FunctionConfig│     │ Executor │    │
+│         │              │  Reconciler   │ ──> │  Cache   │    │
+│         │              └───────────────┘     └──────────┘    │
+│         │                      │                  │          │
+│         │                      ↓                  ↓          │
+│         │              ┌──────────────┐      ┌─────────┐     │
+│         └──────────────│  Kubernetes  │      │  Image  │     │
+│                        │     API      │      │  Cache  │     │
+│                        └──────────────┘      └─────────┘     │
+│                               │                   │          │
+│                               ↓                   ↓          │
+│                        ┌──────────────┐     ┌──────────┐     │
+│                        │ Function Pods│     │ Registry │     │
+│                        │  + Services  │     │   APIs   │     │
+│                        └──────────────┘     └──────────┘     │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
 ```
+
+External Resources:
+- FunctionConfig CRDs (define executor configurations)
+- ServiceTemplate CRDs (define pod/service templates)
+
+## FunctionConfig Reconciler and Cache
+
+The Function Runner includes an embedded reconciler that watches FunctionConfig CRDs and maintains an internal cache of executor configurations.
+
+### Reconciliation Flow
+
+```
+FunctionConfig CRD
+        ↓
+  Watch Event
+        ↓
+  Reconciler
+        ↓
+  Parse Spec
+        ↓
+  ┌────┴────┬──────────┬──────────┐
+  ↓         ↓          ↓          ↓
+Pod     Binary      Go        Update
+Config  Config    Config     Status
+  ↓         ↓          ↓          ↓
+Pod     Binary      Go        Return
+Cache   Cache      Cache
+  ↓         ↓          ↓
+  └────┬────┴──────────┘
+       ↓
+  Ready for
+  Evaluation
+```
+
+**Reconciler responsibilities:**
+- Watch FunctionConfig resources across all namespaces
+- Parse executor configurations (pod, binary, Go)
+- Populate executor-specific caches
+- Update FunctionConfig status with observed generation
+- Handle configuration errors and report via status
+
+**Cache structure:**
+- **Pod executor cache**: Maps image names (with tags/prefixes) to `PodExecutorConfig` (TTL, parallelism, template overrides)
+- **Binary executor cache**: Maps image names (with tags) to local binary paths
+- **Go executor cache**: Maps image names (with tags) to in-process Go function processors
+
+### Executor Selection Logic
+
+When evaluating a function, the executor selection follows this pattern:
+
+```
+EvaluateFunction Request
+        ↓
+  Extract Image Name
+        ↓
+  Query Executor Cache
+        ↓
+  ┌────┴────┬──────────┬──────────┐
+  ↓         ↓          ↓          ↓
+Go      Binary     Pod       Not Found
+Match   Match     Match       Error
+  ↓         ↓          ↓          ↓
+Go      Binary     Pod       Fallback
+Exec    Exec      Exec      to Next
+```
+
+**Selection characteristics:**
+- Image name extracted from request (including registry prefix and tag)
+- Cache lookup considers full image reference with version
+- Single function image can have multiple executors for different versions
+  - Example: `apply-replacements:v0.1.0` → binary executor
+  - Example: `apply-replacements:v0.2.0` → pod executor
+- First matching executor is used
+- NotFoundError triggers fallback to next evaluator in chain
+
+### Configuration Mapping
+
+FunctionConfig resources map to internal cache entries:
+
+**PodExecutor → Pod Cache:**
+- `spec.image` + `spec.prefixes[]` + `spec.podExecutor.tags[]` → full image references
+- `spec.podExecutor.timeToLive` → pod TTL before garbage collection
+- `spec.podExecutor.maxParallelExecutions` → concurrent pod limit per function
+- `spec.podExecutor.preferredMaxQueueLength` → waitlist length before scaling
+- `spec.podExecutor.templateOverrides` → pod/container customizations
+
+**BinaryExecutor → Binary Cache:**
+- `spec.image` + `spec.binaryExecutor.tags[]` → image references
+- `spec.binaryExecutor.path` → absolute or relative binary path
+- Path resolution: absolute if starts with `/`, else relative to `--functions` dir
+
+**GoExecutor → Go Cache:**
+- `spec.image` + `spec.goExecutor.tags[]` → image references
+- `spec.goExecutor.id` → internal function registration ID (defaults to `spec.image`)
+- Registered Go functions: `apply-replacements`, `set-namespace`, `starlark`
 
 ## Task Handler Integration
 
@@ -111,7 +215,7 @@ Both Porch and Function Runner must agree on message size limits:
 
 ## Evaluator Execution Patterns
 
-The Function Runner uses different execution patterns based on evaluator type:
+The Function Runner uses different execution patterns based on evaluator type. Executor selection is determined by the FunctionConfig cache, which maps function images (with prefixes and tags) to executor configurations.
 
 ### Pod-Based Execution
 
@@ -140,6 +244,7 @@ Pod      Pod       Pod
 ```
 
 **Execution pattern:**
+- Pod executor configuration comes from FunctionConfig resources
 - Pod cache checked for existing pod (reuse if available)
 - Pod selection uses round-robin among pods with minimum waitlist length
 - Cache miss triggers pod creation with wrapper server
@@ -147,6 +252,20 @@ Pod      Pod       Pod
 - gRPC connection to wrapper server in pod
 - Wrapper server executes function binary and returns results
 - Multiple evaluations can execute in parallel on the same pod
+
+**Configuration from FunctionConfig:**
+- `podExecutor.timeToLive`: How long pods remain cached before garbage collection
+- `podExecutor.maxParallelExecutions`: Maximum concurrent pods per function
+- `podExecutor.preferredMaxQueueLength`: Waitlist length before scaling up
+- `podExecutor.templateOverrides`: Pod/container customizations (resources, env, security)
+- `podExecutor.tags[]`: Image tags this configuration applies to
+
+**Template system:**
+- ServiceTemplate CRDs define pod and service templates
+- Base templates: `base-pod-template` and `base-service-template` in function runner namespace
+- Inline templates as fallback if CRDs not found
+- Template overrides from FunctionConfig merged with base templates
+- Template version tracked via `resourceVersion` for pod replacement on changes
 
 **For detailed pod lifecycle, see [Pod Lifecycle Management]({{% relref "/docs/5_architecture_and_components/function-runner/functionality/pod-lifecycle-management.md" %}}).**
 
@@ -157,7 +276,7 @@ gRPC Request
         ↓
   Executable Evaluator
         ↓
-  Lookup in Config
+  Lookup in Cache
         ↓
   Found? ──No──> Return NotFoundError
         │
@@ -169,10 +288,54 @@ gRPC Request
 ```
 
 **Execution pattern:**
-- Configuration file maps images to binary paths
+- Binary executor configuration comes from FunctionConfig resources
+- Cache maps image names (with tags) to local binary paths
 - Fast O(1) lookup by image name
 - Direct process execution with ResourceList input
 - NotFoundError triggers fallback in multi-evaluator
+
+**Configuration from FunctionConfig:**
+- `binaryExecutor.tags[]`: Image tags mapped to this binary
+- `binaryExecutor.path`: Binary path (absolute or relative to `--functions` dir)
+- Multiple tags can map to same binary (e.g., `v0.1.0`, `v0.1`, specific digest)
+
+**For detailed function evaluation, see [Function Evaluation]({{% relref "/docs/5_architecture_and_components/function-runner/functionality/function-evaluation.md" %}}).**
+
+### Go-Based Execution
+
+```
+gRPC Request
+        ↓
+  Go Evaluator (in porch-server)
+        ↓
+  Lookup in Cache
+        ↓
+  Found? ──No──> Return NotFoundError
+        │
+       Yes
+        ↓
+  Call Go Function Processor
+        ↓
+  Return Response
+```
+
+**Execution pattern:**
+- Go executor provides highest performance by avoiding process/container overhead
+- Functions executed as native Go function calls within porch-server process
+- Cache maps image names to `ResourceListProcessor` implementations
+- Direct in-process execution with ResourceList input
+- NotFoundError triggers fallback to next evaluator (typically gRPC runtime)
+
+**Configuration from FunctionConfig:**
+- `goExecutor.tags[]`: Image tags mapped to this Go function
+- `goExecutor.id`: Internal registration ID (defaults to `spec.image`)
+- Registered functions: `apply-replacements`, `set-namespace`, `starlark`
+
+**Benefits:**
+- No container startup overhead
+- No gRPC network calls
+- Fastest possible execution for compatible functions
+- Lower resource usage compared to pod-based execution
 
 **For detailed function evaluation, see [Function Evaluation]({{% relref "/docs/5_architecture_and_components/function-runner/functionality/function-evaluation.md" %}}).**
 
@@ -189,22 +352,26 @@ Pod Evaluator
         ↓
   ┌──────┴──────┬──────────┬─────────┐
   ↓             ↓          ↓         ↓
-Pod Ops    Service Ops  ConfigMap  Secrets
+Pod Ops    Service Ops    CRs     Secrets
   ↓             ↓          ↓         ↓
-Create/Get  Create/Get   Template   Auth
-Delete      Delete       Retrieval  Config
+Create/Get  Create/Get   Function   Auth
+Delete      Delete       Config     Config
 ```
 
 **Resource operations:**
 - **Pods**: Create from template, get status, list by label, delete
 - **Services**: Create ClusterIP frontend, get endpoints, delete
-- **ConfigMaps**: Retrieve pod/service templates for customization
+- **FunctionConfig CRs**: Watch for configuration changes
+- **ServiceTemplate CRs**: Base pod and service templates
+- **PodTemplate resources**: Base pod specifications
 - **Secrets**: Access registry authentication and TLS certificates
 
 **Template system:**
-- ConfigMap-based templates for organization-specific customization
-- Inline templates as fallback defaults
-- Template version tracking for pod replacement on changes
+- ServiceTemplate CRs define base pod and service templates
+- PodTemplate resources provide base pod specifications
+- Inline templates as fallback if CRs/resources not found
+- FunctionConfig provides per-function template overrides
+- Template version tracked for pod replacement on changes
 
 **For detailed pod management, see [Pod Lifecycle Management]({{% relref "/docs/5_architecture_and_components/function-runner/functionality/pod-lifecycle-management.md" %}}).**
 
@@ -336,6 +503,7 @@ The Function Runner follows standard integration patterns:
 - Pod and service lifecycle management
 - Image metadata caching
 - Registry authentication
+- FunctionConfig reconciliation and caching
 
 **Task Handler responsibilities:**
 - Render pipeline orchestration
@@ -354,6 +522,7 @@ The Function Runner follows standard integration patterns:
 - No persistent state between requests
 - Pod cache is ephemeral (TTL-based)
 - Image cache is in-memory only
+- Executor configuration cache populated from FunctionConfig CRs
 - Evaluators are stateless
 
 **Benefits:**
@@ -368,6 +537,7 @@ The Function Runner follows standard integration patterns:
 - Garbage collection runs periodically
 - TTL updates are asynchronous patches
 - Cache warming at startup is concurrent
+- FunctionConfig reconciliation is event-driven
 
 **Synchronous patterns:**
 - Function execution is synchronous (blocks until complete)

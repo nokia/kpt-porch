@@ -21,10 +21,26 @@ Key design characteristics:
 - **Single-threaded cache management** eliminates race conditions
 - **Channel-based communication** provides clean separation between components
 - **Service mesh compatibility** through ClusterIP services fronting each pod
-- **Template-based pod creation** supports ConfigMap-based and inline specifications
+- **Template-based pod creation** using PodTemplate resources and ServiceTemplate CRs
 - **TTL-based lifecycle** with automatic garbage collection
 - **Failed pod detection** with immediate deletion and cache eviction
 - **Pod warming** capability for pre-creating pods at startup
+
+## Function Configuration
+
+Porch uses FunctionConfig custom resources to configure function execution, including pod executor settings and template specifications. Each FunctionConfig defines how a specific KRM function should be executed and can specify configurations for multiple execution methods (pod executor, binary executor, or Go executor).
+
+The function-runner includes an embedded FunctionConfig reconciler that watches FunctionConfig resources and maintains an internal cache. This cache is used by both the pod cache manager and pod manager to determine execution parameters and pod template configurations for each function.
+
+**FunctionConfig Components:**
+
+**Image and Prefixes** - The base function image name and optional registry prefixes for image resolution.
+
+**Pod Executor Configuration** - Settings specific to pod-based execution including TTL, parallelism limits, queue length preferences, and template overrides.
+
+**Template Overrides** - Customizations that can be applied to the base pod template, including service account, security context, and container resource specifications.
+
+**PodTemplates and ServiceTemplates** - Define the actual pod and service templates used for creating function execution pods. These templates are referenced by the pod manager when creating pods.
 
 ## Pod Cache Manager
 
@@ -112,20 +128,36 @@ The Pod Manager handles low-level Kubernetes operations for function pods and th
 
 **Image Metadata Operations** - Cache image digests and entrypoints, inspect container images to extract configuration, handle private registry authentication and TLS configuration, manage image pull secrets for function pods.
 
-**Template System** - Load pod templates from ConfigMaps or use inline defaults, load service templates from ConfigMaps or use inline defaults, track template versions to detect changes requiring pod replacement, patch templates with function-specific configuration.
+**Template System** - Retrieve or create base pod and service templates from ServiceTemplate CRDs or inline defaults, track template versions to detect changes requiring pod replacement, patch templates with function-specific configuration and template overrides from FunctionConfig.
 
 ### Pod Template System
 
 The pod manager supports two template sources: ConfigMap-based templates for customization and inline templates as fallback defaults.
 
-**ConfigMap-Based Templates:**
+The pod manager retrieves base pod and service templates from PodTemplate resources and ServiceTemplate CRs in the function execution namespace.
+If these resources are not found, the pod manager creates them from embedded inline defaults.
 
-When functionPodTemplateName is configured, the pod manager retrieves a ConfigMap containing template and serviceTemplate keys. The ConfigMap's ResourceVersion is used as the template version for tracking changes. When the ConfigMap is updated, existing pods with old template versions are replaced on next use.
+The template's `ResourceVersion` is used as the template version for tracking changes. When a template is updated, existing pods with old template versions are replaced on next use.
 
 **Inline Templates:**
 
-When no ConfigMap is configured, the pod manager uses hardcoded inline templates with sensible defaults including init container for wrapper-server binary, main container with wrapper-server as entrypoint, EmptyDir volume for tools, readiness probe using grpc-health-probe, and cluster autoscaler safe-to-evict annotation.
+When PodTemplate/ServiceTemplate resources are not found, the pod manager creates them from hardcoded inline templates with sensible defaults including init container for wrapper-server binary, main container with wrapper-server as entrypoint, EmptyDir volume for tools, readiness probe using grpc-health-probe, and cluster autoscaler safe-to-evict annotation.
 
+**Template Overrides:**
+
+FunctionConfig resources can specify template overrides that customize the base templates on a per-function basis. The pod manager applies these overrides when creating pods:
+
+- **serviceAccountName** - Override the pod's service account
+- **securityContext** - Override the pod's security context
+- **initContainer** - Override init container resources, env, and envFrom
+- **container** - Override main container resources, env, and envFrom
+
+These overrides are merged with the base template during pod creation, allowing function-specific customization without requiring separate templates for each function.
+
+**Legacy ConfigMap Approach:**
+
+Prior to the ServiceTemplate CRD implementation, pod and service templates were stored in ConfigMaps. This approach is deprecated. See [function-runner-pod-templates.md](../relevant_old_docs/function-runner-pod-templates.md) for historical reference.
+ 
 ### Container Configuration
 
 The pod manager patches the function container in the template with function-specific configuration before creating the pod:
@@ -223,11 +255,22 @@ Pods include a readiness probe that executes grpc-health-probe to verify the wra
 
 ### Pod Warming
 
-Pod warming pre-creates function pods at startup to eliminate cold start latency for frequently used functions. Warming is configured through a YAML file mapping function images to TTLs.
+Pod warming pre-creates function pods at startup to eliminate cold start latency for frequently used functions. Warming is configured through FunctionConfig resources that specify pod executor configurations.
+
+**Warming Process:**
+
+The pod cache manager iterates through all FunctionConfig resources in the internal cache and pre-creates pods for functions that have pod executor configurations with specified tags. For each function:
+- The image is resolved using the configured prefixes or default image prefix
+- A pod is created with a fixed name to ensure only one warming pod per function
+- Pod creation happens asynchronously with a 1-minute timeout per pod
+
+{{% alert title="Note" color="primary" %}}
+Pod warming is not yet adapted to the FunctionConfig reconciler and may not initialize pods for all functions.
+{{% /alert %}}
 
 **Concurrent Creation:**
 
-Warming creates all configured pods concurrently to minimize startup time. Each function is processed in a separate goroutine with a 1-minute timeout per pod. Using fixed names ensures only one pod is created per function even if multiple function runner instances start simultaneously.
+Warming processes all configured functions concurrently to minimize startup time. Using fixed names ensures only one pod is created per function even if multiple function runner instances start simultaneously.
 
 **Startup Optimization:**
 
@@ -249,8 +292,8 @@ Each pod has a reclaim-after annotation containing a Unix timestamp indicating w
 This approach provides automatic cleanup of unused pods while keeping frequently used pods alive indefinitely through TTL updates on each use.
 
 **TTL configuration:**
-- Default TTL configured at function runner startup (e.g., 10 minutes)
-- Per-function TTL can be specified in cache warming config
+- Default TTL configured at function runner startup (e.g., 30 minutes)
+- Per-function TTL specified in FunctionConfig pod executor configuration
 - Dynamic updates through TTL extension on each pod reuse
 
 ### GC Scan Process
@@ -299,7 +342,7 @@ The cache maintains consistency through multiple validation mechanisms:
 
 **Service Validation** - Services are validated to ensure they exist and have active endpoints matching the pod IP.
 
-**Template Version Tracking** - Pod template versions are tracked to detect when templates change, triggering pod replacement on next use.
+**Template Version Tracking** - Pod template versions are tracked using ServiceTemplate ResourceVersion to detect when templates change, triggering pod replacement on next use.
 
 **Failed Pod Detection** - Failed pods are immediately detected and removed from cache during both validation and garbage collection.
 
@@ -329,7 +372,7 @@ Pod reuse is the primary performance optimization, eliminating pod startup laten
 
 ### Cache Warming
 
-Cache warming pre-creates pods at startup for frequently used functions, eliminating cold start latency. Warming is configured through a YAML file and creates all pods concurrently to minimize startup time.
+Cache warming pre-creates pods at startup for frequently used functions, eliminating cold start latency. Warming is configured through FunctionConfig resources and creates all pods concurrently to minimize startup time.
 
 **Warming benefits:**
 - First evaluation served from ready pod (<100ms instead of 5-15 seconds)
@@ -360,7 +403,8 @@ When multiple pods serve the same function, the cache manager selects the pod wi
 
 ### Resource Management
 
-Function pods have resource limits configured via pod template to prevent resource exhaustion. Limits affect concurrent execution capacity and should be tuned based on function requirements and cluster resources.
+Function pods have resource limits configured via PodTemplate resources and optionally customized per-function through FunctionConfig template overrides.
+Resource limits prevent resource exhaustion and affect concurrent execution capacity. Limits should be tuned based on function requirements and cluster resources.
 
 ## Concurrency Model
 

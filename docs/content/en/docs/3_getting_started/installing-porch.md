@@ -72,14 +72,53 @@ kubectl api-resources | grep porch
 You should see Porch API resources:
 
 ```bash
+functionconfigs                                  config.porch.kpt.dev/v1alpha1     true         FunctionConfig
 packagerevs                                      config.porch.kpt.dev/v1alpha1     true         PackageRev
 packagevariants                                  config.porch.kpt.dev/v1alpha1     true         PackageVariant
 packagevariantsets                               config.porch.kpt.dev/v1alpha2     true         PackageVariantSet
 repositories                                     config.porch.kpt.dev/v1alpha1     true         Repository
+servicetemplates                                 config.porch.kpt.dev/v1alpha1     true         ServiceTemplate
 packagerevisionresources                         porch.kpt.dev/v1alpha1            true         PackageRevisionResources
 packagerevisions                                 porch.kpt.dev/v1alpha1            true         PackageRevision
 packages                                         porch.kpt.dev/v1alpha1            true         PorchPackage
 ```
+
+Verify that FunctionConfig resources are deployed:
+
+```bash
+kubectl get functionconfigs -n porch-fn-system
+```
+
+You should see several pre-configured FunctionConfig resources for common KRM functions:
+
+```bash
+NAME                             SERVER APPLIED   FNRUNNER APPLIED
+apply-replacements               1                1
+apply-setters                    1                1
+create-setters                   1                1
+ensure-name-substring            1                1
+gatekeeper                       1                1
+kubeconform                      1                1
+search-replace                   1                1
+set-annotations                  1                1
+set-enforcement-action           1                1
+set-image                        1                1
+set-labels                       1                1
+set-namespace                    1                1
+starlark                         1                1
+upsert-resource                  1                1
+enable-gcp-services              1                1
+export-terraform                 1                1
+generate-folders                 1                1
+remove-local-config-resources    1                1
+set-project-id                   1                1
+```
+
+**About these new resources:**
+
+- **FunctionConfig**: Defines how KRM functions are executed (pod, binary, or go executors) and replaces the older ConfigMap-based configuration approach. The function-runner and porch-server both include embedded FunctionConfig reconcilers that populate an internal cache used to determine which executor to use and with what configuration.
+
+- **ServiceTemplate**: Defines pod and service templates for pod-based function execution. These templates are referenced by FunctionConfig resources that use the pod executor.
 
 ## Troubleshooting
 

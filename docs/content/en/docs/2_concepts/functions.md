@@ -9,7 +9,7 @@ description: |
 ## What are Functions in Porch?
 
 **Functions** in Porch are [KRM (Kubernetes Resource Model) functions](https://github.com/kubernetes-sigs/kustomize/blob/master/cmd/config/docs/api-conventions/functions-spec.md) -
-containerized programs that transform or validate Kubernetes resource manifests within a package's files. Functions are
+programs (usually containerized) that transform or validate Kubernetes resource manifests within a package's files. Functions are
 declared in a package's Kptfile and executed by Porch when rendering the package.
 
 Functions enable:
@@ -20,9 +20,68 @@ Functions enable:
 
 For details on how to declare and configure functions in the Kptfile pipeline, see the [kpt functions documentation](https://kpt.dev/book/04-using-functions/).
 
+## Function Configuration
+
+Porch uses **FunctionConfig** custom resources to configure how functions execute. These configurations specify which executor type should handle specific function images and provide executor-specific settings.
+
+Each FunctionConfig specifies:
+- **Image and prefixes**: The function image name and optional registry prefixes
+- **Executor configurations**: One or more executor types (pod, binary, or go) with associated settings
+- **Version-specific settings**: Different executors and configurations for different image tags
+
+Example FunctionConfig:
+
+```yaml
+apiVersion: config.porch.kpt.dev/v1alpha1
+kind: FunctionConfig
+metadata:
+  name: set-namespace
+  namespace: porch-fn-system
+spec:
+  image: set-namespace
+  prefixes:
+    - ""
+    - ghcr.io/kptdev/krm-functions-catalog
+  podExecutor:
+    tags:
+      - v0.4.1
+    timeToLive: 30m
+  binaryExecutor:
+    tags:
+      - v0.4.2
+    path: set-namespace
+  goExecutor:
+    id: set-namespace
+    tags:
+      - v0.4
+      - v0.4.5
+```
+
+Both the function-runner and porch-server components include an embedded FunctionConfig reconciler that watches FunctionConfig resources and populates an internal cache. This cache determines which executor to use for each function invocation.
+
 ## Function Execution in Porch
 
-Porch executes functions through a **function runner** component that calls kpt to orchestrate containerized function execution. The functions run in isolated containers (Kubernetes pods managed by the `function-runner` microservice). Porch passes the package's resources to kpt, which passes the resources on as a [ResourceList](https://github.com/kubernetes-sigs/kustomize/blob/master/cmd/config/docs/api-conventions/functions-spec.md#resourcelist) to each function in the pipeline in turn. kpt executes the functions sequentially in the order declared in the Kptfile pipeline and passes the function results back to Porch, which stores them in the PackageRevisionResources's `status.renderStatus` field. Execution is triggered automatically following creation or clone of a package revision, update of a package revision, and when a package revision is proposed.
+Porch executes functions using multiple executor types, determined by FunctionConfig settings.
+
+**Pod Executor**: Runs functions in isolated containerized pods (the traditional approach):
+- Functions execute in Kubernetes pods managed by the `function-runner` microservice
+- Configurable with pod templates, resource limits, TTL settings, and maximum parallel executions
+- Suitable for functions requiring container isolation or external dependencies
+
+**Binary Executor**: Substitutes specific function image tags with local binary executables:
+- Executes pre-built function binaries directly on the host system
+- Provides improved performance by avoiding container overhead
+- Configured with the file path to the function binary
+
+**Go Executor**: Executes certain functions as native Go function calls within the porch-server process:
+- Functions run in-process for maximum efficiency
+- Only available for functions integrated as Go libraries
+- No container or process overhead
+
+Regardless of executor type, Porch passes the package's resources to kpt, which passes the resources on as a [ResourceList](https://github.com/kubernetes-sigs/kustomize/blob/master/cmd/config/docs/api-conventions/functions-spec.md#resourcelist) to each function in the pipeline in turn.
+kpt executes the functions sequentially in the order declared in the Kptfile pipeline and passes the function results back to Porch, which stores them in the PackageRevisionResources's `status.renderStatus` field.
+Execution is triggered automatically following creation or clone of a package revision, update of a package revision, and when a package revision is proposed.
+kpt passes the function results back to Porch and Porch stores them in the PackageRevisionResources's `status.renderStatus` field.
 
 ## When Functions Execute
 
@@ -77,7 +136,9 @@ enabling iterative development on incomplete packages.
 ## Key Points
 
 - Functions are standard KRM functions declared in the Kptfile pipeline (see [kpt functions docs](https://kpt.dev/book/04-using-functions/))
-- Porch invokes kpt to execute functions via a function-runner component using containerized execution
+- Function execution behavior is configured using FunctionConfig custom resources that specify executor types (pod, binary, or go)
+- Both function-runner and porch-server include FunctionConfig reconcilers that populate internal caches to determine which executor handles each function
+- Functions can execute via pod containers, local binaries, or in-process Go calls depending on configuration
 - Functions automatically execute during package rendering on Draft package revisions
 - Function results are stored in `status.renderStatus` of the PackageRevisionResources view of a package revision
 - Published packages are immutable - functions don't re-execute after publication
