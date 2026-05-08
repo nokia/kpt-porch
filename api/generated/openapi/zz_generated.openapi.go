@@ -578,13 +578,6 @@ func schema_porch_api_porch_v1alpha1_PackageInitTaskSpec(ref common.ReferenceCal
 				Description: "PackageInitTaskSpec defines the package initialization task.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"subpackage": {
-						SchemaProps: spec.SchemaProps{
-							Description: "`Subpackage` is a directory path to a subpackage to initialize. If unspecified, the main package will be initialized.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 					"description": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`Description` is a short description of the package.",
@@ -1442,7 +1435,7 @@ func schema_porch_api_porch_v1alpha1_Result(ref common.ReferenceCallback) common
 					},
 					"stderr": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Enable this once test harness supports filepath based assertions. Pkg is OS specific Absolute path to the package. Pkg string `yaml:\"pkg,omitempty\"` Stderr is the content in function stderr",
+							Description: "Stderr is the content in function stderr",
 							Type:        []string{"string"},
 							Format:      "",
 						},

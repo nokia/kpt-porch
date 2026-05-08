@@ -350,7 +350,7 @@ func RetryOnError(retries int, f func(retryNumber int) error) error {
 // FindBestSemverMatch selects the cache key whose semver tag best satisfies
 // the constraint for the given imageName. It returns the full cache key
 // (e.g. "ghcr.io/foo/bar:v1.2.3") of the highest matching version.
-func FindBestSemverMatch(constraint string, imageName string, cacheKeys []string) (string, error) {
+func FindBestSemverMatch(constraint string, imageName string, cachedTags []string) (string, error) {
 	c, err := semver.NewConstraint(constraint)
 	if err != nil {
 		return "", fmt.Errorf("invalid semver constraint %q: %w", constraint, err)
@@ -362,26 +362,15 @@ func FindBestSemverMatch(constraint string, imageName string, cacheKeys []string
 	}
 
 	var matches []candidate
-	for _, key := range cacheKeys {
-		idx := strings.LastIndex(key, ":v")
-		if idx == -1 {
-			continue
-		}
-
-		baseName := key[:idx]
-		if baseName != imageName {
-			continue
-		}
-
-		versionStr := key[idx+1:] // skip past ":"
-		v, err := semver.NewVersion(versionStr)
+	for _, tag := range cachedTags {
+		v, err := semver.NewVersion(tag)
 		if err != nil {
-			klog.Infof("Failed to parse version %q from cached image %q: %v", versionStr, key, err)
+			klog.Infof("Failed to parse version %q from cached image %q: %v", tag, imageName, err)
 			continue
 		}
 
 		if c.Check(v) {
-			matches = append(matches, candidate{key: key, version: v})
+			matches = append(matches, candidate{key: tag, version: v})
 		}
 	}
 
@@ -396,7 +385,49 @@ func FindBestSemverMatch(constraint string, imageName string, cacheKeys []string
 
 	selected := matches[len(matches)-1]
 	klog.Infof("Selected image %q (version %q) for request %q",
-		selected.key, selected.version, imageName)
+		imageName+":"+selected.key, selected.version, imageName)
 
 	return selected.key, nil
+}
+
+func GetImageName(image string) string {
+	if i := strings.Index(image, "@"); i != -1 {
+		image = image[:i]
+	}
+
+	if i := strings.LastIndex(image, ":"); i != -1 && !strings.Contains(image[i+1:], "/") {
+		image = image[:i]
+	}
+
+	if i := strings.LastIndex(image, "/"); i != -1 {
+		image = image[i+1:]
+	}
+	return image
+}
+
+func GetImageRepository(image string) string {
+	lastSlash := strings.LastIndex(image, "/")
+	if lastSlash == -1 {
+		return ""
+	}
+	return image[:lastSlash]
+}
+
+func GetImageTag(image string) string {
+	if strings.Contains(image, "@sha256:") {
+		return ""
+	}
+
+	lastSlash := strings.LastIndex(image, "/")
+	lastColon := strings.LastIndex(image, ":")
+
+	if lastColon == -1 || lastColon < lastSlash {
+		return "latest"
+	}
+
+	return image[lastColon+1:]
+}
+
+func ImageJoin(prefix, image string) string {
+	return strings.TrimRight(prefix, "/") + "/" + strings.TrimLeft(image, "/")
 }

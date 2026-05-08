@@ -28,17 +28,19 @@ function error() {
 Error: ${1}
 Usage: ${0} [flags]
 Supported Flags:
-  --destination DIRECTORY             ... directory in which to create the Porch deploymetn blueprint
+  --destination DIRECTORY             ... directory in which to create the Porch deployment blueprint
   --server-image IMAGE                ... address of the Porch server image
   --controllers-image IMAGE           ... address of the Porch controllers image
   --function-image IMAGE              ... address of the Porch function runtime image
   --wrapper-server-image IMAGE        ... address of the Porch function wrapper server image
-  --enabled-reconcilers RECONCILDERS  ... comma-separated list of reconcilers that should be enabled in
+  --enabled-reconcilers RECONCILERS   ... comma-separated list of reconcilers that should be enabled in
                                           porch controller
-  --ghcr-image-prefix PREFIX          ... ghcr image url prefix for running porch behind a proxy
+  --ghcr-image-prefix PREFIX          ... GHCR image url prefix for running porch behind a proxy
   --fn-runner-warm-up-pod-cache BOOL  ... disable warm-up-pod-cache in function runner
   --porch-cache-type TYPE             ... porch cache type (CR or DB)
   --db-push-drafts-to-git BOOL        ... enable db-push-drafts-to-git flag for porch-server
+  --dockerhub-mirror REGISTRY         ... alternate registry to pull additional images from (postgres)
+  --create-v1alpha2-rpkg BOOL         ... enable v1alpha2 PackageRevision CRD creation by repo controller
 EOF
   exit 1
 }
@@ -51,9 +53,11 @@ FUNCTION_IMAGE=""
 WRAPPER_SERVER_IMAGE=""
 ENABLED_RECONCILERS=""
 GHCR_IMAGE_PREFIX=""
+DOCKERHUB_MIRROR=""
 FN_RUNNER_WARM_UP_POD_CACHE="true"
 PORCH_CACHE_TYPE="DB"
 DB_PUSH_DRAFTS_TO_GIT="false"
+CREATE_V1ALPHA2_RPKG="false"
 
 while [[ $# -gt 0 ]]; do
   key="${1}"
@@ -62,27 +66,22 @@ while [[ $# -gt 0 ]]; do
       DESTINATION="${2}"
       shift 2
     ;;
-
     --server-image)
       SERVER_IMAGE="${2}"
       shift 2
     ;;
-
     --controllers-image)
       CONTROLLERS_IMAGE="${2}"
       shift 2
     ;;
-
     --function-image)
       FUNCTION_IMAGE="${2}"
       shift 2
     ;;
-
     --wrapper-server-image)
       WRAPPER_SERVER_IMAGE="${2}"
       shift 2
     ;;
-
     --enabled-reconcilers)
       ENABLED_RECONCILERS="${2}"
       shift 2
@@ -101,6 +100,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --db-push-drafts-to-git)
       DB_PUSH_DRAFTS_TO_GIT="${2}"
+      shift 2
+      ;;
+    --dockerhub-mirror)
+      DOCKERHUB_MIRROR="${2}"
+      shift 2
+      ;;
+    --create-v1alpha2-rpkg)
+      CREATE_V1ALPHA2_RPKG="${2}"
       shift 2
       ;;
     *)
@@ -214,6 +221,43 @@ function enable_db_push_drafts_to_git() {
       -- by-value="--db-push-drafts-to-git=false" put-value="--db-push-drafts-to-git=true"
 }
 
+function enable_v1alpha2_packagerevisions() {
+    echo "Enabling v1alpha2 PackageRevision CRD creation and PR controller"
+
+    # Install the v1alpha2 PackageRevision CRD
+    cp "${PORCH_DIR}/api/porch/v1alpha2/porch.kpt.dev_packagerevisions.yaml" \
+       "${DESTINATION}/0-v1alpha2-packagerevisions.yaml"
+
+    # Flip the controller flag
+    kpt fn eval ${DESTINATION} \
+      --image ${SEARCH_REPLACE_IMG} \
+      --match-kind Deployment \
+      --match-name porch-controllers \
+      --match-namespace porch-system \
+      -- by-value="--repositories.create-v1alpha2-rpkg=false" put-value="--repositories.create-v1alpha2-rpkg=true"
+
+    # Enable the PR controller that reconciles v1alpha2 CRDs
+    ENABLED_RECONCILERS="${ENABLED_RECONCILERS},packagerevisions"
+
+    # Wire the fn-runner address so the PR controller can render packages
+    kpt fn eval ${DESTINATION} \
+      --image ${STARLARK_IMG} \
+      --match-kind Deployment \
+      --match-name porch-controllers \
+      --match-namespace porch-system \
+      -- 'source=
+for resource in ctx.resource_list["items"]:
+  for container in resource["spec"]["template"]["spec"]["containers"]:
+    if container["name"] == "porch-controllers":
+      if container["env"] == None:
+        container["env"] = []
+      container["env"].append({
+        "name": "FUNCTION_RUNNER_ADDRESS",
+        "value": "function-runner.porch-system.svc.cluster.local:9445"
+      })
+'
+}
+
 function configure_porch_cache() {
     echo "Configuring Porch: cache=${PORCH_CACHE_TYPE}"
     
@@ -237,14 +281,6 @@ function configure_porch_cache() {
           -- "source=
 for resource in ctx.resource_list['items']:
     podspec = resource['spec']['template']['spec']
-    
-    # Remove wait-for-postgres initContainer
-    if 'initContainers' in podspec:
-        new_init = [c for c in podspec['initContainers'] if c.get('name') != 'wait-for-postgres']
-        if new_init:
-            podspec['initContainers'] = new_init
-        else:
-            podspec.pop('initContainers')
     
     # Update containers
     for container in podspec.get('containers', []):
@@ -315,11 +351,37 @@ function main() {
   cp "./internal/api/porchinternal/v1alpha1/config.porch.kpt.dev_packagerevs.yaml" \
      "${DESTINATION}/0-packagerevs.yaml"
 
+  cp "./api/porchconfig/v1alpha1/config.porch.kpt.dev_functionconfigs.yaml" \
+     "${DESTINATION}/0-functionconfigs.yaml"
+
+  cp "./api/porchconfig/v1alpha1/config.porch.kpt.dev_servicetemplates.yaml" \
+     "${DESTINATION}/0-servicetemplates.yaml"
+
   # Porch Deployment Config
   cp ${PORCH_DIR}/deployments/porch/*.yaml "${PORCH_DIR}/deployments/porch/Kptfile" "${DESTINATION}"
   # Copy Porch controller manager rbac
   cp ${PORCH_DIR}/controllers/config/rbac/role.yaml "${DESTINATION}/9-porch-controller-clusterrole.yaml"
 
+  if [[ -n "${GHCR_IMAGE_PREFIX}" ]]; then
+    add_image_args_porch_server
+  fi
+
+  if [[ "${FN_RUNNER_WARM_UP_POD_CACHE}" == "false" ]]; then
+    disable_fn_runner_warm_up_pod_cache
+  fi
+
+  configure_porch_cache
+
+  if [[ "${DB_PUSH_DRAFTS_TO_GIT}" == "true" ]]; then
+    enable_db_push_drafts_to_git
+  fi
+
+  if [[ "${CREATE_V1ALPHA2_RPKG}" == "true" ]]; then
+    enable_v1alpha2_packagerevisions
+  fi
+
+  # Copy RBAC for each enabled reconciler — must run after all reconcilers
+  # have been added to ENABLED_RECONCILERS (e.g. by enable_v1alpha2_packagerevisions).
   IFS=',' read -ra RECONCILERS <<< "$ENABLED_RECONCILERS"
   for i in "${RECONCILERS[@]}"; do
     if [[ -f "${PORCH_DIR}/controllers/config/crd/bases/config.porch.kpt.dev_${i}.yaml" ]]; then
@@ -336,20 +398,6 @@ function main() {
     "${DESTINATION}/9-porch-controller-${i}-clusterrolebinding.yaml"
   done
 
-  if [[ -n "${GHCR_IMAGE_PREFIX}" ]]; then
-          add_image_args_porch_server
-  fi
-
-  if [[ "${FN_RUNNER_WARM_UP_POD_CACHE}" == "false" ]]; then
-    disable_fn_runner_warm_up_pod_cache
-  fi
-
-  configure_porch_cache
-
-  if [[ "${DB_PUSH_DRAFTS_TO_GIT}" == "true" ]]; then
-    enable_db_push_drafts_to_git
-  fi
-
   customize_controller_reconcilers
   
   customize_image \
@@ -364,6 +412,12 @@ function main() {
   customize_image_in_env \
     "docker.io/nephio/porch-wrapper-server:latest" \
     "${WRAPPER_SERVER_IMAGE}"
+
+  if [[ -n "${DOCKERHUB_MIRROR}" ]]; then
+    customize_image \
+    "docker.io/bitnamilegacy/postgresql:17.6.0-debian-12-r4" \
+    "${DOCKERHUB_MIRROR}/bitnamilegacy/postgresql:17.6.0-debian-12-r4"
+  fi
 }
 
 validate

@@ -75,19 +75,20 @@ func extractFromKptfile(resources map[string]string) (kptfileStatus, []porchapi.
 }
 
 type dbPackageRevision struct {
-	repo          *dbRepository
-	pkgRevKey     repository.PackageRevisionKey
-	meta          metav1.ObjectMeta
-	spec          *porchapi.PackageRevisionSpec
-	updated       time.Time
-	updatedBy     string
-	lifecycle     porchapi.PackageRevisionLifecycle
-	extPRID       kptfile.Locator
-	latest        bool
-	deployment    bool
-	tasks         []porchapi.Task
-	resources     map[string]string
-	kptfileStatus kptfileStatus
+	repo           *dbRepository
+	pkgRevKey      repository.PackageRevisionKey
+	meta           metav1.ObjectMeta
+	spec           *porchapi.PackageRevisionSpec
+	updated        time.Time
+	updatedBy      string
+	lifecycle      porchapi.PackageRevisionLifecycle
+	extPRID        kptfile.Locator
+	latest         bool
+	deployment     bool
+	tasks          []porchapi.Task
+	resources      map[string]string
+	resourcesDirty bool
+	kptfileStatus  kptfileStatus
 
 	// gitDraftPR maintains the draft in the external git repository during editing (when pushDraftsToGit is true)
 	gitPRDraft repository.PackageRevisionDraft
@@ -386,6 +387,10 @@ func (pr *dbPackageRevision) IsLatestRevision() bool {
 	return pr.latest
 }
 
+func (pr *dbPackageRevision) GetCommitInfo() (time.Time, string) {
+	return pr.updated, pr.updatedBy
+}
+
 func (pr *dbPackageRevision) GetKptfile(ctx context.Context) (kptfile.KptFile, error) {
 	_, span := tracer.Start(ctx, "dbPackageRevision::GetKptfile", trace.WithAttributes())
 	defer span.End()
@@ -453,6 +458,10 @@ func (pr *dbPackageRevision) UpdateResources(ctx context.Context, new *porchapi.
 	_, span := tracer.Start(ctx, "dbPackageRevision::UpdateResources", trace.WithAttributes())
 	defer span.End()
 
+	if pr.repo == nil {
+		return fmt.Errorf("cannot update resources for package revision %s: no associated repository", pr.KubeObjectName())
+	}
+
 	if pr.repo.pushDraftsToGit && pr.gitPRDraft != nil {
 		klog.InfoS("[DB Cache] Updating resources in memory and in Git draft for PackageRevision", context1.LogMetadataFrom(ctx)...)
 		defer func() {
@@ -466,6 +475,7 @@ func (pr *dbPackageRevision) UpdateResources(ctx context.Context, new *porchapi.
 	}
 
 	pr.resources = new.Spec.Resources
+	pr.resourcesDirty = true
 	status, gates, pkgMeta := extractFromKptfile(pr.resources)
 	pr.kptfileStatus = status
 	if gates != nil || pkgMeta != nil {

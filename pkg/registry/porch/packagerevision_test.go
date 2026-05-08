@@ -31,6 +31,7 @@ import (
 	mockrepo "github.com/nephio-project/porch/test/mockery/mocks/porch/pkg/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -130,14 +131,26 @@ func setup(t *testing.T) (mockClient *mockclient.MockClient, mockEngine *mockeng
 	return
 }
 
+// filterCalls removes expected calls for a given method name, used to reset mock expectations.
+func filterCalls(calls []*mock.Call, method string) []*mock.Call {
+	var filtered []*mock.Call
+	for _, c := range calls {
+		if c.Method != method {
+			filtered = append(filtered, c)
+		}
+	}
+	return filtered
+}
+
 func TestList(t *testing.T) {
-	_, mockEngine := setup(t)
+	mockClient, mockEngine := setup(t)
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1alpha1.Repository"), mock.Anything).Return(nil).Maybe()
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{
 		packageRevision,
 	}, nil).Once()
 
 	result, err := packagerevisions.List(context.TODO(), &internalversion.ListOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 1, len(result.(*porchapi.PackageRevisionList).Items))
 
 	//=========================================================================================
@@ -154,17 +167,22 @@ func TestList(t *testing.T) {
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{
 		mockPkgRev,
 	}, nil)
+	mockPkgRev.On("Key").Return(repository.PackageRevisionKey{
+		PkgKey: repository.PackageKey{RepoKey: repository.RepositoryKey{Name: "repo"}},
+	}).Maybe()
+	mockPkgRev.On("KubeObjectNamespace").Return("").Maybe()
 	mockPkgRev.On("KubeObjectName").Return("test-package").Maybe()
 	mockPkgRev.On("GetPackageRevision", mock.Anything).Return(nil, errors.New("error getting API package revision")).Once()
 	result, err = packagerevisions.List(context.TODO(), &internalversion.ListOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resultList, isList := result.(*porchapi.PackageRevisionList)
 	assert.True(t, isList)
 	assert.Equal(t, 0, len(resultList.Items))
 }
 
 func TestGet(t *testing.T) {
-	_, mockEngine := setup(t)
+	mockClient, mockEngine := setup(t)
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1alpha1.Repository"), mock.Anything).Return(nil).Maybe()
 	pkgRevName := "repo.1234567890.ws"
 
 	// Success case
@@ -174,7 +192,7 @@ func TestGet(t *testing.T) {
 
 	ctx := request.WithNamespace(context.TODO(), "someDummyNamespace")
 	result, err := packagerevisions.Get(ctx, pkgRevName, &metav1.GetOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.IsType(t, &porchapi.PackageRevision{}, result)
 
@@ -184,7 +202,6 @@ func TestGet(t *testing.T) {
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{}, nil).Once()
 
 	result, err = packagerevisions.Get(ctx, pkgRevName, &metav1.GetOptions{})
-	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.True(t, apierrors.IsNotFound(err))
 
@@ -205,6 +222,7 @@ func TestGet(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	mockClient, mockEngine := setup(t)
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1alpha1.Repository"), mock.Anything).Return(nil).Maybe()
 	ctx := request.WithNamespace(context.TODO(), "someDummyNamespace")
 
 	// Success case - Init task
@@ -219,11 +237,10 @@ func TestCreate(t *testing.T) {
 		},
 	}
 
-	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockEngine.On("CreatePackageRevision", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(packageRevision, nil).Once()
 
 	result, err := packagerevisions.Create(ctx, newPkgRev, nil, &metav1.CreateOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.IsType(t, &porchapi.PackageRevision{}, result)
 
@@ -231,7 +248,6 @@ func TestCreate(t *testing.T) {
 
 	// Missing namespace
 	result, err = packagerevisions.Create(context.TODO(), newPkgRev, nil, &metav1.CreateOptions{})
-	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.ErrorContains(t, err, "namespace must be specified")
 
@@ -240,7 +256,6 @@ func TestCreate(t *testing.T) {
 	// Wrong object type
 	wrongObj := &porchapi.PackageRevisionList{}
 	result, err = packagerevisions.Create(ctx, wrongObj, nil, &metav1.CreateOptions{})
-	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.ErrorContains(t, err, "expected PackageRevision object")
 
@@ -254,20 +269,34 @@ func TestCreate(t *testing.T) {
 		},
 	}
 	result, err = packagerevisions.Create(ctx, invalidPkgRev, nil, &metav1.CreateOptions{})
-	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.ErrorContains(t, err, "spec.repositoryName is required")
 
 	//=========================================================================================
 
 	// Error from CreatePackageRevision
-	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockEngine.On("CreatePackageRevision", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("creation failed")).Once()
+
+	result, err = packagerevisions.Create(ctx, newPkgRev, nil, &metav1.CreateOptions{})
+	assert.Nil(t, result)
+	assert.True(t, apierrors.IsInternalError(err))
+
+	//=========================================================================================
+
+	// v1alpha2 repo returns Forbidden
+	// Reset Get mock to return v1alpha2 annotation
+	mockClient.ExpectedCalls = filterCalls(mockClient.ExpectedCalls, "Get")
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1alpha1.Repository"), mock.Anything).
+		Run(func(args mock.Arguments) {
+			repo := args.Get(2).(*configapi.Repository)
+			repo.Annotations = map[string]string{configapi.AnnotationKeyV1Alpha2Migration: configapi.AnnotationValueMigrationEnabled}
+		}).Return(nil).Maybe()
 
 	result, err = packagerevisions.Create(ctx, newPkgRev, nil, &metav1.CreateOptions{})
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.True(t, apierrors.IsInternalError(err))
+	assert.True(t, apierrors.IsGone(err))
+	assert.ErrorContains(t, err, "managed by v1alpha2")
 }
 
 func TestDelete(t *testing.T) {
@@ -317,8 +346,8 @@ info:
 		},
 	}
 
-	// Need 1 Get call for validateDelete->getRepositoryObj
-	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	// Need Get calls for getRepoPkgRev->getRepositoryObj and validateDelete->getRepositoryObj
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1alpha1.Repository"), mock.Anything).Return(nil).Maybe()
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{
 		deletionProposedPkgRev,
 	}, nil).Once()
@@ -326,7 +355,7 @@ info:
 	mockEngine.On("DeletePackageRevision", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	result, deleted, err := packagerevisions.Delete(ctx, pkgRevName, nil, &metav1.DeleteOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.True(t, deleted)
 	assert.IsType(t, &porchapi.PackageRevision{}, result)
@@ -339,7 +368,6 @@ info:
 	}, nil).Once()
 
 	result, deleted, err = packagerevisions.Delete(ctx, pkgRevName, nil, &metav1.DeleteOptions{})
-	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.False(t, deleted)
 	assert.True(t, apierrors.IsForbidden(err))
@@ -389,7 +417,6 @@ info:
 		},
 	}
 
-	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{
 		draftPkgRev,
 	}, nil).Once()
@@ -397,7 +424,7 @@ info:
 	mockEngine.On("DeletePackageRevision", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	result, deleted, err = packagerevisions.Delete(ctx, pkgRevName, nil, &metav1.DeleteOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.True(t, deleted)
 	assert.IsType(t, &porchapi.PackageRevision{}, result)
@@ -406,7 +433,6 @@ info:
 
 	// Missing namespace
 	result, deleted, err = packagerevisions.Delete(context.TODO(), pkgRevName, nil, &metav1.DeleteOptions{})
-	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.False(t, deleted)
 	assert.ErrorContains(t, err, "namespace must be specified")
@@ -417,7 +443,7 @@ info:
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{}, nil).Once()
 
 	result, deleted, err = packagerevisions.Delete(ctx, pkgRevName, nil, &metav1.DeleteOptions{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.False(t, deleted)
 	assert.True(t, apierrors.IsNotFound(err))
@@ -425,7 +451,6 @@ info:
 	//=========================================================================================
 
 	// Error from DeletePackageRevision
-	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{
 		deletionProposedPkgRev,
 	}, nil).Once()
@@ -433,7 +458,6 @@ info:
 	mockEngine.On("DeletePackageRevision", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("deletion failed")).Once()
 
 	result, deleted, err = packagerevisions.Delete(ctx, pkgRevName, nil, &metav1.DeleteOptions{})
-	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.False(t, deleted)
 	assert.True(t, apierrors.IsInternalError(err))
@@ -449,7 +473,7 @@ func TestWatch(t *testing.T) {
 	defer cancel()
 
 	_, err := packagerevisions.Watch(ctx, &internalversion.ListOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//=========================================================================================
 
@@ -801,7 +825,7 @@ func TestCheckIfUpstreamIsReferenced(t *testing.T) {
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -809,6 +833,7 @@ func TestCheckIfUpstreamIsReferenced(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	mockClient, mockEngine := setup(t)
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1alpha1.Repository"), mock.Anything).Return(nil).Maybe()
 	ctx := request.WithNamespace(context.TODO(), "someDummyNamespace")
 	pkgRevName := "repo.1234567890.ws"
 
@@ -840,7 +865,6 @@ func TestUpdate(t *testing.T) {
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{
 		draftPackageRevision,
 	}, nil).Once()
-	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockEngine.On("UpdatePackageRevision", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(draftPackageRevision, nil).Once()
 
 	objInfo := &mockUpdatedObjectInfo{
@@ -855,7 +879,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	result, created, err := packagerevisions.Update(ctx, pkgRevName, objInfo, nil, nil, false, &metav1.UpdateOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.False(t, created)
 	assert.IsType(t, &porchapi.PackageRevision{}, result)
@@ -866,11 +890,9 @@ func TestUpdate(t *testing.T) {
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{
 		draftPackageRevision,
 	}, nil).Once()
-	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockEngine.On("UpdatePackageRevision", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("update failed")).Once()
 
 	result, created, err = packagerevisions.Update(ctx, pkgRevName, objInfo, nil, nil, false, &metav1.UpdateOptions{})
-	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.False(t, created)
 	assert.True(t, apierrors.IsInternalError(err))
@@ -891,11 +913,9 @@ func TestUpdate(t *testing.T) {
 	mockEngine.On("ListPackageRevisions", mock.Anything, mock.Anything).Return([]repository.PackageRevision{
 		draftPackageRevision,
 	}, nil).Once()
-	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockEngine.On("UpdatePackageRevision", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, apierrors.NewConflict(porchapi.Resource("packagerevisions"), pkgRevName, fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again"))).Once()
 
 	result, created, err = packagerevisions.Update(ctx, pkgRevName, objInfo, nil, nil, false, &metav1.UpdateOptions{})
-	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.False(t, created)
 	assert.True(t, apierrors.IsInternalError(err))

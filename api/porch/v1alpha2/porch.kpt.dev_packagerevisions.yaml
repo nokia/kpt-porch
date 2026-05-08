@@ -202,11 +202,6 @@ spec:
                         description: Site is a link to page with information about
                           the package.
                         type: string
-                      subpackage:
-                        description: |-
-                          Subpackage is a directory path to a subpackage to initialize.
-                          If unspecified, the main package will be initialized.
-                        type: string
                     type: object
                   upgrade:
                     description: Upgrade merges changes from a new upstream version
@@ -274,7 +269,7 @@ spec:
             description: PackageRevisionStatus defines the observed state of PackageRevision
             properties:
               conditions:
-                description: Conditions for controller state (e.g., Ready).
+                description: Conditions for controller state (e.g., Ready, Rendered).
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -330,6 +325,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               creationSource:
                 description: |-
                   CreationSource indicates how this package was created (for debugging/history).
@@ -340,6 +338,11 @@ spec:
                 description: Deployment is true if this is a deployment package (in
                   a deployment repository).
                 type: boolean
+              observedGeneration:
+                description: ObservedGeneration is the generation of the PackageRevision
+                  spec that was last reconciled.
+                format: int64
+                type: integer
               observedPrrResourceVersion:
                 description: |-
                   ObservedPrrResourceVersion tracks the last observed PRR resourceVersion.
@@ -454,6 +457,12 @@ spec:
                 type: object
             type: object
         type: object
+    selectableFields:
+    - jsonPath: .spec.lifecycle
+    - jsonPath: .spec.repository
+    - jsonPath: .spec.packageName
+    - jsonPath: .spec.workspaceName
+    - jsonPath: .status.revision
     served: true
     storage: true
     subresources:

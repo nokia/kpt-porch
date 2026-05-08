@@ -20,18 +20,22 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/nephio-project/porch/pkg/cache"
 	cachetypes "github.com/nephio-project/porch/pkg/cache/types"
 	externalrepotypes "github.com/nephio-project/porch/pkg/externalrepo/types"
 	"github.com/nephio-project/porch/pkg/registry/porch"
 	"github.com/nephio-project/porch/pkg/repository"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (r *RepositoryReconciler) createCacheFromEnv(ctx context.Context, mgr ctrl.Manager) error {
-	log := ctrl.Log.WithName(r.loggerName)
+	log := ctrl.Log.WithName(r.Name())
 	if err := r.validateCacheType(); err != nil {
 		return err
 	}
@@ -64,7 +68,19 @@ func (r *RepositoryReconciler) createCacheFromEnv(ctx context.Context, mgr ctrl.
 
 	options := r.buildCacheOptions(coreClient, dbOptions, cacheDir, credentialResolver, caBundleResolver, userInfoProvider)
 
-	r.Cache, err = cache.GetCacheImpl(ctx, options)
+	err = retry.OnError(
+		wait.Backoff{Duration: time.Second, Factor: 1.5, Steps: 20, Cap: 30 * time.Second},
+		func(err error) bool {
+			klog.Warningf("failed to create repository cache: %v; wait a sec...", err)
+			return true
+		},
+		func() error {
+			var err error
+			r.Cache, err = cache.GetCacheImpl(ctx, options)
+			return err
+		},
+	)
+
 	return err
 }
 
@@ -81,7 +97,7 @@ func (r *RepositoryReconciler) validateCacheType() error {
 // Priority: 1. Flag value, 2. GIT_CACHE_DIR env var, 3. User cache dir, 4. Temp dir
 // Matches porch-server behavior for consistency
 func (r *RepositoryReconciler) determineCacheDirectory() string {
-	log := ctrl.Log.WithName(r.loggerName)
+	log := ctrl.Log.WithName(r.Name())
 
 	// Priority 1: Use flag value if set
 	if r.cacheDirectory != "" {
@@ -139,11 +155,12 @@ func (r *RepositoryReconciler) buildCacheOptions(
 			RepoOperationRetryAttempts: r.RepoOperationRetryAttempts,
 		},
 		RepoPRChangeNotifier: cachetypes.NewNoOpRepoPRChangeNotifier(),
+		DbPushDraftsToGit:    r.PushDraftsToGit,
 	}
 }
 
 func (r *RepositoryReconciler) setupDBCacheOptionsFromEnv() (cachetypes.DBCacheOptions, error) {
-	log := ctrl.Log.WithName(r.loggerName)
+	log := ctrl.Log.WithName(r.Name())
 	dbDriver := os.Getenv("DB_DRIVER")
 	dbHost := os.Getenv("DB_HOST")
 	dbPort := os.Getenv("DB_PORT")

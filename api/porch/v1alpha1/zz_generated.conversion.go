@@ -664,7 +664,6 @@ func Convert_porch_PackageEditTaskSpec_To_v1alpha1_PackageEditTaskSpec(in *porch
 }
 
 func autoConvert_v1alpha1_PackageInitTaskSpec_To_porch_PackageInitTaskSpec(in *PackageInitTaskSpec, out *porch.PackageInitTaskSpec, s conversion.Scope) error {
-	out.Subpackage = in.Subpackage
 	out.Description = in.Description
 	out.Keywords = *(*[]string)(unsafe.Pointer(&in.Keywords))
 	out.Site = in.Site
@@ -677,7 +676,6 @@ func Convert_v1alpha1_PackageInitTaskSpec_To_porch_PackageInitTaskSpec(in *Packa
 }
 
 func autoConvert_porch_PackageInitTaskSpec_To_v1alpha1_PackageInitTaskSpec(in *porch.PackageInitTaskSpec, out *PackageInitTaskSpec, s conversion.Scope) error {
-	out.Subpackage = in.Subpackage
 	out.Description = in.Description
 	out.Keywords = *(*[]string)(unsafe.Pointer(&in.Keywords))
 	out.Site = in.Site

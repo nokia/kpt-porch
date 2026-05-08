@@ -23,60 +23,20 @@ import (
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	"github.com/kptdev/kpt/pkg/fn"
 	"github.com/kptdev/kpt/pkg/lib/kptops"
-	"github.com/kptdev/kpt/pkg/lib/runneroptions"
-	"github.com/kptdev/krm-functions-catalog/functions/go/apply-replacements/replacements"
-	set_namespace "github.com/kptdev/krm-functions-catalog/functions/go/set-namespace/transformer"
-	"github.com/kptdev/krm-functions-catalog/functions/go/starlark/starlark"
 	fnsdk "github.com/kptdev/krm-functions-sdk/go/fn"
+	"github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
 	"github.com/nephio-project/porch/pkg/util"
 	regclientref "github.com/regclient/regclient/types/ref"
 	"k8s.io/klog/v2"
 )
 
-// When updating the version for the builtin functions, please also update the image version
-// in test TestBuiltinFunctionEvaluator in porch/test/e2e/api/fn_runner_test.go, if the versions mismatch
-// the e2e test will fail in local deployment mode.
-var (
-	applyReplacementsImageAliases = []string{
-		"apply-replacements:v0.1.1",
-		"apply-replacements:v0.1",
-		"apply-replacements@sha256:85913d4ec8db62053eb060ff1b7e26d13ff8853b75cae4d0461b8a1c7ddd4947",
-	}
-	setNamespaceImageAliases = []string{
-		"set-namespace:v0.4.1",
-		"set-namespace:v0.4",
-		"set-namespace@sha256:f930d9248001fa763799cc81cf2d89bbf83954fc65de0db20ab038a21784f323",
-	}
-	starlarkImageAliases = []string{
-		"starlark:v0.4.3",
-		"starlark:v0.4",
-		"starlark@sha256:6ba3971c64abcd6c3d93039d45721bb5ab496c7fbbc9ac1e685b11577f368ce0",
-	}
-)
-
 type builtinRuntime struct {
-	fnMapping map[string]fnsdk.ResourceListProcessor
+	store *reconciler.FunctionConfigStore
 }
 
-func newBuiltinRuntime(imagePrefix string) *builtinRuntime {
-	fnMap := map[string]fnsdk.ResourceListProcessor{}
-
-	applyMappings := func(aliases []string, fn fnsdk.ResourceListProcessorFunc) {
-		for _, img := range aliases {
-			fnMap[img] = fn
-			fnMap[runneroptions.GHCRImagePrefix+img] = fn
-			if imagePrefix != "" && imagePrefix != runneroptions.GHCRImagePrefix {
-				fnMap[imagePrefix+"/"+img] = fn
-			}
-		}
-	}
-
-	applyMappings(applyReplacementsImageAliases, replacements.ApplyReplacements)
-	applyMappings(setNamespaceImageAliases, set_namespace.Run)
-	applyMappings(starlarkImageAliases, starlark.Process)
-
+func newBuiltinRuntime(functionConfigStore *reconciler.FunctionConfigStore) *builtinRuntime {
 	return &builtinRuntime{
-		fnMapping: fnMap,
+		store: functionConfigStore,
 	}
 }
 
@@ -87,9 +47,12 @@ func (br *builtinRuntime) GetRunner(ctx context.Context, funct *kptfilev1.Functi
 		ctx: ctx,
 	}
 
+	cache := br.store.GetExecCache()
+
 	if funct.Tag != "" {
 		ref, err := regclientref.New(funct.Image)
 		if err != nil {
+			klog.Infof("????")
 			return nil, fmt.Errorf("failed to parse image %q as reference: %w", funct.Image, err)
 		}
 		// If the image already carries an inline tag, strip it
@@ -101,24 +64,22 @@ func (br *builtinRuntime) GetRunner(ctx context.Context, funct *kptfilev1.Functi
 				funct.Image = stripped
 			}
 		}
+		baseName := util.GetImageName(funct.Image)
 
-		cacheKeys := make([]string, 0, len(br.fnMapping))
-		for k := range br.fnMapping {
-			cacheKeys = append(cacheKeys, k)
-		}
-		selectedKey, err := util.FindBestSemverMatch(funct.Tag, funct.Image, cacheKeys)
+		builtinEntry := cache[baseName]
+		cacheKeys := make([]string, 0, len(builtinEntry.Tags))
+		cacheKeys = append(cacheKeys, builtinEntry.Tags...)
+		_, err = util.FindBestSemverMatch(funct.Tag, funct.Image, cacheKeys)
 		if err != nil {
 			return nil, &fn.NotFoundError{
 				Function: kptfilev1.Function{Image: funct.Image},
 			}
 		}
-		builtinRunner.processor = br.fnMapping[selectedKey]
+		builtinRunner.processor = builtinEntry.Process
 	} else {
 		klog.Infof("Image tag is empty, using the image with explicit tag: %q", funct.Image)
-
-		processor, found := br.fnMapping[funct.Image]
+		processor, found := br.store.GetProcessorFromCache(funct.Image)
 		if !found {
-			klog.Infof("Image %q is not found in the cache", funct.Image)
 			return nil, &fn.NotFoundError{Function: *funct}
 		}
 		builtinRunner.processor = processor
