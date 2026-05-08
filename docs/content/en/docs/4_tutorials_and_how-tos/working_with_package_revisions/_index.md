@@ -27,14 +27,14 @@ PackageRevisions are Kubernetes resources that represent versioned collections o
 
 **PackageRevision Operations:**
 
-| Operation | Git Command | Description |
-|-----------|---------|-------------|
-| Creation | `init`, `clone`, `copy` | Create new PackageRevisions from scratch, existing packages, or new revisions |
-| Inspection | `get` | List and view PackageRevision information and metadata |
-| Content Management | `pull`, `push` | Move PackageRevision content between Git repositories and local filesystem |
-| Lifecycle Management | `propose`, `approve`, `reject` | Control PackageRevision workflow states |
-| Upgrading | `upgrade` | Create new revision upgrading downstream to more recent upstream package |
-| Deletion | `propose-delete`, `del` | Propose deletion of published PackageRevisions, then delete them |
+| Operation            | Git Command                    | Description                                                                   |
+|----------------------|--------------------------------|-------------------------------------------------------------------------------|
+| Creation             | `init`, `clone`, `copy`        | Create new PackageRevisions from scratch, existing packages, or new revisions |
+| Inspection           | `get`                          | List and view PackageRevision information and metadata                        |
+| Content Management   | `pull`, `push`                 | Move PackageRevision content between Git repositories and local filesystem    |
+| Lifecycle Management | `propose`, `approve`, `reject` | Control PackageRevision workflow states                                       |
+| Upgrading            | `upgrade`                      | Create new revision upgrading downstream to more recent upstream package      |
+| Deletion             | `propose-delete`, `del`        | Propose deletion of published PackageRevisions, then delete them              |
 
 ---
 
@@ -46,13 +46,15 @@ PackageRevisions follow a structured lifecycle with three main states:
 - **Proposed**: Ready for review, contents are immutable. To make further changes, reject back to Draft. Revision number remains 0.
 - **Published**: Approved and immutable. Revision number increments to 1+.
 
-PackageRevisions follow the following lifecycle transitions:
+PackageRevisions use the following lifecycle transitions:
 
-1. **Draft → Proposed**: `porchctl rpkg propose` - Signal readiness for review
-2. **Proposed → Published**: `porchctl rpkg approve` - Approve and make immutable
-3. **Proposed → Draft**: `porchctl rpkg reject` - Return for more work
-
-An additional state is **DeletionProposed**. In his state, the PackageRevision is marked for deletion, pending approval.
+| Transition                       | Command                        | Meaning                             |
+|----------------------------------|--------------------------------|-------------------------------------|
+| **Draft → Proposed**             | `porchctl rpkg propose`        | Signal readiness for review         |
+| **Proposed → Published**         | `porchctl rpkg approve`        | Approve and make immutable          |
+| **Proposed → Draft**             | `porchctl rpkg reject`         | Return for more work                |
+| **Published → DeletionProposed** | `porchctl rpkg propose-delete` | Mark for deletion, pending approval |
+| **DeletionProposed → Published** | `porchctl rpkg reject`         | Reject deletion proposal            |
 
 ---
 
