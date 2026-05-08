@@ -33,7 +33,9 @@ Provides declarative configuration of function executors through Kubernetes CRDs
 - **Image Prefix Matching**: Supports multiple image prefixes and tags per function configuration
 - **Template Customization**: Per-function pod and service template overrides including security context, resources, and environment variables
 
-For detailed configuration examples, see [Function Runner Configuration]({{% relref "/docs/5_architecture_and_components/function-runner/function-runner-config.md" %}}). For integration with executor selection, see [Function Runner Interactions]({{% relref "/docs/5_architecture_and_components/function-runner/interactions.md" %}}).
+For detailed configuration examples, see [Function Runner Configuration]({{% relref "/docs/6_configuration_and_deployments/configurations/components/function-runner-config/_index.md" %}}).
+
+For integration with executor selection, see [Function Runner Interactions]({{% relref "/docs/5_architecture_and_components/function-runner/interactions.md" %}}).
 
 ### Pod Lifecycle Management
 
