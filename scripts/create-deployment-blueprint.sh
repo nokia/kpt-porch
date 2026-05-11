@@ -21,7 +21,7 @@ set -o pipefail # Check errors in piped commands
 PORCH_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 STARLARK_IMG="ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5"
 SEARCH_REPLACE_IMG="ghcr.io/kptdev/krm-functions-catalog/search-replace:v0.2"
-SET_IMAGE_IMG="ghcr.io/kptdev/krm-functions-catalog/set-image:v0.1.1"
+SET_IMAGE_IMG="ghcr.io/kptdev/krm-functions-catalog/set-image:v0.2.2"
 
 function error() {
   cat <<EOF

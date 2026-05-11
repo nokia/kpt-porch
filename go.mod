@@ -18,7 +18,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/kptdev/kpt v1.0.0-beta.62.1
 	github.com/kptdev/krm-functions-catalog/functions/go/apply-replacements v0.1.5
-	github.com/kptdev/krm-functions-catalog/functions/go/apply-setters v0.2.2
+	github.com/kptdev/krm-functions-catalog/functions/go/apply-setters v0.2.4
 	github.com/kptdev/krm-functions-catalog/functions/go/set-namespace v0.4.5
 	github.com/kptdev/krm-functions-catalog/functions/go/starlark v0.5.5
 	github.com/kptdev/krm-functions-sdk/go/fn v1.0.2

@@ -15,16 +15,16 @@
 ARG ALPINE_VERSION=latest
 ARG GOLANG_ALPINE_VERSION=latest
 
-FROM ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2.2 AS apply-setters
+FROM ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2.4 AS apply-setters
 FROM ghcr.io/kptdev/krm-functions-catalog/ensure-name-substring:v0.2.1 AS ensure-name-substring
-FROM ghcr.io/kptdev/krm-functions-catalog/search-replace:v0.2.1 AS search-replace
-FROM ghcr.io/kptdev/krm-functions-catalog/set-annotations:v0.1.5 AS set-annotations
-FROM ghcr.io/kptdev/krm-functions-catalog/set-image:v0.1.2 AS set-image
-FROM ghcr.io/kptdev/krm-functions-catalog/set-labels:v0.2.2 AS set-labels
-FROM ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.2 AS set-namespace
+FROM ghcr.io/kptdev/krm-functions-catalog/search-replace:v0.2.3 AS search-replace
+FROM ghcr.io/kptdev/krm-functions-catalog/set-annotations:v0.1.7 AS set-annotations
+FROM ghcr.io/kptdev/krm-functions-catalog/set-image:v0.2.2 AS set-image
+FROM ghcr.io/kptdev/krm-functions-catalog/set-labels:v0.2.4 AS set-labels
+FROM ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.5 AS set-namespace
 FROM ghcr.io/kptdev/krm-functions-catalog/set-project-id:v0.2.1 AS set-project-id
-FROM ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5.2 AS starlark
-FROM ghcr.io/kptdev/krm-functions-catalog/upsert-resource:v0.2.1 AS upsert-resource
+FROM ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5.5 AS starlark
+FROM ghcr.io/kptdev/krm-functions-catalog/upsert-resource:v0.2.3 AS upsert-resource
 
 
 FROM golang:${GOLANG_ALPINE_VERSION} AS builder

@@ -21,7 +21,7 @@ info:
   description: kpt package for provisioning namespace
 pipeline:
   mutators:
-  - image: ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.3.4
+  - image: ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.5
     configPath: package-context.yaml
-  - image: ghcr.io/kptdev/krm-functions-catalog/apply-replacements:v0.1.0
+  - image: ghcr.io/kptdev/krm-functions-catalog/apply-replacements:v0.1.5
     configPath: update-rolebinding.yaml

@@ -109,7 +109,7 @@ function install() {
         mv "$deploy_config_dir"/dbcache/*porch-postgres*.yaml "$postgres_dir"
         cp "$deploy_config_dir"/dbcache/*namespace*.yaml "$postgres_dir"
         kpt fn eval "$postgres_dir" \
-        --image ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5.0 \
+        --image ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5.5 \
         --match-kind Namespace --match-name porch-fn-system \
         -- source='ctx.resource_list["items"] = []'
 
@@ -126,7 +126,7 @@ function install() {
 
         h2 "Increasing porch-server memory to $PORCH_SERVER_MEMORY"
         kpt fn eval "$deploy_config_dir/dbcache/" \
-        --image ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5.0 \
+        --image ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5.5 \
         --match-kind Deployment --match-name porch-server --match-namespace porch-system \
         -- source='for resource in ctx.resource_list["items"]:
             containers = resource.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [])
