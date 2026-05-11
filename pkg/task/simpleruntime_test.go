@@ -34,7 +34,7 @@ type runtime struct{}
 var _ fn.FunctionRuntime = &runtime{}
 
 var processors = map[string]framework.ResourceListProcessorFunc{
-	"ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2.0": applySetters,
+	"ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2.4": applySetters,
 }
 
 func (*runtime) GetRunner(ctx context.Context, f *kptfilev1.Function) (fn.FunctionRunner, error) {

@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"time"
 
+	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -87,7 +87,7 @@ var _ = Describe("Resilience", Ordered, Label("infra"), func() {
 
 		By("pushing content with a render pipeline")
 		updatePRRResources(env.Ctx, env.Namespace, pr.Name, map[string]string{
-			"Kptfile": "apiVersion: kpt.dev/v1\nkind: Kptfile\nmetadata:\n  name: post-restart\npipeline:\n  mutators:\n  - image: ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.1\n    configMap:\n      namespace: post-restart-ns\n",
+			"Kptfile": "apiVersion: kpt.dev/v1\nkind: Kptfile\nmetadata:\n  name: post-restart\npipeline:\n  mutators:\n  - image: ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.5\n    configMap:\n      namespace: post-restart-ns\n",
 			"cm.yaml": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: post-restart-cm\ndata:\n  key: value\n",
 		})
 

@@ -52,9 +52,9 @@ status:
     result:
       exitCode: 0
       items:
-        - image: ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.1
+        - image: ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.5
           exitCode: 0
-        - image: ghcr.io/kptdev/krm-functions-catalog/kubeconform:v0.1.2
+        - image: ghcr.io/kptdev/krm-functions-catalog/kubeconform:v0.1.3
           exitCode: 1
           results:
             - message: "Invalid resource configuration"

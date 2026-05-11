@@ -112,7 +112,7 @@ else
   h1 Gitea LoadBalancer service does not exist. Mutating pkg...
  
   kpt fn eval \
-    --image ghcr.io/kptdev/krm-functions-catalog/set-annotations:v0.1.4 \
+    --image ghcr.io/kptdev/krm-functions-catalog/set-annotations:v0.1.7 \
     --match-kind Service \
     --match-name gitea-lb \
     --match-namespace gitea \
