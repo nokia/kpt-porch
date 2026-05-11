@@ -79,7 +79,7 @@ porchctl rpkg propose porch-test.test-published-package.published-v1 --namespace
 porchctl rpkg approve porch-test.test-published-package.published-v1 --namespace=default
 ```
 
-**Verify the PackageRevisions were created:**
+Verify the PackageRevisions were created:
 
 ```bash
 porchctl rpkg get --namespace=default
@@ -88,11 +88,11 @@ porchctl rpkg get --namespace=default
 You should see an output similar to:
 
 ```bash
-NAME                                           PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
-porch-test.test-draft-package.draft-v1         test-draft-package       draft-v1        0          false    Draft       porch-test
-porch-test.test-proposed-package.proposed-v1   test-proposed-package    proposed-v1     0          false    Proposed    porch-test
-porch-test.test-published-package.main         test-published-package   main            -1         false    Published   porch-test
-porch-test.test-published-package.published-v1 test-published-package   published-v1    1          true     Published   porch-test
+NAME                                             PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
+porch-test.test-draft-package.draft-v1           test-draft-package       draft-v1        0          false    Draft       porch-test
+porch-test.test-proposed-package.proposed-v1     test-proposed-package    proposed-v1     0          false    Proposed    porch-test
+porch-test.test-published-package.main           test-published-package   main            -1         false    Published   porch-test
+porch-test.test-published-package.published-v1   test-published-package   published-v1    1          true     Published   porch-test
 ```
 
 ---
@@ -105,13 +105,9 @@ Draft PackageRevisions can be deleted immediately without any approval process:
 porchctl rpkg del porch-test.test-draft-package.draft-v1 --namespace=default
 ```
 
-**What this does:**
+This command immediately removes the Draft PackageRevision and deletes the corresponding Git branch (`draft/draft-v1`). No approval or confirmation is required.
 
-- Immediately removes the Draft PackageRevision
-- Deletes the corresponding Git branch (`draft/draft-v1`)
-- No approval or confirmation required
-
-**Verify the deletion:**
+Verify the deletion:
 
 ```bash
 porchctl rpkg get --namespace=default
@@ -120,10 +116,10 @@ porchctl rpkg get --namespace=default
 The Draft PackageRevision should no longer appear in the list:
 
 ```bash
-NAME                                           PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
-porch-test.test-proposed-package.proposed-v1   test-proposed-package    proposed-v1     0          false    Proposed    porch-test
-porch-test.test-published-package.main         test-published-package   main            -1         false    Published   porch-test
-porch-test.test-published-package.published-v1 test-published-package   published-v1    1          true     Published   porch-test
+NAME                                             PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
+porch-test.test-proposed-package.proposed-v1     test-proposed-package    proposed-v1     0          false    Proposed    porch-test
+porch-test.test-published-package.main           test-published-package   main            -1         false    Published   porch-test
+porch-test.test-published-package.published-v1   test-published-package   published-v1    1          true     Published   porch-test
 ```
 
 ---
@@ -136,13 +132,9 @@ Proposed PackageRevisions can also be deleted directly:
 porchctl rpkg del porch-test.test-proposed-package.proposed-v1 --namespace=default
 ```
 
-**What this does:**
+This command immediately removes the Proposed PackageRevision and deletes the corresponding Git branch (`proposed/proposed-v1`). No approval process is required.
 
-- Immediately removes the Proposed PackageRevision
-- Deletes the corresponding Git branch (`proposed/proposed-v1`)
-- No approval process required
-
-**Verify the deletion:**
+Verify the deletion:
 
 ```bash
 porchctl rpkg get --namespace=default
@@ -151,9 +143,9 @@ porchctl rpkg get --namespace=default
 The Proposed PackageRevision should no longer appear in the list:
 
 ```bash
-NAME                                           PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
-porch-test.test-published-package.main         test-published-package   main            -1         false    Published   porch-test
-porch-test.test-published-package.published-v1 test-published-package   published-v1    1          true     Published   porch-test
+NAME                                             PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
+porch-test.test-published-package.main           test-published-package   main            -1         false    Published   porch-test
+porch-test.test-published-package.published-v1   test-published-package   published-v1    1          true     Published   porch-test
 ```
 
 ---
@@ -166,13 +158,10 @@ Published PackageRevisions cannot be deleted directly. You must first propose th
 porchctl rpkg propose-delete porch-test.test-published-package.published-v1 --namespace=default
 ```
 
-**What this does:**
+This command changes the PackageRevision lifecycle from `Published` to `DeletionProposed` and signals that its deletion is up for review.
+Requires approval before actual deletion occurs.
 
-- Changes the PackageRevision lifecycle from `Published` to `DeletionProposed`
-- Signals that the PackageRevision should be deleted
-- Requires approval before actual deletion occurs
-
-**Verify the state change:**
+Verify the state change:
 
 ```bash
 porchctl rpkg get porch-test.test-published-package.published-v1 --namespace=default
@@ -181,9 +170,9 @@ porchctl rpkg get porch-test.test-published-package.published-v1 --namespace=def
 The lifecycle should now show `DeletionProposed`:
 
 ```bash
-NAME                                           PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE         REPOSITORY
-porch-test.test-published-package.main         test-published-package   main            -1         false    Published         porch-test
-porch-test.test-published-package.published-v1 test-published-package   published-v1    1          true     DeletionProposed  porch-test
+NAME                                             PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE         REPOSITORY
+porch-test.test-published-package.main           test-published-package   main            -1         false    Published         porch-test
+porch-test.test-published-package.published-v1   test-published-package   published-v1    1          true     DeletionProposed  porch-test
 ```
 
 ---
@@ -196,13 +185,11 @@ If you want to proceed with the deletion, approve the deletion proposal:
 porchctl rpkg del porch-test.test-published-package.published-v1 --namespace=default
 ```
 
-**What this does:**
+{{% alert title="Warning" color="Warning" %}}
+This command permanently deletes the PackageRevision, removing the Git tag and any associated branches. This cannot be undone once completed.
+{{% /alert %}}
 
-- Permanently deletes the PackageRevision
-- Removes the Git tag and any associated branches
-- **Important**: This cannot be undone once completed
-
-**Verify the deletion:**
+Verify the deletion:
 
 ```bash
 porchctl rpkg get --namespace=default
@@ -211,8 +198,8 @@ porchctl rpkg get --namespace=default
 The published PackageRevision should no longer exist, but the main branch-tracking PackageRevision remains:
 
 ```bash
-NAME                                    PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
-porch-test.test-published-package.main  test-published-package   main            -1         false    Published   porch-test
+NAME                                     PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
+porch-test.test-published-package.main   test-published-package   main            -1         false    Published   porch-test
 ```
 
 ---
@@ -239,13 +226,9 @@ porchctl rpkg propose-delete porch-test.test-reject-delete.reject-v1 --namespace
 porchctl rpkg reject porch-test.test-reject-delete.reject-v1 --namespace=default
 ```
 
-**What this does:**
+These commands change lifecycle from `DeletionProposed` back to `Published`, which means that the PackageRevision returns to normal published state. The revision can be used again normally.
 
-- Changes lifecycle from `DeletionProposed` back to `Published`
-- PackageRevision returns to normal published state
-- The package can be used again normally
-
-**Verify the state change:**
+Verify the state change:
 
 ```bash
 porchctl rpkg get porch-test.test-reject-delete.reject-v1 --namespace=default
@@ -254,8 +237,8 @@ porchctl rpkg get porch-test.test-reject-delete.reject-v1 --namespace=default
 The lifecycle should be back to `Published`:
 
 ```bash
-NAME                                    PACKAGE            WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
-porch-test.test-reject-delete.reject-v1 test-reject-delete reject-v1       1          true     Published   porch-test
+NAME                                      PACKAGE            WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
+porch-test.test-reject-delete.reject-v1   test-reject-delete reject-v1       1          true     Published   porch-test
 ```
 
 ---
@@ -307,24 +290,17 @@ graph TD
 
 ## Safety Considerations
 
-**Published PackageRevision Protection:**
+**Published PackageRevision Protection**
 
-- Two-step deletion process prevents accidental removal
-- Deletion proposals can be reviewed before approval
-- Rejected proposals restore the PackageRevision to Published state
+The two-step deletion process prevents accidental removal: deletion proposals can be reviewed before approval, and if a proposal is rejected the PackageRevision returns to the **Published** state.
 
-**Git Repository Impact:**
+**Git Repository Impact**
 
-- Draft/Proposed deletions remove Git branches
-- Published deletions remove Git tags and references
-- Deletion is permanent and cannot be undone
+Draft/Proposed deletions remove Git branches as well, and published deletions remove Git tags and references. Deletion is permanent and cannot be undone.
 
-**Upstream Reference Considerations:**
+**Upstream Reference Considerations**
 
-- Upstream PackageRevisions cannot be deleted while downstream PackageRevisions reference them
-- Delete downstream PackageRevisions first, then you can delete the upstream PackageRevisions
-- The error message identifies which downstream PackageRevision is blocking deletion
-- Consider the impact on deployed workloads
+Upstream PackageRevisions cannot be deleted while downstream PackageRevisions reference them. Make sure to delete downstream PackageRevisions first, then you can delete the upstream PackageRevisions. The error message identifies which downstream PackageRevision is blocking deletion. Also consider the impact on deployed workloads.
 
 ---
 
@@ -341,8 +317,8 @@ Error: cannot delete published package revision directly, use propose-delete fir
 **PackageRevision not found:**
 
 - Verify the exact PackageRevision name with the `porchctl rpkg get --namespace=default` command
-- Check you're using the correct namespace
-- Ensure the PackageRevision hasn't already been deleted
+- Check that you are using the correct namespace
+- Ensure the PackageRevision has not already been deleted
 
 **Permission denied:**
 
@@ -374,7 +350,7 @@ After deleting PackageRevisions, you may notice "main" branch-tracking PackageRe
 Main branch-tracking PackageRevisions (with workspace name "main" and revision "-1") are managed automatically by Porch. Do not modify, propose, approve, or otherwise interact with them except for deletion after all regular PackageRevisions of that specific package have been removed.
 {{% /alert %}}
 
-**Check for remaining PackageRevisions:**
+Check for remaining PackageRevisions:
 
 ```bash
 porchctl rpkg get --namespace=default
@@ -383,12 +359,12 @@ porchctl rpkg get --namespace=default
 You might see an output like:
 
 ```bash
-NAME                                    PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
-porch-test.test-published-package.main test-published-package   main            -1         false    Published   porch-test
-porch-test.test-reject-delete.main     test-reject-delete       main            -1         false    Published   porch-test
+NAME                                     PACKAGE                  WORKSPACENAME   REVISION   LATEST   LIFECYCLE   REPOSITORY
+porch-test.test-published-package.main   test-published-package   main            -1         false    Published   porch-test
+porch-test.test-reject-delete.main       test-reject-delete       main            -1         false    Published   porch-test
 ```
 
-**Delete the main branch-tracking PackageRevisions:**
+Delete the main branch-tracking PackageRevisions:
 
 ```bash
 # Propose deletion of main branch PackageRevisions
@@ -400,7 +376,7 @@ porchctl rpkg del porch-test.test-published-package.main --namespace=default
 porchctl rpkg del porch-test.test-reject-delete.main --namespace=default
 ```
 
-**Verify complete cleanup:**
+Verify complete cleanup:
 
 ```bash
 porchctl rpkg get --namespace=default
