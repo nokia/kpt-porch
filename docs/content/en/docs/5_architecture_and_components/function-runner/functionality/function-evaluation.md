@@ -589,43 +589,7 @@ The evaluation system employs several performance strategies.
 - Use executable evaluator for critical path
 - Monitor pod resource usage
 
-## FunctionConfig CRD
-
-The FunctionConfig CRD is the central configuration mechanism for function evaluation in both function-runner and porch-server.
-
-### CRD Structure
-
-**Core fields:**
-- **image**: Base image name (without prefix or tag)
-- **prefixes**: List of registry prefixes to match
-- **binaryExecutor**: Configuration for binary execution
-- **podExecutor**: Configuration for pod execution
-- **goExecutor**: Configuration for native Go execution (porch-server only)
-
-### Executor Types
-
-**Binary Executor:**
-- Maps specific image tags to local binary executables
-- **tags**: List of image tags to handle
-- **path**: Absolute or relative path to binary
-- Used by function-runner for fast local execution
-
-**Pod Executor:**
-- Runs functions in containers with configurable settings
-- **tags**: List of image tags to handle
-- **timeToLive**: Duration pods remain cached (default: 30m)
-- **templateOverrides**: Customize pod/container specifications
-- Used by function-runner for containerized execution
-
-**Go Executor:**
-- Executes functions as native Go calls
-- **tags**: List of image tags to handle
-- **id**: Registration ID for Go function (defaults to image name)
-- Used by porch-server for built-in functions
-
-### Configuration Reconciliation
-
-Both function-runner and porch-server embed a FunctionConfig reconciler:
+## Configuration Reconciliation
 
 **Reconciler behavior:**
 - Watches FunctionConfig CRDs in the function namespace
@@ -669,8 +633,8 @@ spec:
       - v0.4.5
 ```
 
-This configuration supports:
+This example configuration supports:
 - Binary execution for `set-namespace:v0.4.2`
 - Pod execution for `set-namespace:v0.4.1`
-- Native Go execution for `set-namespace:v0.4` and `v0.4.5` (porch-server only)
+- Native Go execution for `set-namespace:v0.4` and `v0.4.5`
 - Automatic prefix resolution for both qualified and unqualified images

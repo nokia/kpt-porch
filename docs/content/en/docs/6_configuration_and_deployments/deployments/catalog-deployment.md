@@ -88,8 +88,7 @@ kpt live apply porch
 ```
 
 The catalog package includes:
-- FunctionConfig and ServiceTemplate CRDs for configuring KRM function execution
-- Multiple pre-configured FunctionConfig resources for common KRM functions (apply-replacements, set-namespace, starlark, etc.)
+- Multiple pre-configured [FunctionConfig]({{% relref "/docs/6_configuration_and_deployments/configurations/components/function-runner-config/function-configuration.md" %}}) resources for common KRM functions (apply-replacements, set-namespace, starlark, etc.)
 - Pod and service templates for pod-based function execution
 
 ## Verification
@@ -128,11 +127,17 @@ kubectl get functionconfigs -n porch-fn-system
 ```
 
 You should see several pre-configured function configurations for common KRM functions such as:
-- `apply-replacements`
-- `set-namespace`
-- `starlark`
-- `apply-setters`
-- `set-labels`
+```
+NAME                    SERVER APPLIED   FNRUNNER APPLIED   CONTROLLER APPLIED
+apply-replacements      1                1                  1
+apply-setters           1                1                  1
+create-setters          1                1                  1
+enable-gcp-services     1                1                  1
+ensure-name-substring   1                1                  1
+export-terraform        1                1                  1
+gatekeeper              1                1                  1
+...
+```
 
 These FunctionConfig resources define how KRM functions are executed (using pod, binary, or go executors) and streamline function configuration compared to the older ConfigMap-based approach.
 
@@ -184,4 +189,3 @@ kubectl get functionconfigs -n porch-fn-system -o jsonpath='{range .items[*]}{.m
 For additional support:
 - Check the [Porch GitHub issues](https://github.com/nephio-project/porch/issues)
 - Join the [Nephio community](https://nephio.org/community/)
-- See [FunctionConfig documentation]({{% relref "../configurations/components/function-runner-config" %}}) for customizing function execution

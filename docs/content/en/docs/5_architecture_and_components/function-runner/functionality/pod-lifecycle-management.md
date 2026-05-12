@@ -128,13 +128,13 @@ The Pod Manager handles low-level Kubernetes operations for function pods and th
 
 **Image Metadata Operations** - Cache image digests and entrypoints, inspect container images to extract configuration, handle private registry authentication and TLS configuration, manage image pull secrets for function pods.
 
-**Template System** - Retrieve or create base pod and service templates from ServiceTemplate CRDs or inline defaults, track template versions to detect changes requiring pod replacement, patch templates with function-specific configuration and template overrides from FunctionConfig.
+**Template System** - Retrieve or create base pod and service templates from ServiceTemplate custom resources or inline defaults, track template versions to detect changes requiring pod replacement, patch templates with function-specific configuration and template overrides from FunctionConfig.
 
 ### Pod Template System
 
 The pod manager supports two template sources: ConfigMap-based templates for customization and inline templates as fallback defaults.
 
-The pod manager retrieves base pod and service templates from PodTemplate resources and ServiceTemplate CRs in the function execution namespace.
+The pod manager retrieves base pod and service templates from PodTemplate resources and ServiceTemplate resources in the function execution namespace.
 If these resources are not found, the pod manager creates them from embedded inline defaults.
 
 The template's `ResourceVersion` is used as the template version for tracking changes. When a template is updated, existing pods with old template versions are replaced on next use.
@@ -154,10 +154,6 @@ FunctionConfig resources can specify template overrides that customize the base 
 
 These overrides are merged with the base template during pod creation, allowing function-specific customization without requiring separate templates for each function.
 
-**Legacy ConfigMap Approach:**
-
-Prior to the ServiceTemplate CRD implementation, pod and service templates were stored in ConfigMaps. This approach is deprecated. See [function-runner-pod-templates.md](../relevant_old_docs/function-runner-pod-templates.md) for historical reference.
- 
 ### Container Configuration
 
 The pod manager patches the function container in the template with function-specific configuration before creating the pod:

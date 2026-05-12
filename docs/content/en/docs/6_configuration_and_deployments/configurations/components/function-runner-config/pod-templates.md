@@ -2,10 +2,12 @@
 title: "Pod Templates"
 type: docs
 weight: 2
-description: "Customize function evaluator pod specifications using ConfigMap templates"
+description: "Customize function evaluator pod specifications using PodTemplates"
 ---
 
-The Function Runner supports customizing the pod specifications used for KRM function evaluation through ConfigMap-based templates. This allows you to configure resource limits, security contexts, node selectors, tolerations, and other pod-level settings for function execution pods.
+The Function Runner supports customizing the pod specifications used for KRM function evaluation through PodTemplates. This allows you to configure resource limits, security contexts, node selectors, tolerations, and other pod-level settings for function execution pods.
+
+<!-- TODO: this needs to be checked for references to ConfigMaps and ServiceTemplate needs to be added -->
 
 ## Overview
 
