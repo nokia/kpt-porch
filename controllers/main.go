@@ -304,7 +304,7 @@ func setupFunctionConfigReconciler(mgr ctrl.Manager) (*reconciler.FunctionConfig
 	if prefix == "" {
 		prefix = runneroptions.GHCRImagePrefix
 	}
-	functionConfigStore := reconciler.NewFunctionConfigStore(prefix, "")
+	functionConfigStore := reconciler.NewStore(prefix, "")
 
 	rec := &reconciler.FunctionConfigReconciler{
 		Client:              mgr.GetClient(),
@@ -337,12 +337,9 @@ func prePopulateFunctionConfigStore(reader client.Reader, store *reconciler.Func
 	}
 	for i := range fcList.Items {
 		obj := &fcList.Items[i]
-		store.UpsertFunctionConfig(obj.Name, obj)
-		if obj.Spec.GoExecutor != nil {
-			store.UpdateExecCache(obj.Name, obj)
-		}
-		if obj.Spec.BinaryExecutor != nil {
-			store.UpdateBinaryCache(obj.Name, obj)
+		err := store.Store(obj)
+		if err != nil {
+			klog.Warningf("Failed to store %q during pre-pupulate (non-fatal): %v", client.ObjectKeyFromObject(obj), err)
 		}
 	}
 	klog.Infof("FunctionConfig store pre-populated with %d configs", len(fcList.Items))

@@ -62,7 +62,7 @@ func TestInit_NilCache(t *testing.T) {
 	r := &PackageRevisionReconciler{
 		RepoOperationRetryAttempts: 3,
 		MaxGRPCMessageSize:         defaultMaxGRPCMessageSize,
-		FunctionConfigStore:        reconciler.NewFunctionConfigStore("", ""),
+		FunctionConfigStore:        reconciler.NewStore("", ""),
 	}
 	err := r.Init(mgr)
 	require.NoError(t, err)
@@ -75,7 +75,7 @@ func TestInit_SetsCredResolverAndFetcher(t *testing.T) {
 	r := &PackageRevisionReconciler{
 		RepoOperationRetryAttempts: 3,
 		MaxGRPCMessageSize:         defaultMaxGRPCMessageSize,
-		FunctionConfigStore:        reconciler.NewFunctionConfigStore("", ""),
+		FunctionConfigStore:        reconciler.NewStore("", ""),
 	}
 
 	err := r.Init(mgr)
@@ -93,7 +93,7 @@ func TestInit_RendererEnabledWithFnRunner(t *testing.T) {
 	r := &PackageRevisionReconciler{
 		RepoOperationRetryAttempts: 3,
 		MaxGRPCMessageSize:         defaultMaxGRPCMessageSize,
-		FunctionConfigStore:        reconciler.NewFunctionConfigStore("", ""),
+		FunctionConfigStore:        reconciler.NewStore("", ""),
 	}
 
 	t.Setenv("FUNCTION_RUNNER_ADDRESS", "localhost:0")

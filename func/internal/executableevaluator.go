@@ -58,22 +58,22 @@ func (e *executableEvaluator) EvaluateFunction(ctx context.Context, req *pb.Eval
 		ref.Digest = ""
 		req.Image = ref.CommonName()
 
-		binary, exists := e.FunctionConfigStore.GetBinaryFromCacheByConstraint(req.Image, req.Tag)
+		config, exists := e.FunctionConfigStore.GetByConstraint(req.Image, req.Tag)
 		if !exists {
 			return nil, &fn.NotFoundError{
 				Function: kptfilev1.Function{Image: req.Image},
 			}
 		}
-		selectedBinary = binary
+		selectedBinary = config.BinaryExecutor.Path
 	} else {
 		klog.Infof("Image tag is empty, using the image with explicit tag: %q", req.Image)
-		binary, exists := e.FunctionConfigStore.GetBinaryFromCache(req.Image)
+		config, exists := e.FunctionConfigStore.Get(req.Image)
 		if !exists {
 			return nil, &fn.NotFoundError{
 				Function: kptfilev1.Function{Image: req.Image},
 			}
 		}
-		selectedBinary = binary
+		selectedBinary = config.BinaryExecutor.Path
 	}
 
 	klog.Infof("Evaluating %q in executable mode", req.Image)

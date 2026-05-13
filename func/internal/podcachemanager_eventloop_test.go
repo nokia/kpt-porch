@@ -49,7 +49,7 @@ func newTestEventLoopPCM(kubeClient client.Client) (*podCacheManager, chan *conn
 		functions:                  map[string]*functionInfo{},
 		maxWaitlistLength:          2,
 		maxParallelPodsPerFunction: 1,
-		functionConfigMap:          fnconf.NewFunctionConfigStore(runneroptions.GHCRImagePrefix, "/functions"),
+		functionConfigMap:          fnconf.NewStore(runneroptions.GHCRImagePrefix, "/functions"),
 		podManager: &podManager{
 			kubeClient:         kubeClient,
 			namespace:          defaultNamespace,

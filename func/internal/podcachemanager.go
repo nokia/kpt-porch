@@ -23,9 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
 	fnconf "github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
-	"github.com/nephio-project/porch/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -130,12 +128,8 @@ func (pcm *podCacheManager) podCacheManager(ctx context.Context) {
 
 				fn.pods = append(fn.pods, NewPodInfo(req.responseCh))
 
-				functionConfig, exists := pcm.functionConfigMap.GetFunctionConfig(util.GetImageName(req.image))
-				if !exists {
-					functionConfig = &configapi.FunctionConfig{}
-				}
-
-				go pcm.podManager.getFuncEvalPodClient(context.Background(), req.image, len(fn.pods), functionConfig.Spec.PodExecutor, true)
+				config, _ := pcm.functionConfigMap.Get(req.image)
+				go pcm.podManager.getFuncEvalPodClient(context.Background(), req.image, len(fn.pods), config.PodExecutor, true)
 			} else {
 				pod := &fn.pods[bestPodIndex]
 				klog.Infof("Queuing request for %s on pod instance #%d (queue length will be %d)", req.image, bestPodIndex, bestWaitlistLen+1)
@@ -208,8 +202,8 @@ func (pcm *podCacheManager) podCacheManager(ctx context.Context) {
 // If the image is present in the configMap, it returns the specific parameters for that image.
 // Otherwise, it falls back to the global defaults (pcm.podTTL, pcm.maxWaitlistLength, pcm.maxParallelPodsPerFunction).
 func (pcm *podCacheManager) getParamsForImage(image string) (ttl time.Duration, maxWaitlist, maxPods int) {
-	if entry, ok := pcm.functionConfigMap.GetFunctionConfig(util.GetImageName(image)); ok && entry.Spec.PodExecutor != nil {
-		podExecutorConfig := entry.Spec.PodExecutor
+	if entry, ok := pcm.functionConfigMap.Get(image); ok && entry.PodExecutor != nil {
+		podExecutorConfig := entry.PodExecutor
 		parsedTTL := podExecutorConfig.TimeToLive.Duration
 		if parsedTTL <= 0 {
 			parsedTTL = pcm.podTTL
@@ -302,40 +296,36 @@ func (pcm *podCacheManager) retrieveFunctionPods(ctx context.Context) error {
 }
 
 // warmupCache starts preloading 1 pod in the background for each function specified in podCacheConfig
-func (pcm *podCacheManager) warmupCache(defaultImagePrefix string) error {
-	start := time.Now()
-	defer func() {
-		klog.Infof("cache warming is completed and it took %v", time.Since(start))
-	}()
-	for _, entry := range pcm.functionConfigMap.List() {
-		if entry.Spec.PodExecutor != nil && len(entry.Spec.PodExecutor.Tags) > 0 {
-			image := entry.Spec.Image
-			if len(entry.Spec.PodExecutor.Tags[0]) > 0 {
-				image = fmt.Sprintf("%s:%s", entry.Spec.Image, entry.Spec.PodExecutor.Tags[0])
-			}
-			if len(entry.Spec.Prefixes) > 0 && entry.Spec.Prefixes[0] != "" {
-				image = ImageJoin(entry.Spec.Prefixes[0], image)
-			} else {
-				image = ImageJoin(defaultImagePrefix, image)
-			}
-			image = pcm.podManager.imageResolver(image)
-			fn := pcm.FunctionInfo(image)
-			if len(fn.pods) == 0 {
-				fn.pods = append(fn.pods, NewPodInfo(nil))
-				go func(fnImage string) {
-					ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-					defer cancel()
-					functionConfig, exists := pcm.functionConfigMap.GetFunctionConfig(entry.Spec.Image)
-					if !exists {
-						functionConfig = &configapi.FunctionConfig{}
-					}
-					pcm.podManager.getFuncEvalPodClient(ctx, fnImage, 1, functionConfig.Spec.PodExecutor, false)
-				}(image)
-			}
-		}
-	}
-	return nil
-}
+//func (pcm *podCacheManager) warmupCache(defaultImagePrefix string) error {
+//	start := time.Now()
+//	defer func() {
+//		klog.Infof("cache warming is completed and it took %v", time.Since(start))
+//	}()
+//	for _, entry := range pcm.functionConfigMap.List() {
+//		if entry.Spec.PodExecutor != nil && len(entry.Spec.PodExecutor.Tags) > 0 {
+//			image := entry.Spec.Image
+//			if len(entry.Spec.PodExecutor.Tags[0]) > 0 {
+//				image = fmt.Sprintf("%s:%s", entry.Spec.Image, entry.Spec.PodExecutor.Tags[0])
+//			}
+//			if len(entry.Spec.Prefixes) > 0 && entry.Spec.Prefixes[0] != "" {
+//				image = ImageJoin(entry.Spec.Prefixes[0], image)
+//			} else {
+//				image = ImageJoin(defaultImagePrefix, image)
+//			}
+//			image = pcm.podManager.imageResolver(image)
+//			fn := pcm.FunctionInfo(image)
+//			if len(fn.pods) == 0 {
+//				fn.pods = append(fn.pods, NewPodInfo(nil))
+//				go func(fnImage string) {
+//					ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+//					defer cancel()
+//					pcm.podManager.getFuncEvalPodClient(ctx, fnImage, 1, entry.Spec.PodExecutor, false)
+//				}(image)
+//			}
+//		}
+//	}
+//	return nil
+//}
 
 func ImageJoin(prefix, image string) string {
 	return strings.TrimRight(prefix, "/") + "/" + strings.TrimLeft(image, "/")

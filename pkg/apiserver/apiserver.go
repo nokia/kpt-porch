@@ -321,7 +321,7 @@ func (c completedConfig) buildFunctionConfigReconciler(ctx context.Context, sche
 		}
 	}
 
-	functionConfigStore := reconciler.NewFunctionConfigStore(c.ExtraConfig.GRPCRuntimeOptions.DefaultImagePrefix, "")
+	functionConfigStore := reconciler.NewStore(c.ExtraConfig.GRPCRuntimeOptions.DefaultImagePrefix, "")
 
 	rec := &reconciler.FunctionConfigReconciler{
 		Client:              mgr.GetClient(),

@@ -243,7 +243,7 @@ func buildFnConfigReconciler(o *options, scheme *runtime.Scheme) (*reconciler.Fu
 		return nil, err
 	}
 
-	functionConfigStore := reconciler.NewFunctionConfigStore(o.defaultImagePrefix, o.exec.FunctionCacheDir)
+	functionConfigStore := reconciler.NewStore(o.defaultImagePrefix, o.exec.FunctionCacheDir)
 
 	rec := &reconciler.FunctionConfigReconciler{
 		Client:              mgr.GetClient(),

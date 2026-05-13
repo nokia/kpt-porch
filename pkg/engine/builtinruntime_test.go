@@ -25,7 +25,7 @@ import (
 	fnsdk "github.com/kptdev/krm-functions-sdk/go/fn"
 	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
 	"github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
-	"github.com/nephio-project/porch/pkg/util"
+	imageutil "github.com/nephio-project/porch/pkg/util/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,8 +58,8 @@ func TestNewBuiltinRuntime(t *testing.T) {
 			},
 		}
 
-		functionConfigStore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, "")
-		functionConfigStore.UpdateExecCache(applyReplacementsFunction, &functionConfig)
+		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		require.NoError(t, functionConfigStore.Store(&functionConfig))
 
 		br := newBuiltinRuntime(functionConfigStore)
 
@@ -67,13 +67,13 @@ func TestNewBuiltinRuntime(t *testing.T) {
 		assert.NotNil(t, br.store)
 
 		// Verify that functions are registered with the custom image prefix
-		processor, exists := functionConfigStore.GetProcessorFromCache(customImagePrefix + "/" + applyReplacementsFunction + ":v0.1.1")
+		processor, exists := functionConfigStore.GetProcessor(customImagePrefix + "/" + applyReplacementsFunction + ":v0.1.1")
 		assert.True(t, exists,
 			"Expected function to be registered with custom image prefix: %s", customImagePrefix)
 		assert.NotNil(t, processor)
 
 		// Verify that functions are also registered with default GHCR prefix
-		processor, exists = functionConfigStore.GetProcessorFromCache(defaultKRMImagePrefix + "/" + applyReplacementsFunction + ":v0.1.1")
+		processor, exists = functionConfigStore.GetProcessor(defaultKRMImagePrefix + "/" + applyReplacementsFunction + ":v0.1.1")
 		assert.True(t, exists,
 			"Expected function to be registered with default GHCR prefix")
 		assert.NotNil(t, processor)
@@ -93,21 +93,21 @@ func TestNewBuiltinRuntime(t *testing.T) {
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, "")
-		functionConfigStore.UpdateExecCache(applyReplacementsFunction, &functionConfig)
+		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 
 		assert.NotNil(t, br)
 		assert.NotNil(t, br.store)
 
 		// Verify that functions are not registered with the custom image prefix
-		processor, exists := functionConfigStore.GetProcessorFromCache(customImagePrefix + applyReplacementsFunction + ":v0.1.1")
+		processor, exists := functionConfigStore.GetProcessor(customImagePrefix + applyReplacementsFunction + ":v0.1.1")
 		assert.False(t, exists,
 			"Expected function to not be registered with custom image prefix: %s", customImagePrefix)
 		assert.Nil(t, processor)
 
 		// Verify that functions are registered with default GHCR prefix
-		processor, exists = functionConfigStore.GetProcessorFromCache(defaultKRMImagePrefix + "/" + applyReplacementsFunction + ":v0.1.1")
+		processor, exists = functionConfigStore.GetProcessor(defaultKRMImagePrefix + "/" + applyReplacementsFunction + ":v0.1.1")
 		assert.True(t, exists,
 			"Expected function to be registered with default GHCR prefix")
 		assert.NotNil(t, processor)
@@ -127,8 +127,8 @@ func TestBuiltinRuntime(t *testing.T) {
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, "")
-		functionConfigStore.UpdateExecCache(setNamespaceFunction, &functionConfig)
+		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		funct := &kptfilev1.Function{
 			Image: filepath.Join(defaultKRMImagePrefix, testImageName),
@@ -153,8 +153,8 @@ func TestBuiltinRuntime(t *testing.T) {
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, "")
-		functionConfigStore.UpdateExecCache(setNamespaceFunction, &functionConfig)
+		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		funct := &kptfilev1.Function{
 			Image: filepath.Join(defaultKRMImagePrefix, testImageName),
@@ -179,8 +179,8 @@ func TestBuiltinRuntime(t *testing.T) {
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, "")
-		functionConfigStore.UpdateExecCache(setNamespaceFunction, &functionConfig)
+		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		funct := &kptfilev1.Function{
 			Image: filepath.Join(defaultKRMImagePrefix, setNamespaceFunction),
@@ -206,11 +206,11 @@ func TestBuiltinRuntime(t *testing.T) {
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, "")
-		functionConfigStore.UpdateExecCache(setNamespaceFunction, &functionConfig)
+		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		funct := &kptfilev1.Function{
-			Image: util.ImageJoin(defaultKRMImagePrefix, setNamespaceFunction) + ":v0.4.2",
+			Image: imageutil.Join(defaultKRMImagePrefix, setNamespaceFunction) + ":v0.4.2",
 			// Image is explicitly tagged with v0.4.2, however,
 			// there is no function with this explicit tag in the cache
 		}
@@ -231,16 +231,16 @@ func TestBuiltinRuntime(t *testing.T) {
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, "")
-		functionConfigStore.UpdateExecCache(applyReplacementsFunction, &functionConfig)
+		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
-		fn := &kptfilev1.Function{
+		function := &kptfilev1.Function{
 			// Wrong function is specified for namespace setting,
 			// which will cause an execution error when the function tries to run
 			Image: filepath.Join(defaultKRMImagePrefix, applyReplacementsFunction),
 			Tag:   ">= 0.1.0 < 0.2.0",
 		}
-		fr, err := br.GetRunner(ctx, fn)
+		fr, err := br.GetRunner(ctx, function)
 		assert.Nil(t, err)
 		reader := bytes.NewReader([]byte(`apiVersion: config.kubernetes.io/v1alpha1
 kind: ResourceList
@@ -274,10 +274,10 @@ functionConfig:
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, "")
-		functionConfigStore.UpdateExecCache(setNamespaceFunction, &functionConfig)
+		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
-		fn := &kptfilev1.Function{
+		function := &kptfilev1.Function{
 			Image: filepath.Join(defaultKRMImagePrefix, setNamespaceFunction),
 			// This semver constraint matches the version of the apply-replacements function in builtin runtime,
 			// so it should successfully find the function and run it
@@ -289,7 +289,7 @@ functionConfig:
 		r, w, _ := os.Pipe()
 		os.Stderr = w
 
-		fr, err := br.GetRunner(ctx, fn)
+		fr, err := br.GetRunner(ctx, function)
 		assert.Nil(t, err)
 
 		// Flush klog and restore stderr
@@ -348,10 +348,10 @@ functionConfig:
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, "")
-		functionConfigStore.UpdateExecCache(setNamespaceFunction, &functionConfig)
+		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
-		fn := &kptfilev1.Function{
+		function := &kptfilev1.Function{
 			Image: filepath.Join(defaultKRMImagePrefix, setNamespaceFunction) + ":v0.4.1",
 		}
 
@@ -360,7 +360,7 @@ functionConfig:
 		r, w, _ := os.Pipe()
 		os.Stderr = w
 
-		fr, err := br.GetRunner(ctx, fn)
+		fr, err := br.GetRunner(ctx, function)
 		require.NoError(t, err)
 
 		// Flush klog and restore stderr
@@ -414,10 +414,10 @@ functionConfig:
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewFunctionConfigStore(defaultKRMImagePrefix, "")
-		functionConfigStore.UpdateExecCache(setNamespaceFunction, &functionConfig)
+		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
-		fn := &kptfilev1.Function{
+		function := &kptfilev1.Function{
 			Image: filepath.Join(defaultKRMImagePrefix, setNamespaceFunction) + ":v0.3.0",
 			Tag:   ">= 0.4.0 < 0.5.0",
 		}
@@ -427,7 +427,7 @@ functionConfig:
 		r, w, _ := os.Pipe()
 		os.Stderr = w
 
-		fr, err := br.GetRunner(ctx, fn)
+		fr, err := br.GetRunner(ctx, function)
 		require.NoError(t, err)
 
 		// Flush klog and restore stderr

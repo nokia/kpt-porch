@@ -351,5 +351,5 @@ func TestNewMultiFunctionRuntime_NilStorePanics(t *testing.T) {
 }
 
 func newTestFunctionConfigStore() *reconciler.FunctionConfigStore {
-	return reconciler.NewFunctionConfigStore("", "")
+	return reconciler.NewStore("", "")
 }

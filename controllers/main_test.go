@@ -86,7 +86,7 @@ type fakeReconciler struct {
 	name string
 }
 
-func (f *fakeReconciler) Name() string                                  { return f.name }
+func (f *fakeReconciler) Name() string { return f.name }
 func (f *fakeReconciler) Reconcile(context.Context, reconcile.Request) (reconcile.Result, error) {
 	return reconcile.Result{}, nil
 }
@@ -171,14 +171,14 @@ func TestPrePopulateFunctionConfigStore_Success(t *testing.T) {
 			list.(*configapi.FunctionConfigList).Items = items
 		}).Return(nil)
 
-	store := reconciler.NewFunctionConfigStore("ghcr.io/kptdev", "/tmp/bins")
+	store := reconciler.NewStore("ghcr.io/kptdev", "/tmp/bins")
 	prePopulateFunctionConfigStore(mockReader, store)
 
-	_, ok := store.GetFunctionConfig("set-namespace")
+	_, ok := store.Get("set-namespace")
 	assert.True(t, ok, "set-namespace should be in store")
-	_, ok = store.GetFunctionConfig("starlark")
+	_, ok = store.Get("starlark")
 	assert.True(t, ok, "starlark should be in store")
-	_, ok = store.GetFunctionConfig("no-executor")
+	_, ok = store.Get("no-executor")
 	assert.True(t, ok, "no-executor should be in store")
 }
 
@@ -186,10 +186,10 @@ func TestPrePopulateFunctionConfigStore_ListError(t *testing.T) {
 	mockReader := mockclient.NewMockReader(t)
 	mockReader.EXPECT().List(mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
-	store := reconciler.NewFunctionConfigStore("ghcr.io/kptdev", "/tmp/bins")
+	store := reconciler.NewStore("ghcr.io/kptdev", "/tmp/bins")
 	prePopulateFunctionConfigStore(mockReader, store)
 
-	_, ok := store.GetFunctionConfig("anything")
+	_, ok := store.Get("anything")
 	assert.False(t, ok, "store should be empty after list error")
 }
 
@@ -198,8 +198,8 @@ func TestPrePopulateFunctionConfigStore_EmptyList(t *testing.T) {
 	mockReader.EXPECT().List(mock.Anything, mock.AnythingOfType("*v1alpha1.FunctionConfigList"), mock.Anything).
 		Return(nil)
 
-	store := reconciler.NewFunctionConfigStore("ghcr.io/kptdev", "/tmp/bins")
+	store := reconciler.NewStore("ghcr.io/kptdev", "/tmp/bins")
 	prePopulateFunctionConfigStore(mockReader, store)
 
-	assert.Equal(t, 0, len(store.List()))
+	assert.Equal(t, 0, store.Len())
 }

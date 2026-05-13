@@ -161,14 +161,14 @@ func NewPodEvaluator(ctx context.Context, o PodEvaluatorOptions, cl client.Clien
 		return nil, fmt.Errorf("failed to retrieve existing pods: %w", err)
 	}
 
-	if o.WarmUpPodCacheOnStartup {
-		// TODO(mengqiy): add watcher that support reloading the cache when the config file was changed.
-		err = pe.podCacheManager.warmupCache(o.DefaultImagePrefix)
-		// If we can't warm up the cache, we can still proceed without it.
-		if err != nil {
-			klog.Warningf("unable to warm up the pod cache: %v", err)
-		}
-	}
+	//if o.WarmUpPodCacheOnStartup {
+	//	// TODO(mengqiy): add watcher that support reloading the cache when the config file was changed.
+	//	err = pe.podCacheManager.warmupCache(o.DefaultImagePrefix)
+	//	// If we can't warm up the cache, we can still proceed without it.
+	//	if err != nil {
+	//		klog.Warningf("unable to warm up the pod cache: %v", err)
+	//	}
+	//}
 
 	return pe, nil
 }

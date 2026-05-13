@@ -25,7 +25,6 @@ import (
 	"github.com/kptdev/kpt/pkg/lib/kptops"
 	fnsdk "github.com/kptdev/krm-functions-sdk/go/fn"
 	"github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
-	"github.com/nephio-project/porch/pkg/util"
 	regclientref "github.com/regclient/regclient/types/ref"
 	"k8s.io/klog/v2"
 )
@@ -47,8 +46,6 @@ func (br *builtinRuntime) GetRunner(ctx context.Context, funct *kptfilev1.Functi
 		ctx: ctx,
 	}
 
-	cache := br.store.GetExecCache()
-
 	if funct.Tag != "" {
 		ref, err := regclientref.New(funct.Image)
 		if err != nil {
@@ -64,21 +61,17 @@ func (br *builtinRuntime) GetRunner(ctx context.Context, funct *kptfilev1.Functi
 				funct.Image = stripped
 			}
 		}
-		baseName := util.GetImageName(funct.Image)
 
-		builtinEntry := cache[baseName]
-		cacheKeys := make([]string, 0, len(builtinEntry.Tags))
-		cacheKeys = append(cacheKeys, builtinEntry.Tags...)
-		_, err = util.FindBestSemverMatch(funct.Tag, funct.Image, cacheKeys)
-		if err != nil {
+		processor, ok := br.store.GetProcessorByConstraint(funct.Image, funct.Tag)
+		if !ok {
 			return nil, &fn.NotFoundError{
-				Function: kptfilev1.Function{Image: funct.Image},
+				Function: *funct,
 			}
 		}
-		builtinRunner.processor = builtinEntry.Process
+		builtinRunner.processor = processor
 	} else {
 		klog.Infof("Image tag is empty, using the image with explicit tag: %q", funct.Image)
-		processor, found := br.store.GetProcessorFromCache(funct.Image)
+		processor, found := br.store.GetProcessor(funct.Image)
 		if !found {
 			return nil, &fn.NotFoundError{Function: *funct}
 		}
