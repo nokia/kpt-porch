@@ -36,6 +36,12 @@
         "common-false-positives",
         "legacy",
         "std-error-handling"
+      ],
+      "rules": [
+        {
+          "path": "func/evaluator/.*",
+          "text": "ST1001"
+        }
       ]
     }
   },

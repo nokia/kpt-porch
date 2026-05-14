@@ -25,6 +25,7 @@ import (
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/controllers/functionconfigs"
+	. "github.com/kptdev/porch/func/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -35,31 +36,31 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// makePodInfoWithLoad creates a functionPodInfo with the specified concurrent evaluation count.
-func makePodInfoWithLoad(load int32) functionPodInfo {
+// makePodInfoWithLoad creates a FunctionPodInfo with the specified concurrent evaluation count.
+func makePodInfoWithLoad(load int32) FunctionPodInfo {
 	counter := &atomic.Int32{}
 	counter.Store(load)
-	return functionPodInfo{
-		concurrentEvaluations: counter,
-		lastActivity:          time.Now(),
-		waitlist:              []chan<- *connectionResponse{},
+	return FunctionPodInfo{
+		ConcurrentEvaluations: counter,
+		LastActivity:          time.Now(),
+		Waitlist:              []chan<- *ConnectionResponse{},
 	}
 }
 
-// makeReadyPodInfo creates a functionPodInfo with podData, for testing functions that require a ready pod.
-func makeReadyPodInfo(image string, podKey, serviceKey client.ObjectKey, grpcConn *grpc.ClientConn, load int32) functionPodInfo {
+// makeReadyPodInfo creates a FunctionPodInfo with PodData, for testing functions that require a ready pod.
+func makeReadyPodInfo(image string, podKey, serviceKey client.ObjectKey, grpcConn *grpc.ClientConn, load int32) FunctionPodInfo {
 	counter := &atomic.Int32{}
 	counter.Store(load)
-	return functionPodInfo{
-		podData: &podData{
-			image:          image,
-			podKey:         &podKey,
-			serviceKey:     &serviceKey,
-			grpcConnection: grpcConn,
+	return FunctionPodInfo{
+		PodData: &PodData{
+			Image:          image,
+			PodKey:         &podKey,
+			ServiceKey:     &serviceKey,
+			GrpcConnection: grpcConn,
 		},
-		concurrentEvaluations: counter,
-		lastActivity:          time.Now(),
-		waitlist:              []chan<- *connectionResponse{},
+		ConcurrentEvaluations: counter,
+		LastActivity:          time.Now(),
+		Waitlist:              []chan<- *ConnectionResponse{},
 	}
 }
 
@@ -68,7 +69,7 @@ func TestFindBestPod(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		fn               *functionInfo
+		fn               *FunctionInfo
 		expectedIdx      int
 		expectedWaitlist int
 	}{
@@ -80,13 +81,13 @@ func TestFindBestPod(t *testing.T) {
 		},
 		{
 			name:             "empty pods returns -1",
-			fn:               &functionInfo{pods: []functionPodInfo{}},
+			fn:               &FunctionInfo{Pods: []FunctionPodInfo{}},
 			expectedIdx:      -1,
 			expectedWaitlist: 0,
 		},
 		{
 			name: "single pod with no load",
-			fn: &functionInfo{pods: []functionPodInfo{
+			fn: &FunctionInfo{Pods: []FunctionPodInfo{
 				makePodInfoWithLoad(0),
 			}},
 			expectedIdx:      0,
@@ -94,7 +95,7 @@ func TestFindBestPod(t *testing.T) {
 		},
 		{
 			name: "single pod with load",
-			fn: &functionInfo{pods: []functionPodInfo{
+			fn: &FunctionInfo{Pods: []FunctionPodInfo{
 				makePodInfoWithLoad(5),
 			}},
 			expectedIdx:      0,
@@ -102,7 +103,7 @@ func TestFindBestPod(t *testing.T) {
 		},
 		{
 			name: "multiple pods selects least loaded",
-			fn: &functionInfo{pods: []functionPodInfo{
+			fn: &FunctionInfo{Pods: []FunctionPodInfo{
 				makePodInfoWithLoad(5),
 				makePodInfoWithLoad(1),
 				makePodInfoWithLoad(8),
@@ -112,7 +113,7 @@ func TestFindBestPod(t *testing.T) {
 		},
 		{
 			name: "multiple pods with equal load selects first",
-			fn: &functionInfo{pods: []functionPodInfo{
+			fn: &FunctionInfo{Pods: []FunctionPodInfo{
 				makePodInfoWithLoad(3),
 				makePodInfoWithLoad(3),
 				makePodInfoWithLoad(3),
@@ -122,7 +123,7 @@ func TestFindBestPod(t *testing.T) {
 		},
 		{
 			name: "last pod is least loaded",
-			fn: &functionInfo{pods: []functionPodInfo{
+			fn: &FunctionInfo{Pods: []FunctionPodInfo{
 				makePodInfoWithLoad(10),
 				makePodInfoWithLoad(7),
 				makePodInfoWithLoad(2),
@@ -236,48 +237,48 @@ func TestGetParamsForImage(t *testing.T) {
 func TestNewPodInfo(t *testing.T) {
 	t.Run("nil channel creates pod with empty waitlist", func(t *testing.T) {
 		pod := NewPodInfo(nil)
-		assert.Nil(t, pod.podData)
-		assert.Empty(t, pod.waitlist)
-		assert.Equal(t, int32(0), pod.concurrentEvaluations.Load())
+		assert.Nil(t, pod.PodData)
+		assert.Empty(t, pod.Waitlist)
+		assert.Equal(t, int32(0), pod.ConcurrentEvaluations.Load())
 	})
 
 	t.Run("non-nil channel adds to waitlist and increments counter", func(t *testing.T) {
-		ch := make(chan *connectionResponse, 1)
+		ch := make(chan *ConnectionResponse, 1)
 		pod := NewPodInfo(ch)
-		assert.Nil(t, pod.podData)
-		assert.Len(t, pod.waitlist, 1)
-		assert.Equal(t, int32(1), pod.concurrentEvaluations.Load())
+		assert.Nil(t, pod.PodData)
+		assert.Len(t, pod.Waitlist, 1)
+		assert.Equal(t, int32(1), pod.ConcurrentEvaluations.Load())
 	})
 }
 
 func TestSendResponse(t *testing.T) {
 	t.Run("sends error when err is not nil", func(t *testing.T) {
-		pod := &functionPodInfo{
-			podData:               &podData{image: "test"},
-			concurrentEvaluations: &atomic.Int32{},
+		pod := &FunctionPodInfo{
+			PodData:               &PodData{Image: "test"},
+			ConcurrentEvaluations: &atomic.Int32{},
 		}
-		ch := make(chan *connectionResponse, 1)
+		ch := make(chan *ConnectionResponse, 1)
 		testErr := fmt.Errorf("test error")
 
 		pod.SendResponse(ch, testErr)
 
 		resp := <-ch
-		assert.Error(t, resp.err)
-		assert.Equal(t, "test error", resp.err.Error())
+		assert.Error(t, resp.Err)
+		assert.Equal(t, "test error", resp.Err.Error())
 	})
 
 	t.Run("sends error when podData is nil", func(t *testing.T) {
-		pod := &functionPodInfo{
-			podData:               nil,
-			concurrentEvaluations: &atomic.Int32{},
+		pod := &FunctionPodInfo{
+			PodData:               nil,
+			ConcurrentEvaluations: &atomic.Int32{},
 		}
-		ch := make(chan *connectionResponse, 1)
+		ch := make(chan *ConnectionResponse, 1)
 
 		pod.SendResponse(ch, nil)
 
 		resp := <-ch
-		assert.Error(t, resp.err)
-		assert.Contains(t, resp.err.Error(), "pod is not ready")
+		assert.Error(t, resp.Err)
+		assert.Contains(t, resp.Err.Error(), "pod is not ready")
 	})
 
 	t.Run("sends success with podData", func(t *testing.T) {
@@ -286,32 +287,32 @@ func TestSendResponse(t *testing.T) {
 
 		podKey := client.ObjectKey{Name: "test-pod", Namespace: "test-ns"}
 		serviceKey := client.ObjectKey{Name: "test-svc", Namespace: "test-ns"}
-		pod := &functionPodInfo{
-			podData: &podData{
-				image:          "test-image",
-				grpcConnection: conn,
-				podKey:         &podKey,
-				serviceKey:     &serviceKey,
+		pod := &FunctionPodInfo{
+			PodData: &PodData{
+				Image:          "test-image",
+				GrpcConnection: conn,
+				PodKey:         &podKey,
+				ServiceKey:     &serviceKey,
 			},
-			concurrentEvaluations: &atomic.Int32{},
+			ConcurrentEvaluations: &atomic.Int32{},
 		}
-		ch := make(chan *connectionResponse, 1)
+		ch := make(chan *ConnectionResponse, 1)
 
 		pod.SendResponse(ch, nil)
 
 		resp := <-ch
-		assert.NoError(t, resp.err)
-		assert.Equal(t, "test-image", resp.podData.image)
-		assert.NotNil(t, resp.grpcConnection)
-		assert.NotNil(t, resp.concurrentEvaluations)
+		assert.NoError(t, resp.Err)
+		assert.Equal(t, "test-image", resp.PodData.Image)
+		assert.NotNil(t, resp.GrpcConnection)
+		assert.NotNil(t, resp.ConcurrentEvaluations)
 	})
 }
 
 func TestWaitlistLen(t *testing.T) {
 	counter := &atomic.Int32{}
 	counter.Store(7)
-	pod := functionPodInfo{
-		concurrentEvaluations: counter,
+	pod := FunctionPodInfo{
+		ConcurrentEvaluations: counter,
 	}
 	assert.Equal(t, 7, pod.WaitlistLen())
 
@@ -321,13 +322,13 @@ func TestWaitlistLen(t *testing.T) {
 
 func TestFunctionInfo(t *testing.T) {
 	pcm := &podCacheManager{
-		functions: map[string]*functionInfo{},
+		functions: map[string]*FunctionInfo{},
 	}
 
 	t.Run("creates new entry for unknown image", func(t *testing.T) {
 		fn := pcm.FunctionInfo("new-image")
 		assert.NotNil(t, fn)
-		assert.Empty(t, fn.pods)
+		assert.Empty(t, fn.Pods)
 		// Verify it was stored in the map
 		stored, ok := pcm.functions["new-image"]
 		assert.True(t, ok)
@@ -335,12 +336,12 @@ func TestFunctionInfo(t *testing.T) {
 	})
 
 	t.Run("returns existing entry for known image", func(t *testing.T) {
-		existing := &functionInfo{pods: []functionPodInfo{makePodInfoWithLoad(1)}}
+		existing := &FunctionInfo{Pods: []FunctionPodInfo{makePodInfoWithLoad(1)}}
 		pcm.functions["existing-image"] = existing
 
 		fn := pcm.FunctionInfo("existing-image")
 		assert.Equal(t, existing, fn)
-		assert.Len(t, fn.pods, 1)
+		assert.Len(t, fn.Pods, 1)
 	})
 }
 
@@ -367,16 +368,16 @@ func TestRemoveUnhealthyPods(t *testing.T) {
 				kubeClient: fake.NewClientBuilder().Build(),
 			},
 		}
-		fn := &functionInfo{
-			pods: []functionPodInfo{
+		fn := &FunctionInfo{
+			Pods: []FunctionPodInfo{
 				{
-					podData:               nil, // under creation
-					concurrentEvaluations: &atomic.Int32{},
+					PodData:               nil, // under creation
+					ConcurrentEvaluations: &atomic.Int32{},
 				},
 			},
 		}
 		pcm.removeUnhealthyPods(fn, false)
-		assert.Len(t, fn.pods, 1, "pod under creation should be kept")
+		assert.Len(t, fn.Pods, 1, "pod under creation should be kept")
 	})
 
 	t.Run("pod not found in k8s is removed", func(t *testing.T) {
@@ -395,13 +396,13 @@ func TestRemoveUnhealthyPods(t *testing.T) {
 				namespace:  testNs,
 			},
 		}
-		fn := &functionInfo{
-			pods: []functionPodInfo{
+		fn := &FunctionInfo{
+			Pods: []FunctionPodInfo{
 				makeReadyPodInfo("test-image", podKey, serviceKey, conn, 0),
 			},
 		}
 		pcm.removeUnhealthyPods(fn, false)
-		assert.Empty(t, fn.pods, "pod not found in k8s should be removed")
+		assert.Empty(t, fn.Pods, "pod not found in k8s should be removed")
 	})
 
 	t.Run("pod in Failed state is removed", func(t *testing.T) {
@@ -427,13 +428,13 @@ func TestRemoveUnhealthyPods(t *testing.T) {
 				namespace:  testNs,
 			},
 		}
-		fn := &functionInfo{
-			pods: []functionPodInfo{
+		fn := &FunctionInfo{
+			Pods: []FunctionPodInfo{
 				makeReadyPodInfo("test-image", podKey, serviceKey, conn, 0),
 			},
 		}
 		pcm.removeUnhealthyPods(fn, false)
-		assert.Empty(t, fn.pods, "pod in Failed state should be removed")
+		assert.Empty(t, fn.Pods, "pod in Failed state should be removed")
 	})
 
 	t.Run("healthy pod is kept", func(t *testing.T) {
@@ -459,13 +460,13 @@ func TestRemoveUnhealthyPods(t *testing.T) {
 				namespace:  testNs,
 			},
 		}
-		fn := &functionInfo{
-			pods: []functionPodInfo{
+		fn := &FunctionInfo{
+			Pods: []FunctionPodInfo{
 				makeReadyPodInfo("test-image", podKey, serviceKey, conn, 0),
 			},
 		}
 		pcm.removeUnhealthyPods(fn, false)
-		assert.Len(t, fn.pods, 1, "healthy pod should be kept")
+		assert.Len(t, fn.Pods, 1, "healthy pod should be kept")
 	})
 
 	t.Run("idle pod past TTL removed when removeIdle is true", func(t *testing.T) {
@@ -493,11 +494,11 @@ func TestRemoveUnhealthyPods(t *testing.T) {
 		}
 
 		podInfo := makeReadyPodInfo("test-image", podKey, serviceKey, conn, 0)
-		podInfo.lastActivity = time.Now().Add(-15 * time.Minute) // past TTL
-		fn := &functionInfo{pods: []functionPodInfo{podInfo}}
+		podInfo.LastActivity = time.Now().Add(-15 * time.Minute) // past TTL
+		fn := &FunctionInfo{Pods: []FunctionPodInfo{podInfo}}
 
 		pcm.removeUnhealthyPods(fn, true)
-		assert.Empty(t, fn.pods, "idle pod past TTL should be removed when removeIdle=true")
+		assert.Empty(t, fn.Pods, "idle pod past TTL should be removed when removeIdle=true")
 	})
 
 	t.Run("idle pod past TTL kept when removeIdle is false", func(t *testing.T) {
@@ -525,11 +526,11 @@ func TestRemoveUnhealthyPods(t *testing.T) {
 		}
 
 		podInfo := makeReadyPodInfo("test-image", podKey, serviceKey, conn, 0)
-		podInfo.lastActivity = time.Now().Add(-15 * time.Minute) // past TTL
-		fn := &functionInfo{pods: []functionPodInfo{podInfo}}
+		podInfo.LastActivity = time.Now().Add(-15 * time.Minute) // past TTL
+		fn := &FunctionInfo{Pods: []FunctionPodInfo{podInfo}}
 
 		pcm.removeUnhealthyPods(fn, false)
-		assert.Len(t, fn.pods, 1, "idle pod past TTL should be kept when removeIdle=false")
+		assert.Len(t, fn.Pods, 1, "idle pod past TTL should be kept when removeIdle=false")
 	})
 }
 
@@ -558,12 +559,12 @@ func TestGarbageCollectorUnit(t *testing.T) {
 				kubeClient: fake.NewClientBuilder().WithObjects(k8sPod, k8sSvc).Build(),
 				namespace:  testNs,
 			},
-			functions: map[string]*functionInfo{
+			functions: map[string]*FunctionInfo{
 				"expired-image": {
-					pods: []functionPodInfo{
-						func() functionPodInfo {
+					Pods: []FunctionPodInfo{
+						func() FunctionPodInfo {
 							p := makeReadyPodInfo("expired-image", podKey, serviceKey, conn, 0)
-							p.lastActivity = time.Now().Add(-5 * time.Minute)
+							p.LastActivity = time.Now().Add(-5 * time.Minute)
 							return p
 						}(),
 					},
@@ -604,25 +605,25 @@ func TestRedistributeLoad(t *testing.T) {
 				kubeClient: fake.NewClientBuilder().WithObjects(k8sPod, k8sSvc).Build(),
 				namespace:  testNs,
 			},
-			functions: map[string]*functionInfo{},
+			functions: map[string]*FunctionInfo{},
 		}
 
 		readyPod := makeReadyPodInfo("test-image", podKey, serviceKey, conn, 0)
-		fn := &functionInfo{pods: []functionPodInfo{readyPod}}
+		fn := &FunctionInfo{Pods: []FunctionPodInfo{readyPod}}
 		pcm.functions["test-image"] = fn
 
 		// Create connection channels to redistribute
-		ch1 := make(chan *connectionResponse, 1)
-		ch2 := make(chan *connectionResponse, 1)
+		ch1 := make(chan *ConnectionResponse, 1)
+		ch2 := make(chan *ConnectionResponse, 1)
 
-		result := pcm.redistributeLoad("test-image", fn, []chan<- *connectionResponse{ch1, ch2})
+		result := pcm.redistributeLoad("test-image", fn, []chan<- *ConnectionResponse{ch1, ch2})
 		assert.True(t, result, "should redistribute successfully")
 
 		// Both channels should receive responses
 		resp1 := <-ch1
-		assert.NoError(t, resp1.err)
+		assert.NoError(t, resp1.Err)
 		resp2 := <-ch2
-		assert.NoError(t, resp2.err)
+		assert.NoError(t, resp2.Err)
 	})
 
 	t.Run("returns false when no pods available", func(t *testing.T) {
@@ -633,13 +634,13 @@ func TestRedistributeLoad(t *testing.T) {
 				kubeClient: fake.NewClientBuilder().Build(),
 				namespace:  testNs,
 			},
-			functions: map[string]*functionInfo{},
+			functions: map[string]*FunctionInfo{},
 		}
-		fn := &functionInfo{pods: []functionPodInfo{}}
+		fn := &FunctionInfo{Pods: []FunctionPodInfo{}}
 		pcm.functions["empty-image"] = fn
 
-		ch := make(chan *connectionResponse, 1)
-		result := pcm.redistributeLoad("empty-image", fn, []chan<- *connectionResponse{ch})
+		ch := make(chan *ConnectionResponse, 1)
+		result := pcm.redistributeLoad("empty-image", fn, []chan<- *ConnectionResponse{ch})
 		assert.False(t, result, "should return false with no pods")
 	})
 }
@@ -661,9 +662,9 @@ func TestDeletePodWithServiceInBackgroundByObjectKey(t *testing.T) {
 
 		podKey := client.ObjectKeyFromObject(k8sPod)
 		serviceKey := client.ObjectKeyFromObject(k8sSvc)
-		pd := podData{
-			podKey:     &podKey,
-			serviceKey: &serviceKey,
+		pd := PodData{
+			PodKey:     &podKey,
+			ServiceKey: &serviceKey,
 		}
 
 		pcm.DeletePodWithServiceInBackgroundByObjectKey(pd)
@@ -684,9 +685,9 @@ func TestDeletePodWithServiceInBackgroundByObjectKey(t *testing.T) {
 				kubeClient: fake.NewClientBuilder().Build(),
 			},
 		}
-		pd := podData{
-			podKey:     nil,
-			serviceKey: nil,
+		pd := PodData{
+			PodKey:     nil,
+			ServiceKey: nil,
 		}
 		// Should not panic
 		pcm.DeletePodWithServiceInBackgroundByObjectKey(pd)

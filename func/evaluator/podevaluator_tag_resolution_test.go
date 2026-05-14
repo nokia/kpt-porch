@@ -24,6 +24,7 @@ import (
 
 	"github.com/kptdev/kpt/pkg/fn/runtime"
 	pb "github.com/kptdev/porch/func/proto"
+	. "github.com/kptdev/porch/func/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -78,18 +79,18 @@ func TestTagResolution(t *testing.T) {
 		)
 		require.NoError(t, err, "grpc dial failed")
 
-		reqCh := make(chan *connectionRequest, 2)
+		reqCh := make(chan *ConnectionRequest, 2)
 		go func() {
 			counter := &atomic.Int32{}
 			for req := range reqCh {
-				req.responseCh <- &connectionResponse{
-					podData: podData{
-						image:          req.image,
-						grpcConnection: conn,
-						podKey:         ptr.To(client.ObjectKey{}),
+				req.ResponseCh <- &ConnectionResponse{
+					PodData: PodData{
+						Image:          req.Image,
+						GrpcConnection: conn,
+						PodKey:         ptr.To(client.ObjectKey{}),
 					},
-					concurrentEvaluations: counter,
-					err:                   nil,
+					ConcurrentEvaluations: counter,
+					Err:                   nil,
 				}
 			}
 		}()
@@ -126,18 +127,18 @@ func TestTagResolution(t *testing.T) {
 		)
 		require.NoError(t, err, "grpc dial failed")
 
-		reqCh := make(chan *connectionRequest, 2)
+		reqCh := make(chan *ConnectionRequest, 2)
 		go func() {
 			counter := &atomic.Int32{}
 			for req := range reqCh {
-				req.responseCh <- &connectionResponse{
-					podData: podData{
-						image:          req.image,
-						grpcConnection: conn,
-						podKey:         ptr.To(client.ObjectKey{}),
+				req.ResponseCh <- &ConnectionResponse{
+					PodData: PodData{
+						Image:          req.Image,
+						GrpcConnection: conn,
+						PodKey:         ptr.To(client.ObjectKey{}),
 					},
-					concurrentEvaluations: counter,
-					err:                   nil,
+					ConcurrentEvaluations: counter,
+					Err:                   nil,
 				}
 			}
 		}()

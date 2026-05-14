@@ -17,15 +17,14 @@ package evaluator
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/kptdev/kpt/pkg/fn/runtime"
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	"github.com/kptdev/porch/controllers/functionconfigs"
 	"github.com/kptdev/porch/func/proto"
+	. "github.com/kptdev/porch/func/types"
 	"github.com/kptdev/porch/pkg/util"
-	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -47,7 +46,7 @@ const (
 )
 
 type podEvaluator struct {
-	requestCh chan<- *connectionRequest
+	requestCh chan<- *ConnectionRequest
 
 	podCacheManager *podCacheManager
 }
@@ -71,38 +70,6 @@ type PodEvaluatorOptions struct {
 
 var _ Evaluator = &podEvaluator{}
 
-type podData struct {
-	// the OCI image name of the KRM function
-	image string
-	// connection to the grpc server running in the fn evaluator pod
-	grpcConnection *grpc.ClientConn
-	// namespaced name of the pod
-	podKey *client.ObjectKey
-	// namespaced name of the service
-	serviceKey *client.ObjectKey
-}
-
-type connectionRequest struct {
-	// the OCI image name of the KRM function
-	image string
-	// responseCh is the channel to send the response back.
-	responseCh chan<- *connectionResponse
-}
-
-type connectionResponse struct {
-	podData
-	// the number of currently ongoing and waiting fn evaluations in the pod
-	concurrentEvaluations *atomic.Int32
-	// err indicates the error that prevents us to allocate a pod for the fn evaluator
-	err error
-}
-
-type podReadyResponse struct {
-	podData
-	// err indicates the error that prevents us to allocate a pod for the fn evaluator
-	err error
-}
-
 func NewPodEvaluator(ctx context.Context, o PodEvaluatorOptions, cl client.Client, functionConfigStore *functionconfigs.FunctionConfigStore) (Evaluator, error) {
 	maxWaitlist := o.MaxWaitlistLength
 	if maxWaitlist <= 0 {
@@ -120,8 +87,8 @@ func NewPodEvaluator(ctx context.Context, o PodEvaluatorOptions, cl client.Clien
 		managerNs = defaultManagerNamespace
 	}
 
-	reqCh := make(chan *connectionRequest, channelBufferSize)
-	readyCh := make(chan *podReadyResponse, channelBufferSize)
+	reqCh := make(chan *ConnectionRequest, channelBufferSize)
+	readyCh := make(chan *PodReadyResponse, channelBufferSize)
 
 	pe := &podEvaluator{
 		requestCh: reqCh,
@@ -130,7 +97,7 @@ func NewPodEvaluator(ctx context.Context, o PodEvaluatorOptions, cl client.Clien
 			podTTL:                     o.PodTTL,
 			connectionRequestCh:        reqCh,
 			podReadyCh:                 readyCh,
-			functions:                  map[string]*functionInfo{},
+			functions:                  map[string]*FunctionInfo{},
 			maxWaitlistLength:          maxWaitlist,
 			maxParallelPodsPerFunction: maxPods,
 			functionConfigMap:          functionConfigStore,
@@ -188,23 +155,23 @@ func (pe *podEvaluator) EvaluateFunction(ctx context.Context, req *evaluator.Eva
 	req.Image = image
 
 	// make a buffer for the channel to prevent unnecessary blocking when the pod cache manager sends it to multiple waiting goroutine in batch.
-	responseChannel := make(chan *connectionResponse, 1)
+	responseChannel := make(chan *ConnectionResponse, 1)
 	// Send a request to request a grpc client.
-	pe.requestCh <- &connectionRequest{
-		image:      req.Image,
-		responseCh: responseChannel,
+	pe.requestCh <- &ConnectionRequest{
+		Image:      req.Image,
+		ResponseCh: responseChannel,
 	}
 
 	// Waiting for the client from the channel. This step is blocking.
 	select {
 	case pod := <-responseChannel:
-		if pod == nil || pod.grpcConnection == nil || pod.err != nil {
-			return nil, fmt.Errorf("unable to get the grpc client to the pod for %v: %w", req.Image, pod.err)
+		if pod == nil || pod.GrpcConnection == nil || pod.Err != nil {
+			return nil, fmt.Errorf("unable to get the grpc client to the pod for %v: %w", req.Image, pod.Err)
 		}
 
-		defer pod.concurrentEvaluations.Add(-1)
+		defer pod.ConcurrentEvaluations.Add(-1)
 
-		resp, err := evaluator.NewFunctionEvaluatorClient(pod.grpcConnection).EvaluateFunction(ctx, req)
+		resp, err := evaluator.NewFunctionEvaluatorClient(pod.GrpcConnection).EvaluateFunction(ctx, req)
 		if err != nil {
 			klog.V(4).Infof("Resource List: %s", req.ResourceList)
 			return nil, fmt.Errorf("unable to evaluate %q with pod evaluator: %w", req.Image, err)
