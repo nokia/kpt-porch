@@ -41,7 +41,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY ./api ./api
 COPY ./cmd ./cmd
 COPY ./pkg ./pkg
-COPY ./internal ./internal
+COPY ./evaluator ./evaluator
 COPY ./controllers ./controllers
 COPY ./func ./func
 

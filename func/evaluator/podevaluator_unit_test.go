@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package evaluator
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/kptdev/kpt/pkg/fn/runtime"
-	pb "github.com/nephio-project/porch/func/evaluator"
+	pb "github.com/nephio-project/porch/func/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"

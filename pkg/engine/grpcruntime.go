@@ -23,7 +23,7 @@ import (
 	"github.com/kptdev/kpt/pkg/fn"
 	"github.com/kptdev/kpt/pkg/lib/kptops"
 	"github.com/nephio-project/porch/controllers/functionconfigs"
-	"github.com/nephio-project/porch/func/evaluator"
+	"github.com/nephio-project/porch/func/proto"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

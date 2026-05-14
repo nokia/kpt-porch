@@ -27,8 +27,8 @@ import (
 	"strconv"
 
 	"github.com/kptdev/krm-functions-sdk/go/fn"
-	pb "github.com/nephio-project/porch/func/evaluator"
 	"github.com/nephio-project/porch/func/healthchecker"
+	pb "github.com/nephio-project/porch/func/proto"
 	porchotel "github.com/nephio-project/porch/internal/otel"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"

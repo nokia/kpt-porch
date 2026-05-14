@@ -25,7 +25,7 @@ import (
 
 	v1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	"github.com/nephio-project/porch/controllers/functionconfigs"
-	"github.com/nephio-project/porch/func/evaluator"
+	"github.com/nephio-project/porch/func/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"

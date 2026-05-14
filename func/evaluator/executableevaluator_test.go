@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package evaluator
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ import (
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
 	"github.com/nephio-project/porch/controllers/functionconfigs"
-	pb "github.com/nephio-project/porch/func/evaluator"
+	pb "github.com/nephio-project/porch/func/proto"
 	imageutil "github.com/nephio-project/porch/pkg/util/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

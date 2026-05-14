@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package evaluator
 
 import (
 	"crypto/ecdsa"
@@ -157,10 +157,10 @@ func TestIsPodTemplateSameVersion(t *testing.T) {
 
 func TestHasImagePullSecret(t *testing.T) {
 	tests := []struct {
-		name       string
-		podTemplateSpec        *corev1.PodTemplateSpec
-		secretName string
-		expected   bool
+		name            string
+		podTemplateSpec *corev1.PodTemplateSpec
+		secretName      string
+		expected        bool
 	}{
 		{
 			name: "secret found",

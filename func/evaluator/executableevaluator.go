@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package evaluator
 
 import (
 	"bytes"
@@ -23,7 +23,7 @@ import (
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	"github.com/kptdev/kpt/pkg/fn"
 	"github.com/nephio-project/porch/controllers/functionconfigs"
-	pb "github.com/nephio-project/porch/func/evaluator"
+	pb "github.com/nephio-project/porch/func/proto"
 	regclientref "github.com/regclient/regclient/types/ref"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

@@ -22,7 +22,7 @@ PORCHDIR = $(abspath $(CURDIR)/..)
 
 all: $(COMPILED_PROTO)
 
-$(COMPILED_PROTO): evaluator/evaluator.proto
+$(COMPILED_PROTO): proto/evaluator.proto
 	protoc \
 	  -I /usr/local/include/google/protobuf \
 	  -I ./evaluator \

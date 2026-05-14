@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package evaluator
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	"github.com/kptdev/kpt/pkg/fn/runtime"
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	"github.com/nephio-project/porch/controllers/functionconfigs"
-	"github.com/nephio-project/porch/func/evaluator"
+	"github.com/nephio-project/porch/func/proto"
 	"github.com/nephio-project/porch/pkg/util"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
