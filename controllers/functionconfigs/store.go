@@ -100,6 +100,13 @@ func (s *FunctionConfigStore) Store(obj *configapi.FunctionConfig) error {
 	}
 	if strippedSpec.BinaryExecutor != nil {
 		strippedSpec.BinaryExecutor.Tags = nil
+		if strippedSpec.BinaryExecutor.Path[0] != '/' {
+			var err error
+			strippedSpec.BinaryExecutor.Path, err = filepath.Abs(filepath.Join(s.defaultBinaryDir, spec.BinaryExecutor.Path))
+			if err != nil {
+				klog.Warningf("Failed to cache %q: %v", spec.Image, err)
+			}
+		}
 	}
 	if strippedSpec.GoExecutor != nil {
 		strippedSpec.GoExecutor.Tags = nil
@@ -120,38 +127,12 @@ func (s *FunctionConfigStore) Store(obj *configapi.FunctionConfig) error {
 		// One tag can technically have multiple types of configurations,
 		// but handling the overlap would be less efficient than just doing multiple writes.
 		s.internalCache[spec.Image].Entry[prefix] = make(map[string]configapi.FunctionConfigSpec)
-		if spec.GoExecutor != nil {
-			for _, tag := range spec.GoExecutor.Tags {
-				if tag == "" {
+		for _, conf := range []configapi.TagIterable{spec.GoExecutor, spec.BinaryExecutor, spec.PodExecutor} {
+			for tag := range conf.IterTags() {
+				switch tag {
+				case "":
 					s.internalCache[spec.Image].Entry[prefix][LatestTag] = strippedSpec
-				} else if tag == LatestTag {
-					s.internalCache[spec.Image].Entry[prefix][""] = strippedSpec
-				}
-				s.internalCache[spec.Image].Entry[prefix][tag] = strippedSpec
-			}
-		}
-		if spec.BinaryExecutor != nil {
-			for _, tag := range spec.BinaryExecutor.Tags {
-				if strippedSpec.BinaryExecutor.Path[0] != '/' {
-					var err error
-					strippedSpec.BinaryExecutor.Path, err = filepath.Abs(filepath.Join(s.defaultBinaryDir, spec.BinaryExecutor.Path))
-					if err != nil {
-						klog.Warningf("Failed to cache %q: %v", spec.Image, err)
-					}
-				}
-				if tag == "" {
-					s.internalCache[spec.Image].Entry[prefix][LatestTag] = strippedSpec
-				} else if tag == LatestTag {
-					s.internalCache[spec.Image].Entry[prefix][""] = strippedSpec
-				}
-				s.internalCache[spec.Image].Entry[prefix][tag] = strippedSpec
-			}
-		}
-		if spec.PodExecutor != nil {
-			for _, tag := range spec.PodExecutor.Tags {
-				if tag == "" {
-					s.internalCache[spec.Image].Entry[prefix][LatestTag] = strippedSpec
-				} else if tag == LatestTag {
+				case LatestTag:
 					s.internalCache[spec.Image].Entry[prefix][""] = strippedSpec
 				}
 				s.internalCache[spec.Image].Entry[prefix][tag] = strippedSpec

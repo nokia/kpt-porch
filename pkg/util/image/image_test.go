@@ -19,96 +19,102 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFindBestSemverMatch(t *testing.T) {
-	t.Run("selects highest matching version", func(t *testing.T) {
-		cacheKeys := []string{
-			"v0.4.1",
-			"v0.4",
-			"@sha256:abcdef123456",
-		}
-		key, err := FindBestSemverMatch(">= 0.4.0 < 0.5.0", cacheKeys)
-		assert.NoError(t, err)
-		assert.Equal(t, "v0.4.1", key)
-	})
+	testCases := map[string]struct {
+		constraint  string
+		tags        []string
+		expected    string
+		expectedErr string
+	}{
+		"selects highest matching version": {
+			constraint: ">= 0.4.0 < 0.5.0",
+			tags: []string{
+				"v0.4.1",
+				"v0.4",
+				"@sha256:abcdef123456",
+			},
+			expected: "v0.4.1",
+		},
+		"exact version match": {
+			constraint: "0.1.1",
+			tags: []string{
+				"v0.1.1",
+				"v0.1",
+			},
+			expected: "v0.1.1",
+		},
+		"no matching version for valid constraint": {
+			constraint: "> 1.0.0",
+			tags: []string{
+				"v0.1.1",
+				"v0.1",
+			},
+			expectedErr: "no tag matching",
+		},
+		"invalid semver constraint": {
+			constraint: ">> 1.0.0",
+			tags: []string{
+				"v1.1.0",
+			},
+			expectedErr: "invalid semver constraint",
+		},
+		"skips sha256-tagged entries": {
+			constraint: ">= 0.4.0",
+			tags: []string{
+				"v0.4.1",
+				"v0.4",
+				"@sha256:abcdef123456",
+			},
+			expected: "v0.4.1",
+		},
+		"matches without registry prefix": {
+			constraint: ">= 0.4.0",
+			tags: []string{
+				"v0.4.1",
+				"v0.4",
+				"@sha256:abcdef123456",
+			},
+			expected: "v0.4.1",
+		},
+		"empty cache keys": {
+			constraint:  ">= 0.1.0",
+			tags:        []string{},
+			expectedErr: "no tag matching",
+		},
+		"selects greatest from multiple matches": {
+			constraint: ">= 1.0.0 < 2.0.0",
+			tags: []string{
+				"v1.0.0",
+				"v1.1.0",
+				"v1.2.0",
+				"v2.0.0",
+			},
+			expected: "v1.2.0",
+		},
+		"skips entries with unparseable versions": {
+			constraint: ">= 1.0.0",
+			tags: []string{
+				"v1.0.0",
+				"vnotaversion",
+			},
+			expected: "v1.0.0",
+		},
+	}
 
-	t.Run("exact version match", func(t *testing.T) {
-		cacheKeys := []string{
-			"v0.1.1",
-			"v0.1",
-		}
-		key, err := FindBestSemverMatch("0.1.1", cacheKeys)
-		assert.NoError(t, err)
-		assert.Equal(t, "v0.1.1", key)
-	})
-
-	t.Run("no matching version for valid constraint", func(t *testing.T) {
-		cacheKeys := []string{
-			"v0.1.1",
-			"v0.1",
-		}
-		_, err := FindBestSemverMatch("> 1.0.0", cacheKeys)
-		assert.ErrorContains(t, err, "no tag matching")
-	})
-
-	t.Run("invalid semver constraint", func(t *testing.T) {
-		cacheKeys := []string{
-			"v1.1.0",
-		}
-		_, err := FindBestSemverMatch(">> 1.0.0", cacheKeys)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid semver constraint")
-	})
-
-	t.Run("skips sha256-tagged entries", func(t *testing.T) {
-		cacheKeys := []string{
-			"v0.4.1",
-			"v0.4",
-			"@sha256:abcdef123456",
-		}
-		key, err := FindBestSemverMatch(">= 0.4.0", cacheKeys)
-		assert.NoError(t, err)
-		assert.NotContains(t, key, "@sha256:")
-	})
-
-	t.Run("matches without registry prefix", func(t *testing.T) {
-		cacheKeys := []string{
-			"v0.4.1",
-			"v0.4",
-			"@sha256:abcdef123456",
-		}
-		key, err := FindBestSemverMatch(">= 0.4.0", cacheKeys)
-		assert.NoError(t, err)
-		assert.Equal(t, "v0.4.1", key)
-	})
-
-	t.Run("empty cache keys", func(t *testing.T) {
-		_, err := FindBestSemverMatch(">= 0.1.0", []string{})
-		assert.ErrorContains(t, err, "no tag matching")
-	})
-
-	t.Run("selects greatest from multiple matches", func(t *testing.T) {
-		cacheKeys := []string{
-			"v1.0.0",
-			"v1.1.0",
-			"v1.2.0",
-			"v2.0.0",
-		}
-		key, err := FindBestSemverMatch(">= 1.0.0 < 2.0.0", cacheKeys)
-		assert.NoError(t, err)
-		assert.Equal(t, "v1.2.0", key)
-	})
-
-	t.Run("skips entries with unparseable versions", func(t *testing.T) {
-		cacheKeys := []string{
-			"v1.0.0",
-			"vnotaversion",
-		}
-		key, err := FindBestSemverMatch(">= 1.0.0", cacheKeys)
-		assert.NoError(t, err)
-		assert.Equal(t, "v1.0.0", key)
-	})
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			best, err := FindBestSemverMatch(tc.constraint, tc.tags)
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expected, best)
+			}
+		})
+	}
 }
 
 func TestImageParse(t *testing.T) {
