@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
-	fnconf "github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
+	"github.com/nephio-project/porch/controllers/functionconfigs"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -49,7 +49,7 @@ func newTestEventLoopPCM(kubeClient client.Client) (*podCacheManager, chan *conn
 		functions:                  map[string]*functionInfo{},
 		maxWaitlistLength:          2,
 		maxParallelPodsPerFunction: 1,
-		functionConfigMap:          fnconf.NewStore(runneroptions.GHCRImagePrefix, "/functions"),
+		functionConfigMap:          functionconfigs.NewStore(runneroptions.GHCRImagePrefix, "/functions"),
 		podManager: &podManager{
 			kubeClient:         kubeClient,
 			namespace:          defaultNamespace,

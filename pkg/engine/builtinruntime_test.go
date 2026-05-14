@@ -16,15 +16,17 @@ package engine
 
 import (
 	"bytes"
+	"flag"
 	"os"
 	"path/filepath"
 	"testing"
 
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	"github.com/kptdev/kpt/pkg/fn"
+	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	fnsdk "github.com/kptdev/krm-functions-sdk/go/fn"
 	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
-	"github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
+	"github.com/nephio-project/porch/controllers/functionconfigs"
 	imageutil "github.com/nephio-project/porch/pkg/util/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +36,7 @@ import (
 
 const (
 	customImagePrefix     = "test.io/kptdev/krm-functions-catalog"
-	defaultKRMImagePrefix = "ghcr.io/kptdev/krm-functions-catalog"
+	defaultKRMImagePrefix = runneroptions.GHCRImagePrefix
 	testImageName         = "test-image"
 
 	setNamespaceFunction      = "set-namespace"
@@ -48,6 +50,7 @@ func TestNewBuiltinRuntime(t *testing.T) {
 				Name: applyReplacementsFunction,
 			},
 			Spec: configapi.FunctionConfigSpec{
+				Image: applyReplacementsFunction,
 				Prefixes: []string{
 					"",
 					customImagePrefix,
@@ -58,13 +61,13 @@ func TestNewBuiltinRuntime(t *testing.T) {
 			},
 		}
 
-		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		functionConfigStore := functionconfigs.NewStore(defaultKRMImagePrefix, "")
 		require.NoError(t, functionConfigStore.Store(&functionConfig))
 
 		br := newBuiltinRuntime(functionConfigStore)
 
-		assert.NotNil(t, br)
-		assert.NotNil(t, br.store)
+		require.NotNil(t, br)
+		require.NotNil(t, br.store)
 
 		// Verify that functions are registered with the custom image prefix
 		processor, exists := functionConfigStore.GetProcessor(customImagePrefix + "/" + applyReplacementsFunction + ":v0.1.1")
@@ -80,11 +83,11 @@ func TestNewBuiltinRuntime(t *testing.T) {
 	})
 	t.Run("custom image prefix is not specified", func(t *testing.T) {
 		functionConfig := configapi.FunctionConfig{
-
 			ObjectMeta: v1.ObjectMeta{
 				Name: applyReplacementsFunction,
 			},
 			Spec: configapi.FunctionConfigSpec{
+				Image: applyReplacementsFunction,
 				Prefixes: []string{
 					"",
 				},
@@ -93,7 +96,7 @@ func TestNewBuiltinRuntime(t *testing.T) {
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		functionConfigStore := functionconfigs.NewStore(defaultKRMImagePrefix, "")
 		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 
@@ -115,6 +118,10 @@ func TestNewBuiltinRuntime(t *testing.T) {
 }
 
 func TestBuiltinRuntime(t *testing.T) {
+	flagSet := flag.NewFlagSet("log-level", flag.ContinueOnError)
+	klog.InitFlags(flagSet)
+	_ = flagSet.Parse([]string{"--v", "5"})
+
 	t.Run("invalid semver constraint syntax", func(t *testing.T) {
 		ctx := t.Context()
 		functionConfig := configapi.FunctionConfig{
@@ -122,12 +129,13 @@ func TestBuiltinRuntime(t *testing.T) {
 				Name: setNamespaceFunction,
 			},
 			Spec: configapi.FunctionConfigSpec{
+				Image: setNamespaceFunction,
 				GoExecutor: &configapi.GoExecutorConfig{
 					Tags: []string{"v0.4.1"},
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		functionConfigStore := functionconfigs.NewStore(defaultKRMImagePrefix, "")
 		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		funct := &kptfilev1.Function{
@@ -137,9 +145,7 @@ func TestBuiltinRuntime(t *testing.T) {
 			Tag: ">> 0.4.0 < 0.5.0",
 		}
 		_, err := br.GetRunner(ctx, funct)
-		assert.Equal(t, &fn.NotFoundError{
-			Function: kptfilev1.Function{Image: funct.Image},
-		}, err)
+		assert.Equal(t, &fn.NotFoundError{Function: *funct}, err)
 	})
 	t.Run("builtinrutime not found", func(t *testing.T) {
 		ctx := t.Context()
@@ -148,12 +154,13 @@ func TestBuiltinRuntime(t *testing.T) {
 				Name: setNamespaceFunction,
 			},
 			Spec: configapi.FunctionConfigSpec{
+				Image: setNamespaceFunction,
 				GoExecutor: &configapi.GoExecutorConfig{
 					Tags: []string{"v0.4.1"},
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		functionConfigStore := functionconfigs.NewStore(defaultKRMImagePrefix, "")
 		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		funct := &kptfilev1.Function{
@@ -163,9 +170,7 @@ func TestBuiltinRuntime(t *testing.T) {
 			Tag: ">= 0.4.0 < 0.5.0",
 		}
 		_, err := br.GetRunner(ctx, funct)
-		assert.Equal(t, &fn.NotFoundError{
-			Function: kptfilev1.Function{Image: funct.Image},
-		}, err)
+		assert.Equal(t, &fn.NotFoundError{Function: *funct}, err)
 	})
 	t.Run("function does not match the semantic version constraints", func(t *testing.T) {
 		ctx := t.Context()
@@ -174,12 +179,13 @@ func TestBuiltinRuntime(t *testing.T) {
 				Name: setNamespaceFunction,
 			},
 			Spec: configapi.FunctionConfigSpec{
+				Image: setNamespaceFunction,
 				GoExecutor: &configapi.GoExecutorConfig{
 					Tags: []string{"v0.4.1"},
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		functionConfigStore := functionconfigs.NewStore(defaultKRMImagePrefix, "")
 		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		funct := &kptfilev1.Function{
@@ -190,9 +196,7 @@ func TestBuiltinRuntime(t *testing.T) {
 			Tag: "> 0.2.0 < 0.3.0",
 		}
 		_, err := br.GetRunner(ctx, funct)
-		assert.Equal(t, &fn.NotFoundError{
-			Function: kptfilev1.Function{Image: funct.Image},
-		}, err)
+		assert.Equal(t, &fn.NotFoundError{Function: *funct}, err)
 	})
 	t.Run("function not found using explicit tagging", func(t *testing.T) {
 		ctx := t.Context()
@@ -201,12 +205,13 @@ func TestBuiltinRuntime(t *testing.T) {
 				Name: setNamespaceFunction,
 			},
 			Spec: configapi.FunctionConfigSpec{
+				Image: setNamespaceFunction,
 				GoExecutor: &configapi.GoExecutorConfig{
 					Tags: []string{"v0.4.1"},
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		functionConfigStore := functionconfigs.NewStore(defaultKRMImagePrefix, "")
 		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		funct := &kptfilev1.Function{
@@ -215,9 +220,7 @@ func TestBuiltinRuntime(t *testing.T) {
 			// there is no function with this explicit tag in the cache
 		}
 		_, err := br.GetRunner(ctx, funct)
-		assert.Equal(t, &fn.NotFoundError{
-			Function: kptfilev1.Function{Image: funct.Image},
-		}, err)
+		assert.Equal(t, &fn.NotFoundError{Function: *funct}, err)
 	})
 	t.Run("function execution error", func(t *testing.T) {
 		ctx := t.Context()
@@ -226,22 +229,23 @@ func TestBuiltinRuntime(t *testing.T) {
 				Name: applyReplacementsFunction,
 			},
 			Spec: configapi.FunctionConfigSpec{
+				Image: applyReplacementsFunction,
 				GoExecutor: &configapi.GoExecutorConfig{
 					Tags: []string{"v0.1.0"},
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		functionConfigStore := functionconfigs.NewStore(defaultKRMImagePrefix, "")
 		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		function := &kptfilev1.Function{
 			// Wrong function is specified for namespace setting,
 			// which will cause an execution error when the function tries to run
-			Image: filepath.Join(defaultKRMImagePrefix, applyReplacementsFunction),
+			Image: imageutil.Join(defaultKRMImagePrefix, applyReplacementsFunction),
 			Tag:   ">= 0.1.0 < 0.2.0",
 		}
 		fr, err := br.GetRunner(ctx, function)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 		reader := bytes.NewReader([]byte(`apiVersion: config.kubernetes.io/v1alpha1
 kind: ResourceList
 items:
@@ -260,7 +264,7 @@ functionConfig:
 `))
 		var buf bytes.Buffer
 		err = fr.Run(reader, &buf)
-		assert.Equal(t, "error: function failure", err.Error())
+		assert.ErrorContains(t, err, "function failure")
 	})
 	t.Run("successful execution with semantic versioning", func(t *testing.T) {
 		ctx := t.Context()
@@ -269,12 +273,13 @@ functionConfig:
 				Name: setNamespaceFunction,
 			},
 			Spec: configapi.FunctionConfigSpec{
+				Image: setNamespaceFunction,
 				GoExecutor: &configapi.GoExecutorConfig{
 					Tags: []string{"v0.4.1"},
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		functionConfigStore := functionconfigs.NewStore(defaultKRMImagePrefix, "")
 		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		function := &kptfilev1.Function{
@@ -290,7 +295,7 @@ functionConfig:
 		os.Stderr = w
 
 		fr, err := br.GetRunner(ctx, function)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		// Flush klog and restore stderr
 		klog.Flush()
@@ -303,9 +308,7 @@ functionConfig:
 		logOutput := logBuffer.String()
 
 		// Verify the klog message contains the expected version selection
-		assert.Contains(t, logOutput, `Selected image "ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.1"`)
-		assert.Contains(t, logOutput, `version "0.4.1"`)
-		assert.Contains(t, logOutput, `for request "ghcr.io/kptdev/krm-functions-catalog/set-namespace"`)
+		assert.Contains(t, logOutput, `Selected tag "v0.4.1"`)
 
 		reader := bytes.NewReader([]byte(`apiVersion: config.kubernetes.io/v1alpha1
 kind: ResourceList
@@ -340,6 +343,7 @@ functionConfig:
 				Name: setNamespaceFunction,
 			},
 			Spec: configapi.FunctionConfigSpec{
+				Image: setNamespaceFunction,
 				Prefixes: []string{
 					"",
 				},
@@ -348,7 +352,7 @@ functionConfig:
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		functionConfigStore := functionconfigs.NewStore(defaultKRMImagePrefix, "")
 		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		function := &kptfilev1.Function{
@@ -409,12 +413,13 @@ functionConfig:
 				Name: setNamespaceFunction,
 			},
 			Spec: configapi.FunctionConfigSpec{
+				Image: setNamespaceFunction,
 				GoExecutor: &configapi.GoExecutorConfig{
 					Tags: []string{"v0.4.1"},
 				},
 			},
 		}
-		functionConfigStore := reconciler.NewStore(defaultKRMImagePrefix, "")
+		functionConfigStore := functionconfigs.NewStore(defaultKRMImagePrefix, "")
 		require.NoError(t, functionConfigStore.Store(&functionConfig))
 		br := newBuiltinRuntime(functionConfigStore)
 		function := &kptfilev1.Function{
@@ -441,9 +446,7 @@ functionConfig:
 		logOutput := logBuffer.String()
 
 		// Verify the klog message contains the expected version selection
-		assert.Contains(t, logOutput, `Selected image "ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.1"`)
-		assert.Contains(t, logOutput, `(version "0.4.1")`)
-		assert.Contains(t, logOutput, `for request "ghcr.io/kptdev/krm-functions-catalog/set-namespace"`)
+		assert.Contains(t, logOutput, `Selected tag "v0.4.1"`)
 
 		reader := bytes.NewReader([]byte(`apiVersion: config.kubernetes.io/v1alpha1
 kind: ResourceList

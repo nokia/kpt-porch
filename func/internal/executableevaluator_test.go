@@ -16,14 +16,17 @@ package internal
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	"github.com/kptdev/kpt/pkg/fn"
+	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
-	"github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
+	"github.com/nephio-project/porch/controllers/functionconfigs"
 	pb "github.com/nephio-project/porch/func/evaluator"
 	imageutil "github.com/nephio-project/porch/pkg/util/image"
 	"github.com/stretchr/testify/assert"
@@ -32,12 +35,12 @@ import (
 )
 
 const (
-	defaultKRMImagePrefix = "ghcr.io/kptdev/krm-functions-catalog/"
+	defaultKRMImagePrefix = runneroptions.GHCRImagePrefix
 	setImageFunction      = "set-image"
 	starlarkFunction      = "starlark"
 )
 
-func getFunctionConfigStore(t *testing.T, binaryDir string) *reconciler.FunctionConfigStore {
+func getFunctionConfigStore(t *testing.T, binaryDir string) *functionconfigs.FunctionConfigStore {
 	t.Helper()
 	starlarkConfig := &configapi.FunctionConfig{
 		Spec: configapi.FunctionConfigSpec{
@@ -69,7 +72,7 @@ func getFunctionConfigStore(t *testing.T, binaryDir string) *reconciler.Function
 			},
 		},
 	}
-	fstore := reconciler.NewStore(defaultKRMImagePrefix, binaryDir)
+	fstore := functionconfigs.NewStore(defaultKRMImagePrefix, binaryDir)
 	require.NoError(t, fstore.Store(starlarkConfig))
 	require.NoError(t, fstore.Store(setImageConfig))
 	return fstore
@@ -88,6 +91,10 @@ func TestNewExecutableEvaluator(t *testing.T) {
 }
 
 func TestEvaluateExecutableFunction(t *testing.T) {
+	flagSet := flag.NewFlagSet("log-level", flag.ContinueOnError)
+	klog.InitFlags(flagSet)
+	_ = flagSet.Parse([]string{"--v", "5"})
+
 	const tempCacheDir = "/tmp/func_cache"
 	t.Run("invalid semver constraint will cause function not found error", func(t *testing.T) {
 		ctx := t.Context()
@@ -170,14 +177,14 @@ func TestEvaluateExecutableFunction(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create a simple test executable that echoes input as a valid KRM function
-		testBinary := imageutil.Join(tmpDir, setImageFunction)
+		testBinary := filepath.Join(tmpDir, setImageFunction)
 		const testScript = `#!/bin/sh
 # Emulating the KRM function execution by running this shell script
 cat
 exit 0
 `
 		err := os.WriteFile(testBinary, []byte(testScript), 0755)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		executableEvaluatorOptions := ExecutableEvaluatorOptions{
 			FunctionCacheDir: tmpDir,
@@ -222,9 +229,7 @@ items: []
 		assert.NotNil(t, resp)
 
 		// Verify the klog message contains the expected version selection
-		assert.Contains(t, logOutput, `Selected image "ghcr.io/kptdev/krm-functions-catalog/set-image:v0.1.3"`)
-		assert.Contains(t, logOutput, `(version "0.1.3")`)
-		assert.Contains(t, logOutput, `for request "ghcr.io/kptdev/krm-functions-catalog/set-image"`)
+		assert.Contains(t, logOutput, `Selected tag "v0.1.3"`)
 	})
 	t.Run("successful function execution with explicit tagging", func(t *testing.T) {
 		ctx := t.Context()
@@ -233,7 +238,7 @@ items: []
 		tmpDir := t.TempDir()
 
 		// Create a simple test executable that echoes input as a valid KRM function
-		testBinary := imageutil.Join(tmpDir, setImageFunction)
+		testBinary := filepath.Join(tmpDir, setImageFunction)
 		const testScript = `#!/bin/sh
 # Emulating the KRM function execution by running this shell script
 cat
@@ -292,7 +297,7 @@ items: []
 		tmpDir := t.TempDir()
 
 		// Create a simple test executable that echoes input as a valid KRM function
-		testBinary := imageutil.Join(tmpDir, setImageFunction)
+		testBinary := filepath.Join(tmpDir, setImageFunction)
 		const testScript = `#!/bin/sh
 # Emulating the KRM function execution by running this shell script
 cat
@@ -342,8 +347,6 @@ items: []
 		assert.NotNil(t, resp)
 
 		// Verify the klog message contains the expected version selection
-		assert.Contains(t, logOutput, `Selected image "ghcr.io/kptdev/krm-functions-catalog/set-image:v0.1.3"`)
-		assert.Contains(t, logOutput, `(version "0.1.3")`)
-		assert.Contains(t, logOutput, `for request "ghcr.io/kptdev/krm-functions-catalog/set-image"`)
+		assert.Contains(t, logOutput, `Selected tag "v0.1.3"`)
 	})
 }

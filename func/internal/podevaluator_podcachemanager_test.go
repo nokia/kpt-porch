@@ -27,7 +27,7 @@ import (
 
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
-	fnconf "github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
+	"github.com/nephio-project/porch/controllers/functionconfigs"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -342,7 +342,7 @@ func TestPodCacheManager(t *testing.T) {
 		pm.imageMetadataCache.Store(k, v)
 	}
 
-	functionConfigStore := fnconf.NewStore(runneroptions.GHCRImagePrefix, "/function")
+	functionConfigStore := functionconfigs.NewStore(runneroptions.GHCRImagePrefix, "/function")
 
 	pcm := &podCacheManager{
 		// Setting to 5 minutes to avoid GC invocation

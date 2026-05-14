@@ -22,7 +22,7 @@ import (
 
 	"github.com/kptdev/kpt/pkg/fn/runtime"
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
-	fnconf "github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
+	"github.com/nephio-project/porch/controllers/functionconfigs"
 	"github.com/nephio-project/porch/func/evaluator"
 	"github.com/nephio-project/porch/pkg/util"
 	"google.golang.org/grpc"
@@ -103,7 +103,7 @@ type podReadyResponse struct {
 	err error
 }
 
-func NewPodEvaluator(ctx context.Context, o PodEvaluatorOptions, cl client.Client, functionConfigStore *fnconf.FunctionConfigStore) (Evaluator, error) {
+func NewPodEvaluator(ctx context.Context, o PodEvaluatorOptions, cl client.Client, functionConfigStore *functionconfigs.FunctionConfigStore) (Evaluator, error) {
 	maxWaitlist := o.MaxWaitlistLength
 	if maxWaitlist <= 0 {
 		maxWaitlist = 2

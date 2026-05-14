@@ -26,7 +26,7 @@ import (
 // FindBestSemverMatch selects the cache key whose semver tag best satisfies
 // the constraint for the given imageName. It returns the full cache key
 // (e.g. "ghcr.io/foo/bar:v1.2.3") of the highest matching version.
-func FindBestSemverMatch(constraint string, imageName string, cachedTags []string) (string, error) {
+func FindBestSemverMatch(constraint string, cachedTags []string) (string, error) {
 	c, err := semver.NewConstraint(constraint)
 	if err != nil {
 		return "", fmt.Errorf("invalid semver constraint %q: %w", constraint, err)
@@ -41,7 +41,7 @@ func FindBestSemverMatch(constraint string, imageName string, cachedTags []strin
 	for _, tag := range cachedTags {
 		v, err := semver.NewVersion(tag)
 		if err != nil {
-			klog.Infof("Failed to parse version %q from cached image %q: %v", tag, imageName, err)
+			klog.V(2).Infof("Failed to parse version %q: %v", tag, err)
 			continue
 		}
 
@@ -51,8 +51,7 @@ func FindBestSemverMatch(constraint string, imageName string, cachedTags []strin
 	}
 
 	if len(matches) == 0 {
-		klog.Infof("Image %q with constraint %q is not found in the cache", imageName, constraint)
-		return "", fmt.Errorf("no image matching %q with constraint %q found in the cache", imageName, constraint)
+		return "", fmt.Errorf("no tag matching constraint %q found among %+v", constraint, cachedTags)
 	}
 
 	slices.SortFunc(matches, func(a, b candidate) int {
@@ -60,37 +59,9 @@ func FindBestSemverMatch(constraint string, imageName string, cachedTags []strin
 	})
 
 	selected := matches[len(matches)-1]
-	klog.Infof("Selected image %q (version %q) for request %q",
-		imageName+":"+selected.key, selected.version, imageName)
+	klog.V(3).Infof("Selected tag %q", selected.key)
 
 	return selected.key, nil
-}
-
-func GetImageName(image string) string {
-	return Parse(image).BaseName
-}
-
-func GetImageRepository(image string) string {
-	lastSlash := strings.LastIndex(image, "/")
-	if lastSlash == -1 {
-		return ""
-	}
-	return image[:lastSlash]
-}
-
-func GetImageTag(image string) string {
-	if strings.Contains(image, "@sha256:") {
-		return ""
-	}
-
-	lastSlash := strings.LastIndex(image, "/")
-	lastColon := strings.LastIndex(image, ":")
-
-	if lastColon == -1 || lastColon < lastSlash {
-		return "latest"
-	}
-
-	return image[lastColon+1:]
 }
 
 func Join(parts ...string) string {
@@ -120,16 +91,16 @@ func Parse(fullImageName string) ParsedImage {
 	if firstSlash != -1 {
 		str := fullImageName[:firstSlash]
 		if registryRE.MatchString(str) {
-			output.Registry = str
+			output.Registry = strings.TrimRight(str, "/")
 			fullImageName = fullImageName[firstSlash+1:]
 
 			lastSlash = strings.LastIndex(fullImageName, "/")
 			if lastSlash != -1 {
-				output.SubPath = fullImageName[:lastSlash]
+				output.SubPath = strings.Trim(fullImageName[:lastSlash], "/")
 				fullImageName = fullImageName[lastSlash+1:]
 			}
 		} else {
-			output.SubPath = fullImageName[:lastSlash]
+			output.SubPath = strings.Trim(fullImageName[:lastSlash], "/")
 			fullImageName = fullImageName[lastSlash+1:]
 		}
 	}
@@ -144,6 +115,6 @@ func Parse(fullImageName string) ParsedImage {
 		fullImageName = fullImageName[:lastColon]
 	}
 
-	output.BaseName = fullImageName
+	output.BaseName = strings.TrimLeft(fullImageName, "/")
 	return output
 }

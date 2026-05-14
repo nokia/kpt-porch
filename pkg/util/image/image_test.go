@@ -22,27 +22,13 @@ import (
 )
 
 func TestFindBestSemverMatch(t *testing.T) {
-	cacheKeys := []string{
-		"ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.1",
-		"ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4",
-		"ghcr.io/kptdev/krm-functions-catalog/set-namespace@sha256:abcdef123456",
-		"ghcr.io/kptdev/krm-functions-catalog/apply-replacements:v0.1.1",
-		"ghcr.io/kptdev/krm-functions-catalog/apply-replacements:v0.1",
-		"ghcr.io/kptdev/krm-functions-catalog/starlark:v0.4.3",
-		"set-namespace:v0.4.1",
-	}
-
 	t.Run("selects highest matching version", func(t *testing.T) {
 		cacheKeys := []string{
 			"v0.4.1",
 			"v0.4",
 			"@sha256:abcdef123456",
 		}
-		key, err := FindBestSemverMatch(
-			">= 0.4.0 < 0.5.0",
-			"ghcr.io/kptdev/krm-functions-catalog/set-namespace",
-			cacheKeys,
-		)
+		key, err := FindBestSemverMatch(">= 0.4.0 < 0.5.0", cacheKeys)
 		assert.NoError(t, err)
 		assert.Equal(t, "v0.4.1", key)
 	})
@@ -52,41 +38,25 @@ func TestFindBestSemverMatch(t *testing.T) {
 			"v0.1.1",
 			"v0.1",
 		}
-		key, err := FindBestSemverMatch(
-			"0.1.1",
-			"ghcr.io/kptdev/krm-functions-catalog/apply-replacements",
-			cacheKeys,
-		)
+		key, err := FindBestSemverMatch("0.1.1", cacheKeys)
 		assert.NoError(t, err)
 		assert.Equal(t, "v0.1.1", key)
 	})
 
 	t.Run("no matching version for valid constraint", func(t *testing.T) {
-		_, err := FindBestSemverMatch(
-			"> 1.0.0",
-			"ghcr.io/kptdev/krm-functions-catalog/set-namespace",
-			cacheKeys,
-		)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "no image matching")
-	})
-
-	t.Run("image not in cache", func(t *testing.T) {
-		_, err := FindBestSemverMatch(
-			">= 0.1.0",
-			"ghcr.io/kptdev/krm-functions-catalog/nonexistent",
-			cacheKeys,
-		)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "no image matching")
+		cacheKeys := []string{
+			"v0.1.1",
+			"v0.1",
+		}
+		_, err := FindBestSemverMatch("> 1.0.0", cacheKeys)
+		assert.ErrorContains(t, err, "no tag matching")
 	})
 
 	t.Run("invalid semver constraint", func(t *testing.T) {
-		_, err := FindBestSemverMatch(
-			">> 1.0.0",
-			"ghcr.io/kptdev/krm-functions-catalog/set-namespace",
-			cacheKeys,
-		)
+		cacheKeys := []string{
+			"v1.1.0",
+		}
+		_, err := FindBestSemverMatch(">> 1.0.0", cacheKeys)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid semver constraint")
 	})
@@ -97,11 +67,7 @@ func TestFindBestSemverMatch(t *testing.T) {
 			"v0.4",
 			"@sha256:abcdef123456",
 		}
-		key, err := FindBestSemverMatch(
-			">= 0.4.0",
-			"ghcr.io/kptdev/krm-functions-catalog/set-namespace",
-			cacheKeys,
-		)
+		key, err := FindBestSemverMatch(">= 0.4.0", cacheKeys)
 		assert.NoError(t, err)
 		assert.NotContains(t, key, "@sha256:")
 	})
@@ -112,43 +78,34 @@ func TestFindBestSemverMatch(t *testing.T) {
 			"v0.4",
 			"@sha256:abcdef123456",
 		}
-		key, err := FindBestSemverMatch(
-			">= 0.4.0",
-			"set-namespace",
-			cacheKeys,
-		)
+		key, err := FindBestSemverMatch(">= 0.4.0", cacheKeys)
 		assert.NoError(t, err)
 		assert.Equal(t, "v0.4.1", key)
 	})
 
 	t.Run("empty cache keys", func(t *testing.T) {
-		_, err := FindBestSemverMatch(
-			">= 0.1.0",
-			"ghcr.io/kptdev/krm-functions-catalog/set-namespace",
-			[]string{},
-		)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "no image matching")
+		_, err := FindBestSemverMatch(">= 0.1.0", []string{})
+		assert.ErrorContains(t, err, "no tag matching")
 	})
 
 	t.Run("selects greatest from multiple matches", func(t *testing.T) {
-		keys := []string{
+		cacheKeys := []string{
 			"v1.0.0",
 			"v1.1.0",
 			"v1.2.0",
 			"v2.0.0",
 		}
-		key, err := FindBestSemverMatch(">= 1.0.0 < 2.0.0", "myimage", keys)
+		key, err := FindBestSemverMatch(">= 1.0.0 < 2.0.0", cacheKeys)
 		assert.NoError(t, err)
 		assert.Equal(t, "v1.2.0", key)
 	})
 
 	t.Run("skips entries with unparseable versions", func(t *testing.T) {
-		keys := []string{
+		cacheKeys := []string{
 			"v1.0.0",
 			"vnotaversion",
 		}
-		key, err := FindBestSemverMatch(">= 1.0.0", "myimage", keys)
+		key, err := FindBestSemverMatch(">= 1.0.0", cacheKeys)
 		assert.NoError(t, err)
 		assert.Equal(t, "v1.0.0", key)
 	})
@@ -165,8 +122,8 @@ func TestImageParse(t *testing.T) {
 	)
 
 	testCases := map[string]struct {
-		input        string
-		want         ParsedImage
+		input string
+		want  ParsedImage
 	}{
 		"empty": {
 			input: "",

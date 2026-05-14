@@ -26,7 +26,7 @@ import (
 
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	configapi "github.com/nephio-project/porch/api/porchconfig/v1alpha1"
-	"github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
+	"github.com/nephio-project/porch/controllers/functionconfigs"
 	pb "github.com/nephio-project/porch/func/evaluator"
 	"github.com/nephio-project/porch/func/healthchecker"
 	"github.com/nephio-project/porch/func/internal"
@@ -222,7 +222,7 @@ func buildScheme() (*runtime.Scheme, error) {
 	return scheme, nil
 }
 
-func buildFnConfigReconciler(o *options, scheme *runtime.Scheme) (*reconciler.FunctionConfigReconciler, error) {
+func buildFnConfigReconciler(o *options, scheme *runtime.Scheme) (*functionconfigs.FunctionConfigReconciler, error) {
 	restCfg, err := getRestConfig()
 	if err != nil {
 		return nil, err
@@ -243,12 +243,12 @@ func buildFnConfigReconciler(o *options, scheme *runtime.Scheme) (*reconciler.Fu
 		return nil, err
 	}
 
-	functionConfigStore := reconciler.NewStore(o.defaultImagePrefix, o.exec.FunctionCacheDir)
+	functionConfigStore := functionconfigs.NewStore(o.defaultImagePrefix, o.exec.FunctionCacheDir)
 
-	rec := &reconciler.FunctionConfigReconciler{
+	rec := &functionconfigs.FunctionConfigReconciler{
 		Client:              mgr.GetClient(),
 		FunctionConfigStore: functionConfigStore,
-		For:                 reconciler.ReconcilerForFunctionRunner,
+		For:                 functionconfigs.ReconcilerForFunctionRunner,
 	}
 
 	if err := ctrl.NewControllerManagedBy(mgr).

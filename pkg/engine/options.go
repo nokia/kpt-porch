@@ -19,7 +19,7 @@ import (
 
 	"github.com/kptdev/kpt/pkg/fn"
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
-	"github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
+	"github.com/nephio-project/porch/controllers/functionconfigs"
 	cachetypes "github.com/nephio-project/porch/pkg/cache/types"
 	"github.com/nephio-project/porch/pkg/repository"
 )
@@ -44,7 +44,7 @@ func WithCache(cache cachetypes.Cache) EngineOption {
 	})
 }
 
-func WithBuiltinFunctionRuntime(functionConfigStore *reconciler.FunctionConfigStore) EngineOption {
+func WithBuiltinFunctionRuntime(functionConfigStore *functionconfigs.FunctionConfigStore) EngineOption {
 	return EngineOptionFunc(func(engine *cadEngine) error {
 		runtime := newBuiltinRuntime(functionConfigStore)
 		if engine.taskHandler.GetRuntime() == nil {

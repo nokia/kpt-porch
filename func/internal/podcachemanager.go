@@ -23,7 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	fnconf "github.com/nephio-project/porch/controllers/functionconfigs/reconciler"
+	"github.com/nephio-project/porch/controllers/functionconfigs"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -54,7 +54,7 @@ type podCacheManager struct {
 
 	maxWaitlistLength          int
 	maxParallelPodsPerFunction int
-	functionConfigMap          *fnconf.FunctionConfigStore
+	functionConfigMap          *functionconfigs.FunctionConfigStore
 }
 
 // functionInfo holds the list of all pod instances for the same KRM function image.
