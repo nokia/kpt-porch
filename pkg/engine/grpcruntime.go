@@ -1,4 +1,4 @@
-// Copyright 2022, 2025-2026 The kpt and Nephio Authors
+// Copyright 2022, 2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ import (
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	"github.com/kptdev/kpt/pkg/fn"
 	"github.com/kptdev/kpt/pkg/lib/kptops"
-	"github.com/nephio-project/porch/controllers/functionconfigs"
-	"github.com/nephio-project/porch/func/proto"
+	"github.com/kptdev/porch/controllers/functionconfigs"
+	"github.com/kptdev/porch/func/proto"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

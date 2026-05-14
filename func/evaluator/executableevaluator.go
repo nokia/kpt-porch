@@ -1,4 +1,4 @@
-// Copyright 2022, 2026 The kpt and Nephio Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ import (
 
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	"github.com/kptdev/kpt/pkg/fn"
-	"github.com/nephio-project/porch/controllers/functionconfigs"
-	pb "github.com/nephio-project/porch/func/proto"
+	"github.com/kptdev/porch/controllers/functionconfigs"
+	pb "github.com/kptdev/porch/func/proto"
 	regclientref "github.com/regclient/regclient/types/ref"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
