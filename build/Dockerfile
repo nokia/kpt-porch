@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 ARG ALPINE_VERSION=latest
 ARG GOLANG_BOOKWORM_VERSION=latest
+ARG DOCKERHUB_MIRROR=docker.io
 
-FROM golang:${GOLANG_BOOKWORM_VERSION} AS builder
+FROM ${DOCKERHUB_MIRROR}/golang:${GOLANG_BOOKWORM_VERSION} AS builder
 
 WORKDIR /go/src
 
@@ -43,7 +43,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -trimpath -ldflags="-s -w" -v -o /porch ./cmd/porch
 
 
-FROM alpine:${ALPINE_VERSION}
+FROM ${DOCKERHUB_MIRROR}/alpine:${ALPINE_VERSION}
 RUN addgroup -g 10001 nonroot && \
     adduser -D -G nonroot -u 10001 nonroot
 

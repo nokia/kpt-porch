@@ -14,8 +14,9 @@
 
 ARG ALPINE_VERSION=latest
 ARG GOLANG_ALPINE_VERSION=latest
+ARG DOCKERHUB_MIRROR=docker.io
 
-FROM golang:${GOLANG_ALPINE_VERSION} AS builder
+FROM ${DOCKERHUB_MIRROR}/golang:${GOLANG_ALPINE_VERSION} AS builder
 
 WORKDIR /go/src
 
@@ -39,7 +40,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     cd func ; go build -trimpath -ldflags="-s -w" -v -o /wrapper-server/wrapper-server ./wrapper-server
 RUN cp $GOPATH/bin/grpc-health-probe /wrapper-server/
 
-FROM alpine:${ALPINE_VERSION}
+FROM ${DOCKERHUB_MIRROR}/alpine:${ALPINE_VERSION}
 RUN addgroup -g 10001 nonroot && \
     adduser -D -G nonroot -u 10001 nonroot
 

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: do we still use this?
 
 ARG GOLANG_BOOKWORM_VERSION=latest
 
