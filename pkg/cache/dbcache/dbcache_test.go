@@ -23,6 +23,7 @@ import (
 	"time"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
+	"github.com/joho/godotenv"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/pkg/cache/testutil"
 	cachetypes "github.com/kptdev/porch/pkg/cache/types"
@@ -38,6 +39,7 @@ import (
 )
 
 const defaultPorchSQLSchema = "api/sql/porch-db.sql"
+const dbMavenMirrorEnv = "DB_MAVEN_MIRROR"
 
 type DbTestSuite struct {
 	suite.Suite
@@ -61,12 +63,21 @@ func (t *DbTestSuite) Context() context.Context {
 }
 
 func (t *DbTestSuite) SetupSuite() {
-	postgres := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().
+	if err := godotenv.Load("../../../.env"); err != nil {
+		t.T().Logf("Failed to load .env file: %v", err)
+	}
+
+	config := embeddedpostgres.DefaultConfig().
 		Username("porch").
 		Password("porch").
 		Database("porch").
-		Port(55432))
+		Port(55432)
 
+	if mavenMirror := os.Getenv(dbMavenMirrorEnv); mavenMirror != "" {
+		config = config.BinaryRepositoryURL(mavenMirror)
+	}
+
+	postgres := embeddedpostgres.NewDatabase(config)
 	err := postgres.Start()
 	t.Require().NoError(err, "could not start test instance of postgres")
 

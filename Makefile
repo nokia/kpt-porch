@@ -55,6 +55,13 @@ ifneq ("$(wildcard .env)", "")
     export
 endif
 
+export PORCH_GHCR_PREFIX_URL ?= ghcr.io/kptdev/krm-functions-catalog/
+# remove '/' suffix
+export PORCH_GHCR_PREFIX_URL := $(patsubst %/,'',$(PORCH_GHCR_PREFIX_URL))
+export DOCKERHUB_MIRROR ?= ""
+# remove '/' suffix
+export DOCKERHUB_MIRROR := $(patsubst %/,'',$(DOCKERHUB_MIRROR))
+
 # Include module makefiles
 include make/build.mk        # generate, tidy, porch, porchctl, build-images, push-images
 include make/deploy.mk       # deploy, run-in-kind*, destroy, deployment-config*, load-images-to-kind, reload-*
@@ -83,3 +90,7 @@ dev: build check ## Full development cycle (build + check)
 
 .PHONY: quick-test
 quick-test: fmt vet test ## Quick development test cycle
+
+.PHONY: dump-env
+dump-env:
+	env

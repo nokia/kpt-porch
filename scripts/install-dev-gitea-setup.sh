@@ -17,15 +17,18 @@
 set -e # Exit on error
 set -u # Must predefine variables
 set -o pipefail # Check errors in piped commands
- 
+
+# Source common configuration
+source "$(dirname "$0")/common.sh"
+
 self_dir="$(dirname "$(readlink -f "$0")")"
 git_repo_name=${1:-porch-test}
 gitea_ip=${2:-172.18.255.200}  # should be from the address range in deployments/local/metallb-conf.yaml
- 
+
 git_root="$(readlink -f "${self_dir}/..")"
 TEST_BLUEPRINTS_PATH="${git_root}/test/pkgs/test-pkgs/test-blueprints.bundle"
 cd "${git_root}"
- 
+
 function h1() {
   echo
   echo "** $*"
@@ -35,35 +38,28 @@ function h1() {
 # Function to reload test-blueprints from bundle
 reload_test_blueprints_bundle() {
   h1 Reload test-blueprints from bundle
-  
   # Setup port-forward
   kubectl port-forward -n gitea svc/gitea-lb 3000:3000 >/dev/null 2>&1 &
   PORT_FORWARD_PID=$!
   sleep 3
-  
   # Delete existing repo
   h1 "Deleting existing test-blueprints repository"
   curl -s -X DELETE "http://porch:secret@localhost:3000/api/v1/repos/porch/test-blueprints" >/dev/null 2>&1 || true
-  
   # Recreate repo from bundle
   h1 "Recreating test-blueprints repository"
   curl -s -H "content-type: application/json" "http://porch:secret@localhost:3000/api/v1/user/repos" --data '{"name":"test-blueprints"}' >/dev/null 2>&1
-  
   TEST_BLUEPRINTS_TMP_DIR=$(mktemp -d)
   cd "$TEST_BLUEPRINTS_TMP_DIR"
   h1 "Cloning from bundle: $TEST_BLUEPRINTS_PATH"
   git clone "$TEST_BLUEPRINTS_PATH" -b main
   cd test-blueprints
-  
   git gc
   git remote rename origin upstream
   git remote add origin "http://porch:secret@localhost:3000/porch/test-blueprints"
   git push -u origin --all
   git push -u origin --tags
-  
   cd "${git_root}"
   rm -fr "$TEST_BLUEPRINTS_TMP_DIR"
-  
   kill $PORT_FORWARD_PID 2>/dev/null || true
   echo "Test-blueprints repo reloaded from bundle"
 }
@@ -80,7 +76,6 @@ function retry_curl() {
   local delay=$2
   shift 2
   local attempt=1
-  
   while [ $attempt -le $max_attempts ]; do
     if "$@"; then
       return 0
@@ -89,7 +84,6 @@ function retry_curl() {
     sleep $delay
     attempt=$((attempt + 1))
   done
-  
   echo "ERROR: Command failed after $max_attempts attempts: $*"
   return 1
 }
@@ -97,12 +91,14 @@ function retry_curl() {
 h1 Install Gitea and init test repos
 mkdir -p "${git_root}/.build"
 cd "${git_root}/.build"
+
+# Always clean and rebuild the package
 if [ -d gitea ]; then
-  h1 Dev Gitea pkg already present
-else
-  cp -r "${git_root}/test/pkgs/gitea-dev" gitea
+  rm -rf gitea
 fi
- 
+
+cp -r "${git_root}/test/pkgs/gitea-dev" gitea
+
 cd "${git_root}/.build/gitea"
  
 # Check if the gitea service of type LoadBalancer exists in the 'gitea' namespace
@@ -112,7 +108,7 @@ else
   h1 Gitea LoadBalancer service does not exist. Mutating pkg...
  
   kpt fn eval \
-    --image ghcr.io/kptdev/krm-functions-catalog/set-annotations:v0.1.7 \
+    --image "${PORCH_GHCR_PREFIX_URL}/set-annotations:v0.1.7" \
     --match-kind Service \
     --match-name gitea-lb \
     --match-namespace gitea \
@@ -120,6 +116,13 @@ else
 fi
  
 kpt fn render
+
+if [[ -n "${DOCKERHUB_MIRROR}" ]]; then
+  kpt fn eval . --image "${PORCH_GHCR_PREFIX_URL}/set-image:v0.2.2" -- \
+    "name=gitea/gitea" \
+    "newName=${DOCKERHUB_MIRROR}/gitea/gitea"
+fi
+
 kpt live init || true
 kpt live apply --inventory-policy=adopt
 echo "Waiting for gitea deployment to become ready..."

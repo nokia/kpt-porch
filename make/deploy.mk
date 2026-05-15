@@ -159,7 +159,7 @@ deploy-gitea-dev-pkg:## Deploy gitea development package
 	  --kubeconfig $(KUBECONFIG)
 
 .PHONY: setup-dev-env
-setup-dev-env: PORCH_TEST_CLUSTER=porch-test ## Setup gitea, Metallb and test repository in kind cluster
+setup-dev-env: PORCH_TEST_CLUSTER=porch-test
 setup-dev-env: GIT_REPO_NAME=porch-test
-setup-dev-env:
+setup-dev-env: ## Setup gitea, Metallb and test repository in kind cluster
 	./scripts/setup-dev-env.sh

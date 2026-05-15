@@ -18,10 +18,13 @@ set -e # Exit on error
 set -u # Must predefine variables
 set -o pipefail # Check errors in piped commands
 
+# Source common configuration
+source "$(dirname "$0")/common.sh"
+
 PORCH_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-STARLARK_IMG="ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5"
-SEARCH_REPLACE_IMG="ghcr.io/kptdev/krm-functions-catalog/search-replace:v0.2"
-SET_IMAGE_IMG="ghcr.io/kptdev/krm-functions-catalog/set-image:v0.2.2"
+STARLARK_IMG="${PORCH_GHCR_PREFIX_URL}/starlark:v0.5"
+SEARCH_REPLACE_IMG="${PORCH_GHCR_PREFIX_URL}/search-replace:v0.2"
+SET_IMAGE_IMG="${PORCH_GHCR_PREFIX_URL}/set-image:v0.2.2"
 
 function error() {
   cat <<EOF
@@ -53,7 +56,6 @@ FUNCTION_IMAGE=""
 WRAPPER_SERVER_IMAGE=""
 ENABLED_RECONCILERS=""
 GHCR_IMAGE_PREFIX=""
-DOCKERHUB_MIRROR=""
 FN_RUNNER_WARM_UP_POD_CACHE="true"
 PORCH_CACHE_TYPE="DB"
 DB_PUSH_DRAFTS_TO_GIT="false"
@@ -100,10 +102,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --db-push-drafts-to-git)
       DB_PUSH_DRAFTS_TO_GIT="${2}"
-      shift 2
-      ;;
-    --dockerhub-mirror)
-      DOCKERHUB_MIRROR="${2}"
       shift 2
       ;;
     --create-v1alpha2-rpkg)

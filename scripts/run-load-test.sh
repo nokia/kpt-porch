@@ -137,9 +137,9 @@ info:
 
 pipeline:
   mutators:
-    - image: ghcr.io/kptdev/krm-functions-catalog/apply-replacements:v0.1.5
+    - image: ${PORCH_GHCR_PREFIX_URL}/apply-replacements:v0.1.5
       configPath: apply-replacements-annotation1.yaml
-    - image: ghcr.io/kptdev/krm-functions-catalog/apply-replacements:v0.1.5
+    - image: ${PORCH_GHCR_PREFIX_URL}/apply-replacements:v0.1.5
       configPath: apply-replacements-annotation2.yaml
 EOF
 
