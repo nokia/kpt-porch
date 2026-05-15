@@ -18,6 +18,9 @@ set -e # Exit on error
 set -u # Must predefine variables
 set -o pipefail # Check errors in piped commands
 
+# Source common configuration
+source "$(dirname "$0")/common.sh"
+
 function_runner_ip="${1:-172.18.255.202}"
 self_dir="$(dirname "$(readlink -f "$0")")"
 deployment_config_dir="${DEPLOYPORCHCONFIGDIR:-$(readlink -f "${self_dir}/../.build/deploy")}"

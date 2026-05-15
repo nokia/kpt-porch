@@ -14,6 +14,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Source common configuration
+source "$(dirname "$0")/common.sh"
+
 script_name=$(basename "$0")
 
 git_repo_server=""

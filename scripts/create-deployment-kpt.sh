@@ -18,6 +18,9 @@ set -e # Exit on error
 set -u # Must predefine variables
 set -o pipefail # Check errors in piped commands
 
+# Source common configuration
+source "$(dirname "$0")/common.sh"
+
 function error() {
   cat <<EOF
 Error: ${1}

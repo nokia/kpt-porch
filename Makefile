@@ -55,12 +55,12 @@ ifneq ("$(wildcard .env)", "")
     export
 endif
 
-export PORCH_GHCR_PREFIX_URL ?= ghcr.io/kptdev/krm-functions-catalog/
+export PORCH_GHCR_PREFIX_URL ?= ghcr.io/kptdev/krm-functions-catalog
 # remove '/' suffix
-export PORCH_GHCR_PREFIX_URL := $(patsubst %/,'',$(PORCH_GHCR_PREFIX_URL))
-export DOCKERHUB_MIRROR ?= ""
+export PORCH_GHCR_PREFIX_URL := $(patsubst %/,%,$(PORCH_GHCR_PREFIX_URL))
+export DOCKERHUB_MIRROR ?=
 # remove '/' suffix
-export DOCKERHUB_MIRROR := $(patsubst %/,'',$(DOCKERHUB_MIRROR))
+export DOCKERHUB_MIRROR := $(patsubst %/,%,$(DOCKERHUB_MIRROR))
 
 # Include module makefiles
 include make/build.mk        # generate, tidy, porch, porchctl, build-images, push-images

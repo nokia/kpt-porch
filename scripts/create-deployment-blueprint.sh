@@ -42,7 +42,6 @@ Supported Flags:
   --fn-runner-warm-up-pod-cache BOOL  ... disable warm-up-pod-cache in function runner
   --porch-cache-type TYPE             ... porch cache type (CR or DB)
   --db-push-drafts-to-git BOOL        ... enable db-push-drafts-to-git flag for porch-server
-  --dockerhub-mirror REGISTRY         ... alternate registry to pull additional images from (postgres)
   --create-v1alpha2-rpkg BOOL         ... enable v1alpha2 PackageRevision CRD creation by repo controller
 EOF
   exit 1

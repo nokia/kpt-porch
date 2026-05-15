@@ -17,6 +17,10 @@
 set -e # Exit on error
 set -u # Must predefine variables
 set -o pipefail # Check errors in piped commands
+
+# Source common configuration
+source "$(dirname "$0")/common.sh"
+
 self_dir="$(dirname "$(readlink -f "$0")")"
 
 # function_runner_ip should match the --function-runner argument given to porch-server

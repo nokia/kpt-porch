@@ -20,6 +20,9 @@ set -e # Exit on error
 set -u # Must predefine variables
 set -o pipefail # Check errors in piped commands
 
+# Source common configuration
+source "$(dirname "$0")/common.sh"
+
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 BUNDLE_PATH="$SCRIPT_DIR/../test/pkgs/test-pkgs/test-blueprints.bundle"
 
