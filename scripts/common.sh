@@ -12,7 +12,7 @@ if [[ -f "${PORCHDIR}/.env" ]]; then
   set +a
 fi
 
-IMAGE_REPO=${IMAGE_REPO:-docker.io/nephio} # TODO: this should be kptdev, right?
+IMAGE_REPO=${IMAGE_REPO:-ghcr.io/kptdev}
 
 PORCH_SERVER_IMAGE=${PORCH_SERVER_IMAGE:-porch-server}
 PORCH_CONTROLLERS_IMAGE=${PORCH_CONTROLLERS_IMAGE:-porch-controllers}

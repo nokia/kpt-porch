@@ -15,7 +15,7 @@
 # TODO: do we still use this?
 
 IMAGE_TAG  ?= latest
-IMAGE_REPO ?= docker.io/nephio
+IMAGE_REPO ?= ghcr.io/kptdev
 IMAGE_NAME ?= test-git-server
 
 .PHONY: build-image docker-build
