@@ -27,6 +27,7 @@ if [[ -f "${PORCHDIR}/.env" ]]; then
     export "${key}=${value}"
   done < "${PORCHDIR}/.env"
   unset -f _env_trim
+  unset -v key value line
 fi
 
 IMAGE_REPO=${IMAGE_REPO:-ghcr.io/kptdev}
