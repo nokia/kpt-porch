@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO: do we still use this?
-
 ARG ALPINE_VERSION=latest
 ARG GOLANG_BOOKWORM_VERSION=latest
+ARG DOCKERHUB_MIRROR=docker.io
 
-FROM golang:${GOLANG_BOOKWORM_VERSION} AS builder
+FROM ${DOCKERHUB_MIRROR}/golang:${GOLANG_BOOKWORM_VERSION} AS builder
 
 WORKDIR /workspace/src
 RUN git clone https://github.com/kubernetes/kubernetes --branch v1.30.3 --depth=1
@@ -25,7 +24,7 @@ WORKDIR /workspace/src/kubernetes
 RUN apt-get update && apt-get install --yes rsync
 RUN make kube-apiserver
 
-FROM alpine:${ALPINE_VERSION}
+FROM ${DOCKERHUB_MIRROR}/alpine:${ALPINE_VERSION}
 RUN addgroup -g 10001 nonroot && \
     adduser -D -G nonroot -u 10001 nonroot
 

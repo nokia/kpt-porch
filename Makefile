@@ -90,7 +90,3 @@ dev: build check ## Full development cycle (build + check)
 
 .PHONY: quick-test
 quick-test: fmt vet test ## Quick development test cycle
-
-.PHONY: dump-env
-dump-env:
-	env

@@ -20,8 +20,14 @@ IMAGE_NAME ?= test-git-server
 
 .PHONY: build-image docker-build
 build-image docker-build:
-	docker buildx build --load --tag $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG) --build-arg GOLANG_BOOKWORM_VERSION=$(GOLANG_BOOKWORM_VERSION) -f Dockerfile ..
+	docker buildx build --load --tag $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG) \
+      --build-arg GOLANG_BOOKWORM_VERSION=$(GOLANG_BOOKWORM_VERSION) \
+	  $$(if [ -n "${DOCKERHUB_MIRROR}" ]; then echo "--build-arg DOCKERHUB_MIRROR=${DOCKERHUB_MIRROR}"; fi) \
+      -f Dockerfile ..
 
 .PHONY: push-image docker-push
 push-image docker-push:
-	docker buildx build --push --tag $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG) --build-arg GOLANG_BOOKWORM_VERSION=$(GOLANG_BOOKWORM_VERSION) -f Dockerfile ..
+	docker buildx build --push --tag $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG) \
+      --build-arg GOLANG_BOOKWORM_VERSION=$(GOLANG_BOOKWORM_VERSION) \
+	  $$(if [ -n "${DOCKERHUB_MIRROR}" ]; then echo "--build-arg DOCKERHUB_MIRROR=${DOCKERHUB_MIRROR}"; fi) \
+      -f Dockerfile ..

@@ -2,14 +2,31 @@
 # Fallback defaults for direct script execution
 # NOTE: Users should use root Makefile targets instead of calling scripts directly
 
-# Only set defaults if variables are not already exported from Makefile
+# Only set defaults if variables are not already exported from Makefile.
+# .env entries do not override variables already set in the environment.
 
 PORCHDIR=${PORCHDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 
 if [[ -f "${PORCHDIR}/.env" ]]; then
-  set -a
-  export $(grep -v '^#' "${PORCHDIR}/.env" | xargs)
-  set +a
+  _env_trim() {
+    local s="$1"
+    s="${s#"${s%%[![:space:]]*}"}"
+    s="${s%"${s##*[![:space:]]}"}"
+    printf '%s' "$s"
+  }
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    [[ "$line" != *=* ]] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    key="$(_env_trim "$key")"
+    value="$(_env_trim "$value")"
+    [[ -z "$key" ]] && continue
+    [[ -n "${!key+x}" ]] && continue
+    export "${key}=${value}"
+  done < "${PORCHDIR}/.env"
+  unset -f _env_trim
 fi
 
 IMAGE_REPO=${IMAGE_REPO:-ghcr.io/kptdev}
