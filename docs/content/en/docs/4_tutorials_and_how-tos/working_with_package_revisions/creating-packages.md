@@ -124,7 +124,7 @@ info:
   description: My first Porch package
 pipeline:
   mutators:
-    - image: gcr.io/kpt-fn/set-namespace:v0.4.1
+    - image: set-namespace:latest
       configMap:
         namespace: production
 ```
@@ -171,8 +171,8 @@ This command updates the PackageRevision in Porch and triggers rendering (execut
 Successful output should look like a following. This describes how the KRM function was run by Porch and has updated the namespace in our new configmap.
 
 ```bash
-[RUNNING] "gcr.io/kpt-fn/set-namespace:v0.4.1"
-[PASS] "gcr.io/kpt-fn/set-namespace:v0.4.1"
+[RUNNING] "set-namespace:latest"
+[PASS] "set-namespace:latest"
   Results:
     [info]: namespace "" updated to "production", 1 value(s) changed
 porch-test.my-first-package.v1 pushed

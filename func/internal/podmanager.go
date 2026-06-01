@@ -891,7 +891,7 @@ func podID(image, hash, postFix string) (string, error) {
 		return "", fmt.Errorf("unable to parse image reference %v: %w", image, err)
 	}
 
-	// repoName will be something like gcr.io/kpt-fn/set-namespace
+	// repoName will be something like ghcr.io/kptdev/krm-functions-catalog/...
 	repoName := ref.Context().Name()
 	tag := strings.ReplaceAll(ref.Identifier(), ".", "")
 	parts := strings.Split(repoName, "/")

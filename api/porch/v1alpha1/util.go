@@ -73,8 +73,9 @@ func IsPackageCreation(pkgRev *PackageRevision) bool {
 	return false
 }
 
-// IsSubpackageSource checks if the package revision contains a subpackage operation
-func GetSubpackage(pkgRev *PackageRevision) string {
+// GetSubpackageDir returns the SubpackageDir for a package revision,
+// or "" if there is no SubpackageDir set.
+func GetSubpackageDir(pkgRev *PackageRevision) string {
 	for _, task := range pkgRev.Spec.Tasks {
 		if task.Type == TaskTypeClone {
 			if task.Clone == nil || task.Clone.SubpackageDir == "" {

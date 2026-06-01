@@ -48,28 +48,28 @@ func TestPodID(t *testing.T) {
 	}{
 		{
 			name:     "standard image with tag",
-			image:    "gcr.io/kpt-fn/apply-replacements:latest",
+			image:    "ghcr.io/kptdev/krm-functions-catalog/apply-replacements:latest",
 			hash:     "5245a52778d684fa698f69861fb2e058b308f6a74fed5bf2fe77d97bad5e071c",
 			postFix:  "1",
 			expected: "apply-replacements-latest-1-5245a527",
 		},
 		{
 			name:     "image without explicit tag defaults to latest",
-			image:    "gcr.io/kpt-fn/set-namespace",
+			image:    "ghcr.io/kptdev/krm-functions-catalog/set-namespace",
 			hash:     "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 			postFix:  "2",
 			expected: "set-namespace-latest-2-abcdef12",
 		},
 		{
 			name:     "image with version tag containing dots",
-			image:    "gcr.io/kpt-fn/set-labels:v0.4.1",
+			image:    "ghcr.io/kptdev/krm-functions-catalog/set-labels:v0.4.1",
 			hash:     "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 			postFix:  "1",
 			expected: "set-labels-v041-1-12345678",
 		},
 		{
 			name:     "image with underscores in name",
-			image:    "gcr.io/kpt-fn/my_function:latest",
+			image:    "ghcr.io/kptdev/krm-functions-catalog/my_function:latest",
 			hash:     "aabbccddee112233aabbccddee112233aabbccddee112233aabbccddee112233",
 			postFix:  "1",
 			expected: "my-function-latest-1-aabbccdd",
@@ -235,11 +235,11 @@ func TestPatchNewPodContainer(t *testing.T) {
 			entrypoint: []string{"/my-function"},
 		}
 
-		err := pm.patchNewPodContainer(podTemplateSpec, de, "gcr.io/kpt-fn/my-function:latest")
+		err := pm.patchNewPodContainer(podTemplateSpec, de, "ghcr.io/kptdev/krm-functions-catalog/my-function:latest")
 		require.NoError(t, err)
 
 		container := podTemplateSpec.Spec.Containers[0]
-		assert.Equal(t, "gcr.io/kpt-fn/my-function:latest", container.Image)
+		assert.Equal(t, "ghcr.io/kptdev/krm-functions-catalog/my-function:latest", container.Image)
 		assert.Contains(t, container.Args, "--port")
 		assert.Contains(t, container.Args, defaultWrapperServerPort)
 		assert.Contains(t, container.Args, "--")

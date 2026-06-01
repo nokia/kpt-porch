@@ -137,7 +137,7 @@ info:
   description: My app version 2 with improvements
 pipeline:
   mutators:
-    - image: gcr.io/kpt-fn/set-namespace:v0.4.1
+    - image: set-namespace:latest
       configMap:
         namespace: production
 ```

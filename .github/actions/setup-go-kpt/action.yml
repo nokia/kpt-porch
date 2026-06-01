@@ -23,7 +23,11 @@ inputs:
   kpt-fallback-version:
     description: "Fallback kpt version if extraction from go.mod fails"
     required: false
-    default: "v1.0.0-beta.62.1"
+    default: "v1.0.0-beta.64"
+  go-version-file:
+    description: "Path to go.mod file for Go version setup"
+    required: false
+    default: "go.mod"
   go-cache:
     description: "Enable Go module caching"
     required: false
@@ -40,18 +44,22 @@ runs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version-file: go.mod
+        go-version-file: ${{ inputs.go-version-file }}
         cache: ${{ inputs.go-cache == 'true' }}
 
     - name: Get kpt version from go.mod
       if: inputs.install-kpt == 'true'
       id: kpt-version
       shell: bash
+      env:
+        GO_VERSION_FILE: ${{ inputs.go-version-file }}
+        KPT_FALLBACK: ${{ inputs.kpt-fallback-version }}
       run: |
-        KPT_VERSION=$(go list -m -f '{{.Version}}' github.com/kptdev/kpt 2>/dev/null)
+        GO_MOD_DIR=$(dirname -- "$GO_VERSION_FILE")
+        KPT_VERSION=$(cd "$GO_MOD_DIR" && go list -m -f '{{.Version}}' github.com/kptdev/kpt 2>/dev/null)
         if [ -z "$KPT_VERSION" ]; then
-          echo "Warning: Could not resolve kpt version from go.mod, using fallback"
-          KPT_VERSION="${{ inputs.kpt-fallback-version }}"
+          echo "Warning: Could not resolve kpt version from ${GO_VERSION_FILE}, using fallback."
+          KPT_VERSION="$KPT_FALLBACK"
         fi
         echo "version=${KPT_VERSION}" >> "$GITHUB_OUTPUT"
 

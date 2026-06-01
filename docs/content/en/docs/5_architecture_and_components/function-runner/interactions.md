@@ -263,7 +263,7 @@ Pod Creation
 The Function Runner supports private registries with authentication:
 
 **Authentication flow:**
-- Default registry (gcr.io/kpt-fn/) uses default keychain
+- Default registry (ghcr.io/kptdev/krm-functions-catalog/) uses default keychain
 - Custom registries use Docker config JSON format
 - Auth secret mounted into Function Runner pod
 - Image pull secrets created and attached to function pods

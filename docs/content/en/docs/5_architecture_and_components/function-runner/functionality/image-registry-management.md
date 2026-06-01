@@ -121,7 +121,7 @@ Image Reference
 ```
 
 **Authentication decision:**
-- **Default registry** (gcr.io/kpt-fn/): Uses default keychain
+- **Default registry** (ghcr.io/kptdev/krm-functions-catalog/): Uses default keychain
 - **Custom registry**: Requires private registry support enabled
 - **Disabled private registries**: Falls back to default keychain
 

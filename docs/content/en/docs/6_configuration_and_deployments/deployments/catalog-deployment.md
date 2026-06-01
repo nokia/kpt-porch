@@ -67,7 +67,7 @@ If you need any pre-deployment features from the [Configuration Planning](#confi
 cd porch/
 
 # Example: Configure database cache for Porch Server
-kpt fn eval --image gcr.io/kpt-fn/set-annotations:v0.1 -- \
+kpt fn eval --image ghcr.io/kptdev/krm-functions-catalog/set-annotations:latest -- \
   annotations='cache-type=DB'
 
 # Review your changes
