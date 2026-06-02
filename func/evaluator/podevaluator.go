@@ -21,10 +21,12 @@ import (
 
 	"github.com/kptdev/kpt/pkg/fn/runtime"
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
+	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/controllers/functionconfigs"
 	"github.com/kptdev/porch/func/proto"
 	. "github.com/kptdev/porch/func/types"
 	"github.com/kptdev/porch/pkg/util"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -43,6 +45,9 @@ const (
 	defaultRegistry           = "ghcr.io/kptdev/krm-functions-catalog/"
 	serviceDnsNameSuffix      = ".svc.cluster.local"
 	channelBufferSize         = 128
+
+	// how long to wait for the FunctionConfig caches to be filled
+	warmupCacheWaitTimeout = 20 * time.Second
 )
 
 type podEvaluator struct {
@@ -128,16 +133,38 @@ func NewPodEvaluator(ctx context.Context, o PodEvaluatorOptions, cl client.Clien
 		return nil, fmt.Errorf("failed to retrieve existing pods: %w", err)
 	}
 
-	//if o.WarmUpPodCacheOnStartup {
-	//	// TODO(mengqiy): add watcher that support reloading the cache when the config file was changed.
-	//	err = pe.podCacheManager.warmupCache(o.DefaultImagePrefix)
-	//	// If we can't warm up the cache, we can still proceed without it.
-	//	if err != nil {
-	//		klog.Warningf("unable to warm up the pod cache: %v", err)
-	//	}
-	//}
+	if o.WarmUpPodCacheOnStartup {
+		err = waitForFunctionConfigs(ctx, cl, functionConfigStore)
+		// We proceed even if not all CRs are reconciled
+		if err != nil {
+			klog.Warningf("Failed to wait for all FunctionConfigs to be cached, warmup may be partial: %v", err)
+		}
+		// TODO(mengqiy): add watcher that support reloading the cache when the config file was changed.
+		err = pe.podCacheManager.warmupCache(o.DefaultImagePrefix)
+		// If we can't warm up the cache, we can still proceed without it.
+		if err != nil {
+			klog.Warningf("unable to warm up the pod cache: %v", err)
+		}
+	}
 
 	return pe, nil
+}
+
+func waitForFunctionConfigs(ctx context.Context, cl client.Client, store *functionconfigs.FunctionConfigStore) error {
+	list := &configapi.FunctionConfigList{}
+	return wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, warmupCacheWaitTimeout, true, func(ctx context.Context) (bool, error) {
+		if err := cl.List(ctx, list); err != nil {
+			// if listing fails, something is wrong with the client or cluster
+			return false, err
+		}
+
+		if len(list.Items) > store.Len() {
+			klog.Infof("[Cache Warmup]: Some FunctionConfigs have not yet been reconciled; CRs: %d, Cached: %d", len(list.Items), store.Len())
+			return false, nil
+		}
+
+		return true, nil
+	})
 }
 
 func (pe *podEvaluator) EvaluateFunction(ctx context.Context, req *evaluator.EvaluateFunctionRequest) (*evaluator.EvaluateFunctionResponse, error) {

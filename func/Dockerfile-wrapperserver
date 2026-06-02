@@ -33,7 +33,7 @@ RUN go install github.com/grpc-ecosystem/grpc-health-probe@v0.4.11
 COPY func/ func/
 COPY ./api ./api
 COPY ./pkg ./pkg
-COPY ./evaluator ./evaluator
+COPY ./internal ./internal
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

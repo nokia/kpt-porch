@@ -276,36 +276,38 @@ func (pcm *podCacheManager) retrieveFunctionPods(ctx context.Context) error {
 }
 
 // warmupCache starts preloading 1 pod in the background for each function specified in podCacheConfig
-//func (pcm *podCacheManager) warmupCache(defaultImagePrefix string) error {
-//	start := time.Now()
-//	defer func() {
-//		klog.Infof("cache warming is completed and it took %v", time.Since(start))
-//	}()
-//	for _, entry := range pcm.functionConfigMap.List() {
-//		if entry.Spec.PodExecutor != nil && len(entry.Spec.PodExecutor.Tags) > 0 {
-//			image := entry.Spec.Image
-//			if len(entry.Spec.PodExecutor.Tags[0]) > 0 {
-//				image = fmt.Sprintf("%s:%s", entry.Spec.Image, entry.Spec.PodExecutor.Tags[0])
-//			}
-//			if len(entry.Spec.Prefixes) > 0 && entry.Spec.Prefixes[0] != "" {
-//				image = ImageJoin(entry.Spec.Prefixes[0], image)
-//			} else {
-//				image = ImageJoin(defaultImagePrefix, image)
-//			}
-//			image = pcm.podManager.imageResolver(image)
-//			fn := pcm.FunctionInfo(image)
-//			if len(fn.pods) == 0 {
-//				fn.pods = append(fn.pods, NewPodInfo(nil))
-//				go func(fnImage string) {
-//					ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-//					defer cancel()
-//					pcm.podManager.getFuncEvalPodClient(ctx, fnImage, 1, entry.Spec.PodExecutor, false)
-//				}(image)
-//			}
-//		}
-//	}
-//	return nil
-//}
+func (pcm *podCacheManager) warmupCache(defaultImagePrefix string) error {
+	start := time.Now()
+	defer func() {
+		klog.Infof("cache warming is completed and it took %v", time.Since(start))
+	}()
+	for spec := range pcm.functionConfigMap.IterPodConfigSpecs() {
+		if spec.PodExecutor != nil {
+			image := spec.Image
+			if len(spec.PodExecutor.Tags[0]) > 0 {
+				image += ":" + spec.PodExecutor.Tags[0]
+			} else {
+				image += ":latest"
+			}
+			if len(spec.Prefixes) > 0 && spec.Prefixes[0] != "" {
+				image = ImageJoin(spec.Prefixes[0], image)
+			} else {
+				image = ImageJoin(defaultImagePrefix, image)
+			}
+			image = pcm.podManager.imageResolver(image)
+			fn := pcm.FunctionInfo(image)
+			if len(fn.Pods) == 0 {
+				fn.Pods = append(fn.Pods, NewPodInfo(nil))
+				go func(fnImage string) {
+					ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+					defer cancel()
+					pcm.podManager.getFuncEvalPodClient(ctx, fnImage, 1, spec.PodExecutor, false)
+				}(image)
+			}
+		}
+	}
+	return nil
+}
 
 func ImageJoin(prefix, image string) string {
 	return strings.TrimRight(prefix, "/") + "/" + strings.TrimLeft(image, "/")

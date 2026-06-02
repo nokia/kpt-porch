@@ -94,9 +94,17 @@ func (s *FunctionConfigStore) Store(obj *configapi.FunctionConfig) error {
 
 	// remove any unnecessary data that will only be used for map keys
 	strippedSpec := *spec.DeepCopy()
-	strippedSpec.Prefixes = nil
+	// keep the first prefix for warmup TODO: remove once warmup is event based
+	//strippedSpec.Prefixes = nil
+	if len(strippedSpec.Prefixes) != 0 {
+		strippedSpec.Prefixes = strippedSpec.Prefixes[:1]
+	}
 	if strippedSpec.PodExecutor != nil {
-		strippedSpec.PodExecutor.Tags = nil
+		// keep the first tag for warmup TODO: remove once warmup is event based
+		//strippedSpec.PodExecutor.Tags = nil
+		if len(strippedSpec.PodExecutor.Tags) > 0 {
+			strippedSpec.PodExecutor.Tags = strippedSpec.PodExecutor.Tags[:1]
+		}
 	}
 	if strippedSpec.BinaryExecutor != nil {
 		strippedSpec.BinaryExecutor.Tags = nil
@@ -257,22 +265,19 @@ func (s *FunctionConfigStore) getProcessorForConfig(config *configapi.FunctionCo
 	return proc, ok
 }
 
-func (s *FunctionConfigStore) SendWarmupRequest(image imageutil.ParsedImage) {
-
-}
-
-// TODO: this is atrociously inefficient
-// TODO: only used by pod warmup, so fixing that will fix this
-func (s *FunctionConfigStore) IterPodConfigs() iter.Seq2[string, configapi.PodExecutorConfig] {
-	return func(yield func(string, configapi.PodExecutorConfig) bool) {
+// IterPodConfigSpecs iterates through function configs which contain a pod executor config
+//
+// TODO: remove when warmup is event based
+func (s *FunctionConfigStore) IterPodConfigSpecs() iter.Seq[configapi.FunctionConfigSpec] {
+	return func(yield func(configapi.FunctionConfigSpec) bool) {
 		s.mu.RLock()
 		defer s.mu.RUnlock()
 
-		for imageName, imageEntry := range s.internalCache {
+		for _, imageEntry := range s.internalCache {
 			for _, prefixEntry := range imageEntry.Entry {
 				for _, tagEntry := range prefixEntry {
 					if tagEntry.PodExecutor != nil {
-						if !yield(imageName, *tagEntry.PodExecutor) {
+						if !yield(tagEntry) {
 							return
 						}
 					}
