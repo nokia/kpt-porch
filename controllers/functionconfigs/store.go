@@ -1,4 +1,4 @@
-// Copyright 2026 The kpt and Nephio Authors
+// Copyright 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kptdev/krm-functions-catalog/functions/go/apply-replacements/replacements"
-	"github.com/kptdev/krm-functions-catalog/functions/go/set-namespace/transformer"
+	applyreplacements "github.com/kptdev/krm-functions-catalog/functions/go/apply-replacements/replacements"
+	setnamespace "github.com/kptdev/krm-functions-catalog/functions/go/set-namespace/transformer"
 	"github.com/kptdev/krm-functions-catalog/functions/go/starlark/starlark"
 	"github.com/kptdev/krm-functions-sdk/go/fn"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
@@ -61,8 +61,8 @@ type FunctionConfigStore struct {
 
 func NewStore(defaultImagePrefix, defaultBinaryDir string) *FunctionConfigStore {
 	procMap := map[string]fn.ResourceListProcessorFunc{
-		"apply-replacements": replacements.ApplyReplacements,
-		"set-namespace":      set_namespace.Run,
+		"apply-replacements": applyreplacements.ApplyReplacements,
+		"set-namespace":      setnamespace.Run,
 		"starlark":           starlark.Process,
 	}
 
@@ -108,7 +108,7 @@ func (s *FunctionConfigStore) Store(obj *configapi.FunctionConfig) error {
 	}
 	if strippedSpec.BinaryExecutor != nil {
 		strippedSpec.BinaryExecutor.Tags = nil
-		if strippedSpec.BinaryExecutor.Path[0] != '/' {
+		if len(strippedSpec.BinaryExecutor.Path) > 0 && strippedSpec.BinaryExecutor.Path[0] != '/' {
 			var err error
 			strippedSpec.BinaryExecutor.Path, err = filepath.Abs(filepath.Join(s.defaultBinaryDir, spec.BinaryExecutor.Path))
 			if err != nil {
@@ -175,16 +175,14 @@ func (s *FunctionConfigStore) Delete(imageName string) {
 }
 
 func (s *FunctionConfigStore) DeleteByObjName(key client.ObjectKey) {
-	toDelete := ""
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for imageName, entry := range s.internalCache {
 		if entry.objName == key {
-			toDelete = imageName
-			break
+			delete(s.internalCache, imageName)
+			return
 		}
-	}
-
-	if toDelete != "" {
-		s.Delete(toDelete)
 	}
 }
 

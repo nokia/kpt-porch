@@ -91,7 +91,7 @@ type FunctionPodInfo struct {
 
 // SendResponse sends a reply to the connection request containing the pod data.
 // If err != nil it sends `err` as an error response.
-// It sends and error response if the pod is not ready yet (this shouldn't happen).
+// It sends an error response if the pod is not ready yet (this shouldn't happen).
 func (pod *FunctionPodInfo) SendResponse(responseCh chan<- *ConnectionResponse, err error) {
 	switch {
 	case err != nil:

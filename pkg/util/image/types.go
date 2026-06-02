@@ -1,4 +1,4 @@
-// Copyright 2026 The kpt and Nephio Authors
+// Copyright 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,8 @@ package image
 
 import "strings"
 
-// ParsedImage is a
+// ParsedImage is a structured representation of a container image reference,
+// broken into registry, sub-path, base name, tag, and digest components.
 type ParsedImage struct {
 	// The registry part of the image name without trailing slash.
 	// Example: ghcr.io

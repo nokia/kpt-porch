@@ -339,7 +339,7 @@ func prePopulateFunctionConfigStore(reader client.Reader, store *functionconfigs
 		obj := &fcList.Items[i]
 		err := store.Store(obj)
 		if err != nil {
-			klog.Warningf("Failed to store %q during pre-pupulate (non-fatal): %v", client.ObjectKeyFromObject(obj), err)
+			klog.Warningf("Failed to store %q during pre-populate (non-fatal): %v", client.ObjectKeyFromObject(obj), err)
 		}
 	}
 	klog.Infof("FunctionConfig store pre-populated with %d configs", len(fcList.Items))
