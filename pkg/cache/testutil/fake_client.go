@@ -66,6 +66,10 @@ func (w *fakeStatusWriter) Create(ctx context.Context, obj client.Object, subres
 	return nil
 }
 
+func (w *fakeStatusWriter) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.SubResourceApplyOption) error {
+	return nil
+}
+
 func (f *FakeClientWithStatusUpdate) Watch(ctx context.Context, list client.ObjectList, opts ...client.ListOption) (watch.Interface, error) {
 	return watch.NewEmptyWatch(), nil
 }

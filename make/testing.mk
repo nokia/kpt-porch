@@ -27,7 +27,7 @@ unit: test
 
 test: ## Run unit tests (go test)
 ifeq ($(CONTAINER_RUNNABLE), 0)
-	$(RUN_CONTAINER_COMMAND) -e CONTAINER_RUNNABLE golang:1.25.7-bookworm \
+	$(RUN_CONTAINER_COMMAND) -e CONTAINER_RUNNABLE golang:"$(GOLANG_BOOKWORM_VERSION)" \
 	sh -c "useradd -m -s /bin/sh porch && \
 	         mkdir -p ${TEST_COVERAGE_TMP_DIR} && chown porch:porch ${TEST_COVERAGE_TMP_DIR} && \
 	         su porch -c 'export TEST_COVERAGE_TMP_DIR=${TEST_COVERAGE_TMP_DIR}; \

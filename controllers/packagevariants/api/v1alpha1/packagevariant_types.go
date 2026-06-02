@@ -121,7 +121,3 @@ type PackageVariantList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []PackageVariant `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&PackageVariant{}, &PackageVariantList{})
-}

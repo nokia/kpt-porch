@@ -180,7 +180,7 @@ func (r *packageRevisions) Create(ctx context.Context, runtimeObject runtime.Obj
 	}
 
 	if isV1Alpha2Repo(repositoryObj) {
-		return nil, apierrors.NewGone(fmt.Sprintf("repository %q is managed by v1alpha2; use the v1alpha2 API", repositoryName))
+		return nil, apierrors.NewResourceExpired(fmt.Sprintf("repository %q is managed by v1alpha2; use the v1alpha2 API", repositoryName))
 	}
 
 	fieldErrors := r.createStrategy.Validate(ctx, runtimeObject)

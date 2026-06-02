@@ -367,7 +367,7 @@ func (r *packageCommon) updatePackageRevision(ctx context.Context, name string, 
 	}
 
 	if isV1Alpha2Repo(&repositoryObj) {
-		return nil, false, apierrors.NewGone(fmt.Sprintf("repository %q is managed by v1alpha2; use the v1alpha2 API", repositoryID.Name))
+		return nil, false, apierrors.NewResourceExpired(fmt.Sprintf("repository %q is managed by v1alpha2; use the v1alpha2 API", repositoryID.Name))
 	}
 
 	var parentPackage repository.PackageRevision

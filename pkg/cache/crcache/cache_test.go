@@ -1,4 +1,4 @@
-// Copyright 2022, 2024-2025 The kpt Authors
+// Copyright 2022, 2024-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -73,7 +73,7 @@ func TestLatestPackages(t *testing.T) {
 			}
 
 			if existing, ok := gotLatest[rev.Spec.PackageName]; ok {
-				t.Errorf("Multiple latest package revisions for package %q: %q and %q",
+				t.Errorf("Multiple latest package revisions for package %q: %d and %d",
 					rev.Spec.PackageName, rev.Spec.Revision, existing)
 			}
 
