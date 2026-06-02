@@ -69,6 +69,7 @@ type FunctionConfigStatus struct {
 
 // TagIterable is a simple interface to allow code deduplication when storing the Tags field of each config
 //
+// +kubebuilder:object:generate=false
 // TODO: should this be here, in the api, or just unexported in store.go?
 type TagIterable interface {
 	IterTags() iter.Seq[string]
