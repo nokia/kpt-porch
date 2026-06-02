@@ -14,20 +14,22 @@
 
 ARG ALPINE_VERSION=latest
 ARG GOLANG_ALPINE_VERSION=latest
+ARG PORCH_GHCR_PREFIX_URL=ghcr.io/kptdev/krm-functions-catalog
+ARG DOCKERHUB_MIRROR=docker.io
 
-FROM ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2.4 AS apply-setters
-FROM ghcr.io/kptdev/krm-functions-catalog/ensure-name-substring:v0.2.1 AS ensure-name-substring
-FROM ghcr.io/kptdev/krm-functions-catalog/search-replace:v0.2.3 AS search-replace
-FROM ghcr.io/kptdev/krm-functions-catalog/set-annotations:v0.1.7 AS set-annotations
-FROM ghcr.io/kptdev/krm-functions-catalog/set-image:v0.2.2 AS set-image
-FROM ghcr.io/kptdev/krm-functions-catalog/set-labels:v0.2.4 AS set-labels
-FROM ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.5 AS set-namespace
-FROM ghcr.io/kptdev/krm-functions-catalog/set-project-id:v0.2.1 AS set-project-id
-FROM ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5.5 AS starlark
-FROM ghcr.io/kptdev/krm-functions-catalog/upsert-resource:v0.2.3 AS upsert-resource
+FROM ${PORCH_GHCR_PREFIX_URL}/apply-setters:v0.2.4 AS apply-setters
+FROM ${PORCH_GHCR_PREFIX_URL}/ensure-name-substring:v0.2.1 AS ensure-name-substring
+FROM ${PORCH_GHCR_PREFIX_URL}/search-replace:v0.2.3 AS search-replace
+FROM ${PORCH_GHCR_PREFIX_URL}/set-annotations:v0.1.7 AS set-annotations
+FROM ${PORCH_GHCR_PREFIX_URL}/set-image:v0.2.2 AS set-image
+FROM ${PORCH_GHCR_PREFIX_URL}/set-labels:v0.2.4 AS set-labels
+FROM ${PORCH_GHCR_PREFIX_URL}/set-namespace:v0.4.5 AS set-namespace
+FROM ${PORCH_GHCR_PREFIX_URL}/set-project-id:v0.2.1 AS set-project-id
+FROM ${PORCH_GHCR_PREFIX_URL}/starlark:v0.5.5 AS starlark
+FROM ${PORCH_GHCR_PREFIX_URL}/upsert-resource:v0.2.3 AS upsert-resource
 
 
-FROM golang:${GOLANG_ALPINE_VERSION} AS builder
+FROM ${DOCKERHUB_MIRROR}/golang:${GOLANG_ALPINE_VERSION} AS builder
 WORKDIR /go/src
 
 RUN go install github.com/grpc-ecosystem/grpc-health-probe@v0.4.11
@@ -49,7 +51,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     cd func ; go build -trimpath -ldflags="-s -w" -v -o /server ./server
 
-FROM alpine:${ALPINE_VERSION}
+FROM ${DOCKERHUB_MIRROR}/alpine:${ALPINE_VERSION}
 RUN addgroup -g 10001 nonroot && \
     adduser -D -G nonroot -u 10001 nonroot
 

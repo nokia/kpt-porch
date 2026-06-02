@@ -18,15 +18,35 @@ set -e # Exit on error
 set -u # Must predefine variables
 set -o pipefail # Check errors in piped commands
 
-function_runner_ip="${1:-172.18.255.202}"
+# Source common configuration
+source "$(dirname "$0")/common.sh"
+
 self_dir="$(dirname "$(readlink -f "$0")")"
+git_root="$(readlink -f "${self_dir}/..")"
+source "${git_root}/scripts/get-kind-metallb-subnet.sh"
+
+# Discover function-runner IP dynamically. Accept as argument or env var for backward compat.
+if [[ -n "${1:-}" ]]; then
+  function_runner_ip="$1"
+elif [[ -n "${FUNCTION_RUNNER_IP:-}" ]]; then
+  function_runner_ip="$FUNCTION_RUNNER_IP"
+else
+  # Try to get it from the running service first; fall back to deriving from MetalLB range
+  function_runner_ip="$(get_service_lb_ip function-runner porch-system 2>/dev/null)" || {
+    get_metallb_ip_range
+    # Use third IP in the MetalLB range for function-runner when controller runs locally
+    # (first is gitea, second is used when server runs locally)
+    function_runner_ip="${METALLB_IP_RANGE_START%.*}.$((${METALLB_IP_RANGE_START##*.} + 2))"
+  }
+fi
+
 deployment_config_dir="${DEPLOYPORCHCONFIGDIR:-$(readlink -f "${self_dir}/../.build/deploy")}"
 
 cd "${deployment_config_dir}"
 
 # expose function-runner to local processes
 kpt fn eval \
-  --image ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5.5 \
+  --image "${PORCH_GHCR_PREFIX_URL}/starlark:v0.5.5" \
   --match-kind Service \
   --match-name function-runner \
   --match-namespace porch-system \
@@ -39,7 +59,7 @@ for resource in ctx.resource_list["items"]:
 
 # remove porch-controllers Deployment from package
 kpt fn eval \
-  --image ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5.5 \
+  --image "${PORCH_GHCR_PREFIX_URL}/starlark:v0.5.5" \
   --match-kind Deployment \
   --match-name porch-controllers \
   --match-namespace porch-system \

@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: do we still use this?
 
 ARG GOLANG_BOOKWORM_VERSION=latest
+ARG DOCKERHUB_MIRROR=docker.io
 
-FROM golang:${GOLANG_BOOKWORM_VERSION} AS builder
+FROM ${DOCKERHUB_MIRROR}/golang:${GOLANG_BOOKWORM_VERSION} AS builder
 
 WORKDIR /go/src
 
@@ -27,7 +29,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     cd test; go build -trimpath -ldflags="-s -w" -v -o /git-server ./git
 
-FROM debian:bookworm-slim
+FROM ${DOCKERHUB_MIRROR}/debian:bookworm-slim
 RUN apt update && apt install -y ca-certificates && rm -rf /var/lib/apt && rm -rf /var/cache/apt
 COPY --from=builder /git-server /git-server
 ENTRYPOINT ["/git-server", "--port=8080"]

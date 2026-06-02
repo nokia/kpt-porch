@@ -6,7 +6,7 @@ replace k8s.io/apiserver v0.34.1 => ./third_party/k8s.io/apiserver-v0.34.1
 
 require (
 	cloud.google.com/go/iam v1.5.3
-	github.com/fergusstrange/embedded-postgres v1.32.0
+	github.com/fergusstrange/embedded-postgres v1.34.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-git/go-billy/v5 v5.9.0
 	github.com/go-git/go-git/v5 v5.19.0
@@ -16,6 +16,7 @@ require (
 	github.com/google/go-containerregistry v0.20.6
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
+	github.com/joho/godotenv v1.5.1
 	github.com/kptdev/kpt v1.0.0-beta.62.1
 	github.com/kptdev/krm-functions-catalog/functions/go/apply-replacements v0.1.5
 	github.com/kptdev/krm-functions-catalog/functions/go/apply-setters v0.2.4

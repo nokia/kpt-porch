@@ -135,6 +135,12 @@ type PackageRevisionSpec struct {
 	// +optional
 	Source *PackageSource `json:"source,omitempty"`
 
+	// SubpackageOperation specifies an operation to be carried out on an independent subpackage
+	// in the package.
+	// When set, exactly one subpackage operation may be specified.
+	// +optional
+	SubpackageOperation *SubpackageOperation `json:"subpackageOperation,omitempty"`
+
 	// ReadinessGates specifies conditions that must be met before the package is considered ready.
 	ReadinessGates []ReadinessGate `json:"readinessGates,omitempty"`
 
@@ -169,10 +175,10 @@ type PackageRevisionStatus struct {
 	// SelfLock identifies the location of the current package's data
 	SelfLock *Locator `json:"selfLock,omitempty"`
 
-	// PublishedBy is the identity of the user who approved the packagerevision.
+	// PublishedBy is the identity of the user who approved the package revision.
 	PublishedBy string `json:"publishedBy,omitempty"`
 
-	// PublishedAt is the time when the packagerevision were approved.
+	// PublishedAt is the time when the package revision was approved.
 	// +optional
 	PublishedAt *metav1.Time `json:"publishedAt,omitempty"`
 
@@ -193,6 +199,10 @@ type PackageRevisionStatus struct {
 	// +optional
 	CreationSource string `json:"creationSource,omitempty"`
 
+	// LastSubpackageOperation holds the last operation that was carried out on an independent subpackage
+	// in the package. It is used to prevent re-execution of the same operation.
+	LastSubpackageOperation *SubpackageOperation `json:"lastSubpackageOperation,omitempty"`
+
 	// PackageConditions from Kptfile. Set by KRM functions, used for ReadinessGates.
 	PackageConditions []PackageCondition `json:"packageConditions,omitempty"`
 
@@ -200,6 +210,9 @@ type PackageRevisionStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// ResourcesSizeBytes is the total file size, in bytes, of the package revision's resources.
+	ResourcesSizeBytes int64 `json:"resourcesSizeBytes,omitempty"`
 }
 
 // PackageSource specifies how a package was created.
@@ -216,6 +229,34 @@ type PackageSource struct {
 	CopyFrom *PackageRevisionRef `json:"copyFrom,omitempty"`
 
 	// Upgrade merges changes from a new upstream version into a local package.
+	Upgrade *PackageUpgradeSpec `json:"upgrade,omitempty"`
+}
+
+// SubpackageOperation specifies an operation on an independent subpackage of a package.
+// Exactly one field must be set.
+// +kubebuilder:validation:XValidation:rule="[has(self.cloneFrom), has(self.upgrade)].filter(x, x).size() == 1",message="exactly one of cloneFrom or upgrade must be set"
+// +kubebuilder:validation:XValidation:rule="has(self.subpackageDir) && !self.subpackageDir.startsWith('/') && !self.subpackageDir.startsWith('./') && !self.subpackageDir.contains('../')",message="subpackageDir must be set and a valid relative path without leading '/' or './' and without '../' segments"
+type SubpackageOperation struct {
+	// `SubpackageDir` is the path to a subdirectory in an existing package revision
+	// into which the package specified in `CloneFrom` will be cloned as an
+	// independent subpackage, or which identifies the independent subpackage whose
+	// upstream will be upgraded by `Upgrade`.
+	// It is a relative path within the package being modified by the subpackage
+	// operation. The path may not have any leading or trailing '/', and may not
+	// contain any path segment equal to '.' or '..'.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^([^./][^/]*|\.[^./][^/]*|\.\.[^/]+)(/([^./][^/]*|\.[^./][^/]*|\.\.[^/]+))*$`
+	SubpackageDir string `json:"subpackageDir"`
+
+	// `CloneFrom` specifies an upstream package from which to clone the independent
+	// subpackage. The package specified in `CloneFrom` is cloned into the subdirectory specified
+	// in `SubpackageDir`.
+	CloneFrom *UpstreamPackage `json:"cloneFrom,omitempty"`
+
+	// `Upgrade` specifies an upgrade of the upstream package of the independent subpackage
+	// in `SubpackageDir`. The independent subpackage in the subdirectory specified in `SubpackageDir`
+	// is upgraded.
 	Upgrade *PackageUpgradeSpec `json:"upgrade,omitempty"`
 }
 

@@ -13,13 +13,21 @@
 # limitations under the License.
 
 IMAGE_TAG ?= latest
-IMAGE_REPO ?= docker.io/nephio
+IMAGE_REPO ?= ghcr.io/kptdev
 IMAGE_NAME ?= porch-controllers
 
 .PHONY: build-image docker-build
 build-image docker-build:
-	docker buildx build --load --tag $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG) --build-arg ALPINE_VERSION=$(ALPINE_VERSION) --build-arg GOLANG_BOOKWORM_VERSION=$(GOLANG_BOOKWORM_VERSION) -f Dockerfile ..
+	docker buildx build --load --tag $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG) \
+      --build-arg ALPINE_VERSION=$(ALPINE_VERSION) \
+      --build-arg GOLANG_BOOKWORM_VERSION=$(GOLANG_BOOKWORM_VERSION) \
+	  $$(if [ -n "${DOCKERHUB_MIRROR}" ]; then echo "--build-arg DOCKERHUB_MIRROR=${DOCKERHUB_MIRROR}"; fi) \
+      -f Dockerfile ..
 
 .PHONY: push-image docker-push
 push-image docker-push:
-	docker buildx build --push --tag $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG) --build-arg ALPINE_VERSION=$(ALPINE_VERSION) --build-arg GOLANG_BOOKWORM_VERSION=$(GOLANG_BOOKWORM_VERSION) -f Dockerfile ..
+	docker buildx build --push --tag $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG) \
+      --build-arg ALPINE_VERSION=$(ALPINE_VERSION) \
+      --build-arg GOLANG_BOOKWORM_VERSION=$(GOLANG_BOOKWORM_VERSION) \
+	  $$(if [ -n "${DOCKERHUB_MIRROR}" ]; then echo "--build-arg DOCKERHUB_MIRROR=${DOCKERHUB_MIRROR}"; fi) \
+      -f Dockerfile ..

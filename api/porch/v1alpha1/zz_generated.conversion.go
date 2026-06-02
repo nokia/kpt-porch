@@ -623,6 +623,7 @@ func autoConvert_v1alpha1_PackageCloneTaskSpec_To_porch_PackageCloneTaskSpec(in 
 	if err := Convert_v1alpha1_UpstreamPackage_To_porch_UpstreamPackage(&in.Upstream, &out.Upstream, s); err != nil {
 		return err
 	}
+	out.SubpackageDir = in.SubpackageDir
 	return nil
 }
 
@@ -635,6 +636,7 @@ func autoConvert_porch_PackageCloneTaskSpec_To_v1alpha1_PackageCloneTaskSpec(in 
 	if err := Convert_porch_UpstreamPackage_To_v1alpha1_UpstreamPackage(&in.Upstream, &out.Upstream, s); err != nil {
 		return err
 	}
+	out.SubpackageDir = in.SubpackageDir
 	return nil
 }
 
@@ -932,6 +934,7 @@ func autoConvert_v1alpha1_PackageRevisionStatus_To_porch_PackageRevisionStatus(i
 	out.PublishedAt = in.PublishedAt
 	out.Deployment = in.Deployment
 	out.Conditions = *(*[]porch.Condition)(unsafe.Pointer(&in.Conditions))
+	out.ResourcesSizeBytes = in.ResourcesSizeBytes
 	return nil
 }
 
@@ -947,6 +950,7 @@ func autoConvert_porch_PackageRevisionStatus_To_v1alpha1_PackageRevisionStatus(i
 	out.PublishedAt = in.PublishedAt
 	out.Deployment = in.Deployment
 	out.Conditions = *(*[]Condition)(unsafe.Pointer(&in.Conditions))
+	out.ResourcesSizeBytes = in.ResourcesSizeBytes
 	return nil
 }
 
@@ -1007,6 +1011,7 @@ func autoConvert_v1alpha1_PackageUpgradeTaskSpec_To_porch_PackageUpgradeTaskSpec
 	if err := Convert_v1alpha1_PackageRevisionRef_To_porch_PackageRevisionRef(&in.LocalPackageRevisionRef, &out.LocalPackageRevisionRef, s); err != nil {
 		return err
 	}
+	out.SubpackageDir = in.SubpackageDir
 	out.Strategy = porch.PackageMergeStrategy(in.Strategy)
 	return nil
 }
@@ -1026,6 +1031,7 @@ func autoConvert_porch_PackageUpgradeTaskSpec_To_v1alpha1_PackageUpgradeTaskSpec
 	if err := Convert_porch_PackageRevisionRef_To_v1alpha1_PackageRevisionRef(&in.LocalPackageRevisionRef, &out.LocalPackageRevisionRef, s); err != nil {
 		return err
 	}
+	out.SubpackageDir = in.SubpackageDir
 	out.Strategy = PackageMergeStrategy(in.Strategy)
 	return nil
 }

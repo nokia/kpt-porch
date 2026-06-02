@@ -126,7 +126,7 @@ info:
   description: My application package
 pipeline:
   mutators:
-  - image: ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.5
+  - image: ghcr.io/kptdev/krm-functions-catalog/set-namespace:latest
     configMap:
       namespace: production
 status:
@@ -179,7 +179,7 @@ items:
     description: My first Porch package
   pipeline:
     mutators:
-    - image: gcr.io/kpt-fn/set-namespace:v0.4.1
+    - image: set-namespace:latest
       configMap:
         namespace: production
 - apiVersion: v1

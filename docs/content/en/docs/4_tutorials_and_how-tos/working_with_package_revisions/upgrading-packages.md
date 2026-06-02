@@ -94,7 +94,7 @@ porchctl rpkg clone porch-test.blueprint.1 --namespace=porch-demo --repository=p
 porchctl rpkg pull porch-test.deployment.1 --namespace=porch-demo ./tmp/deployment-v1
 
 # Apply a local customization (e.g., add an annotation to the Kptfile)
-kpt fn eval --image gcr.io/kpt-fn/set-annotations:v0.1.4 ./tmp/deployment-v1/Kptfile -- kpt.dev/annotation=true
+kpt fn eval --image ghcr.io/kptdev/krm-functions-catalog/set-annotations:latest ./tmp/deployment-v1/Kptfile -- kpt.dev/annotation=true
 
 # Push the local changes back to Porch
 porchctl rpkg push porch-test.deployment.1 --namespace=porch-demo ./tmp/deployment-v1

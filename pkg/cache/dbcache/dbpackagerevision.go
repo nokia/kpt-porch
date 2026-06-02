@@ -1,4 +1,4 @@
-// Copyright 2024-2025 The kpt Authors
+// Copyright 2024-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 	"github.com/kptdev/porch/pkg/engine"
 	"github.com/kptdev/porch/pkg/repository"
 	"github.com/kptdev/porch/pkg/util"
-	context1 "github.com/kptdev/porch/pkg/util/context"
+	pctx "github.com/kptdev/porch/pkg/util/context"
 	pkgerrors "github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,22 +75,23 @@ func extractFromKptfile(resources map[string]string) (kptfileStatus, []porchapi.
 }
 
 type dbPackageRevision struct {
-	repo           *dbRepository
-	pkgRevKey      repository.PackageRevisionKey
-	meta           metav1.ObjectMeta
-	spec           *porchapi.PackageRevisionSpec
-	updated        time.Time
-	updatedBy      string
-	lifecycle      porchapi.PackageRevisionLifecycle
-	extPRID        kptfile.Locator
-	latest         bool
-	deployment     bool
-	tasks          []porchapi.Task
-	resources      map[string]string
-	resourcesDirty bool
-	kptfileStatus  kptfileStatus
+	repo               *dbRepository
+	pkgRevKey          repository.PackageRevisionKey
+	meta               metav1.ObjectMeta
+	spec               *porchapi.PackageRevisionSpec
+	updated            time.Time
+	updatedBy          string
+	lifecycle          porchapi.PackageRevisionLifecycle
+	extPRID            kptfile.Locator
+	latest             bool
+	deployment         bool
+	tasks              []porchapi.Task
+	resources          map[string]string
+	resourcesDirty     bool
+	kptfileStatus      kptfileStatus
+	resourcesSizeBytes int64
 
-	// gitDraftPR maintains the draft in the external git repository during editing (when pushDraftsToGit is true)
+	// gitPRDraft maintains the draft in the external git repository during editing (when pushDraftsToGit is true)
 	gitPRDraft repository.PackageRevisionDraft
 
 	// gitPR is the closed package revision in git (when pushDraftsToGit is true)
@@ -187,20 +188,20 @@ func (pr *dbPackageRevision) UpdateLifecycle(ctx context.Context, newLifecycle p
 	// Only Approve (Proposed → Published) pushes to external repo
 	if pr.lifecycle == porchapi.PackageRevisionLifecycleProposed && newLifecycle == porchapi.PackageRevisionLifecyclePublished {
 		klog.InfoS("[DB Cache] Updating lifecycle in database and pushing to external repo for PackageRevision",
-			context1.LogMetadataFrom(ctx)...)
+			pctx.LogMetadataFrom(ctx)...)
 		defer func() {
 			klog.V(3).InfoS("[DB Cache] Lifecycle updated in database and pushed to external repo for PackageRevision",
-				context1.LogMetadataFrom(ctx)...)
+				pctx.LogMetadataFrom(ctx)...)
 		}()
 	} else if pr.repo.pushDraftsToGit && pr.gitPRDraft != nil {
-		klog.InfoS("[DB Cache] Updating lifecycle in database and in Git draft for PackageRevision", context1.LogMetadataFrom(ctx)...)
+		klog.InfoS("[DB Cache] Updating lifecycle in database and in Git draft for PackageRevision", pctx.LogMetadataFrom(ctx)...)
 		defer func() {
-			klog.V(3).InfoS("[DB Cache] Lifecycle updated in database and in Git draft for PackageRevision", context1.LogMetadataFrom(ctx)...)
+			klog.V(3).InfoS("[DB Cache] Lifecycle updated in database and in Git draft for PackageRevision", pctx.LogMetadataFrom(ctx)...)
 		}()
 	} else {
-		klog.InfoS("[DB Cache] Updating lifecycle in database for PackageRevision", context1.LogMetadataFrom(ctx)...)
+		klog.InfoS("[DB Cache] Updating lifecycle in database for PackageRevision", pctx.LogMetadataFrom(ctx)...)
 		defer func() {
-			klog.V(3).InfoS("[DB Cache] Lifecycle updated in database for PackageRevision", context1.LogMetadataFrom(ctx)...)
+			klog.V(3).InfoS("[DB Cache] Lifecycle updated in database for PackageRevision", pctx.LogMetadataFrom(ctx)...)
 		}()
 	}
 
@@ -236,10 +237,11 @@ func (pr *dbPackageRevision) GetPackageRevision(ctx context.Context) (*porchapi.
 	_, selfLock, _ := pr.GetLock(ctx)
 
 	status := porchapi.PackageRevisionStatus{
-		UpstreamLock: repository.KptUpstreamLock2APIUpstreamLock(upstreamLock),
-		SelfLock:     repository.KptUpstreamLock2APIUpstreamLock(selfLock),
-		Deployment:   pr.deployment,
-		Conditions:   pr.kptfileStatus.Conditions,
+		UpstreamLock:       repository.KptUpstreamLock2APIUpstreamLock(upstreamLock),
+		SelfLock:           repository.KptUpstreamLock2APIUpstreamLock(selfLock),
+		Deployment:         pr.deployment,
+		Conditions:         pr.kptfileStatus.Conditions,
+		ResourcesSizeBytes: pr.resourcesSizeBytes,
 	}
 
 	if porchapi.LifecycleIsPublished(pr.Lifecycle(ctx)) {
@@ -347,17 +349,18 @@ func (pr *dbPackageRevision) ToMainPackageRevision(ctx context.Context) reposito
 			Revision:      -1,
 			WorkspaceName: pr.Key().RKey().PlaceholderWSname,
 		},
-		meta:          metav1.ObjectMeta{},
-		spec:          &porchapi.PackageRevisionSpec{},
-		updated:       time.Now(),
-		updatedBy:     getCurrentUser(),
-		lifecycle:     pr.lifecycle,
-		extPRID:       pr.extPRID,
-		latest:        false,
-		deployment:    pr.deployment,
-		tasks:         pr.tasks,
-		resources:     pr.resources,
-		kptfileStatus: pr.kptfileStatus,
+		meta:               metav1.ObjectMeta{},
+		spec:               &porchapi.PackageRevisionSpec{},
+		updated:            time.Now(),
+		updatedBy:          getCurrentUser(),
+		lifecycle:          pr.lifecycle,
+		extPRID:            pr.extPRID,
+		latest:             false,
+		deployment:         pr.deployment,
+		tasks:              pr.tasks,
+		resources:          pr.resources,
+		kptfileStatus:      pr.kptfileStatus,
+		resourcesSizeBytes: pr.resourcesSizeBytes,
 	}
 
 	mainPR.meta.CreationTimestamp = metav1.Time{Time: time.Now()}
@@ -452,6 +455,7 @@ func (pr *dbPackageRevision) copyToThis(otherPr *dbPackageRevision) {
 	pr.lifecycle = otherPr.lifecycle
 	pr.tasks = otherPr.tasks
 	pr.resources = otherPr.resources
+	pr.resourcesSizeBytes = otherPr.resourcesSizeBytes
 }
 
 func (pr *dbPackageRevision) UpdateResources(ctx context.Context, new *porchapi.PackageRevisionResources, change *porchapi.Task) error {
@@ -463,14 +467,14 @@ func (pr *dbPackageRevision) UpdateResources(ctx context.Context, new *porchapi.
 	}
 
 	if pr.repo.pushDraftsToGit && pr.gitPRDraft != nil {
-		klog.InfoS("[DB Cache] Updating resources in memory and in Git draft for PackageRevision", context1.LogMetadataFrom(ctx)...)
+		klog.InfoS("[DB Cache] Updating resources in memory and in Git draft for PackageRevision", pctx.LogMetadataFrom(ctx)...)
 		defer func() {
-			klog.V(3).InfoS("[DB Cache] Resources updated in memory and in Git draft for PackageRevision", context1.LogMetadataFrom(ctx)...)
+			klog.V(3).InfoS("[DB Cache] Resources updated in memory and in Git draft for PackageRevision", pctx.LogMetadataFrom(ctx)...)
 		}()
 	} else {
-		klog.InfoS("[DB Cache] Updating resources in memory for PackageRevision", context1.LogMetadataFrom(ctx)...)
+		klog.InfoS("[DB Cache] Updating resources in memory for PackageRevision", pctx.LogMetadataFrom(ctx)...)
 		defer func() {
-			klog.V(3).InfoS("[DB Cache] Resources updated in memory for PackageRevision", context1.LogMetadataFrom(ctx)...)
+			klog.V(3).InfoS("[DB Cache] Resources updated in memory for PackageRevision", pctx.LogMetadataFrom(ctx)...)
 		}()
 	}
 
@@ -537,6 +541,10 @@ func (pr *dbPackageRevision) publishPR(ctx context.Context, newLifecycle porchap
 		return pkgerrors.Wrapf(err, "dbPackageRevision:publishPR: failed to save package revision %+v to database after push to external repo", pr.Key())
 	}
 
+	// The DB trigger sets latest=TRUE for the newly published revision.
+	// Reflect that in memory so notifications carry the correct label.
+	pr.latest = true
+
 	return pr.publishPlaceholderPRForPR(ctx)
 }
 
@@ -549,7 +557,7 @@ func (pr *dbPackageRevision) publishPlaceholderPRForPR(ctx context.Context) erro
 		if readPR, err := pkgRevReadFromDB(ctx, pr.Key(), true); err == nil {
 			prWithResources = readPR
 		} else {
-			return pkgerrors.Wrapf(err, "dbPackageRevision:publishPlaceholderPRForPR: could read resources for package revision %+v to DB", pr.Key())
+			return pkgerrors.Wrapf(err, "dbPackageRevision:publishPlaceholderPRForPR: could not read resources for package revision %+v from DB", pr.Key())
 		}
 	}
 

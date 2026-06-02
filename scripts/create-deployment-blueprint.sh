@@ -18,10 +18,13 @@ set -e # Exit on error
 set -u # Must predefine variables
 set -o pipefail # Check errors in piped commands
 
+# Source common configuration
+source "$(dirname "$0")/common.sh"
+
 PORCH_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-STARLARK_IMG="ghcr.io/kptdev/krm-functions-catalog/starlark:v0.5"
-SEARCH_REPLACE_IMG="ghcr.io/kptdev/krm-functions-catalog/search-replace:v0.2"
-SET_IMAGE_IMG="ghcr.io/kptdev/krm-functions-catalog/set-image:v0.2.2"
+STARLARK_IMG="${PORCH_GHCR_PREFIX_URL}/starlark:v0.5"
+SEARCH_REPLACE_IMG="${PORCH_GHCR_PREFIX_URL}/search-replace:v0.2"
+SET_IMAGE_IMG="${PORCH_GHCR_PREFIX_URL}/set-image:v0.2.2"
 
 function error() {
   cat <<EOF
@@ -39,7 +42,6 @@ Supported Flags:
   --fn-runner-warm-up-pod-cache BOOL  ... disable warm-up-pod-cache in function runner
   --porch-cache-type TYPE             ... porch cache type (CR or DB)
   --db-push-drafts-to-git BOOL        ... enable db-push-drafts-to-git flag for porch-server
-  --dockerhub-mirror REGISTRY         ... alternate registry to pull additional images from (postgres)
   --create-v1alpha2-rpkg BOOL         ... enable v1alpha2 PackageRevision CRD creation by repo controller
 EOF
   exit 1
@@ -53,7 +55,6 @@ FUNCTION_IMAGE=""
 WRAPPER_SERVER_IMAGE=""
 ENABLED_RECONCILERS=""
 GHCR_IMAGE_PREFIX=""
-DOCKERHUB_MIRROR=""
 FN_RUNNER_WARM_UP_POD_CACHE="true"
 PORCH_CACHE_TYPE="DB"
 DB_PUSH_DRAFTS_TO_GIT="false"
@@ -100,10 +101,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --db-push-drafts-to-git)
       DB_PUSH_DRAFTS_TO_GIT="${2}"
-      shift 2
-      ;;
-    --dockerhub-mirror)
-      DOCKERHUB_MIRROR="${2}"
       shift 2
       ;;
     --create-v1alpha2-rpkg)
@@ -401,16 +398,16 @@ function main() {
   customize_controller_reconcilers
   
   customize_image \
-    "docker.io/nephio/porch-function-runner:latest" \
+    "ghcr.io/kptdev/porch-function-runner:latest" \
     "${FUNCTION_IMAGE}"
   customize_image \
-    "docker.io/nephio/porch-server:latest" \
+    "ghcr.io/kptdev/porch-server:latest" \
     "${SERVER_IMAGE}"
   customize_image \
-    "docker.io/nephio/porch-controllers:latest" \
+    "ghcr.io/kptdev/porch-controllers:latest" \
     "${CONTROLLERS_IMAGE}"
   customize_image_in_env \
-    "docker.io/nephio/porch-wrapper-server:latest" \
+    "ghcr.io/kptdev/porch-wrapper-server:latest" \
     "${WRAPPER_SERVER_IMAGE}"
 
   if [[ -n "${DOCKERHUB_MIRROR}" ]]; then

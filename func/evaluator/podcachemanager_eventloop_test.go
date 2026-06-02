@@ -255,7 +255,7 @@ func TestEventLoop_PodFailedNoRedistribution(t *testing.T) {
 	pcm, reqCh, _ := newTestEventLoopPCM(kubeClient)
 
 	// Pre-populate imageMetadataCache so imageDigestAndEntrypoint returns instantly
-	pcm.podManager.imageMetadataCache.Store("gcr.io/kpt-fn/test-fn:latest", &DigestAndEntrypoint{
+	pcm.podManager.imageMetadataCache.Store("ghcr.io/kptdev/krm-functions-catalog/test-fn:latest", &DigestAndEntrypoint{
 		Digest:     "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
 		Entrypoint: []string{"/test-fn"},
 	})
@@ -265,7 +265,7 @@ func TestEventLoop_PodFailedNoRedistribution(t *testing.T) {
 	// Send connectionRequest — triggers scale-up → goroutine → CreatePod fails → error response
 	responseCh := make(chan *ConnectionResponse, 1)
 	reqCh <- &ConnectionRequest{
-		Image:      "gcr.io/kpt-fn/test-fn:latest",
+		Image:      "ghcr.io/kptdev/krm-functions-catalog/test-fn:latest",
 		ResponseCh: responseCh,
 	}
 

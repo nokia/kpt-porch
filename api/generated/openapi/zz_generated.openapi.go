@@ -544,6 +544,13 @@ func schema_porch_api_porch_v1alpha1_PackageCloneTaskSpec(ref common.ReferenceCa
 							Ref:         ref("github.com/kptdev/porch/api/porch/v1alpha1.UpstreamPackage"),
 						},
 					},
+					"subpackageDir": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`SubpackageDir` is the path to a subdirectory in an existing package into which the package `Upstream` will be cloned as an independent subpackage. The `SubpackageDir` cannot already exist in the package. It is a relative path within the package being modified by the clone task. The path may not have any leading '/', './' or .. segments.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -1050,20 +1057,20 @@ func schema_porch_api_porch_v1alpha1_PackageRevisionStatus(ref common.ReferenceC
 					},
 					"selfLock": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SelfLock identifies the location of the current package's data",
+							Description: "SelfLock identifies the location of the current package's data.",
 							Ref:         ref("github.com/kptdev/porch/api/porch/v1alpha1.Locator"),
 						},
 					},
 					"publishedBy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PublishedBy is the identity of the user who approved the packagerevision.",
+							Description: "PublishedBy is the identity of the user who approved the package revision.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"publishTimestamp": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PublishedAt is the time when the packagerevision were approved.",
+							Description: "PublishedAt is the time when the package revision was approved.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
@@ -1085,6 +1092,13 @@ func schema_porch_api_porch_v1alpha1_PackageRevisionStatus(ref common.ReferenceC
 									},
 								},
 							},
+						},
+					},
+					"resourcesSizeBytes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourcesSizeBytes is the total file size, in bytes, of the package revision's resources.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
@@ -1167,6 +1181,13 @@ func schema_porch_api_porch_v1alpha1_PackageUpgradeTaskSpec(ref common.Reference
 							Description: "`LocalPackageRevisionRef` is the reference to the local package revision that contains all the local changes on top of the `OldUpstream` package revision.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kptdev/porch/api/porch/v1alpha1.PackageRevisionRef"),
+						},
+					},
+					"subpackageDir": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`SubpackageDir` is the path to a subdirectory in a package that contains an independent subpackage that is to be upgraded from `OldUpstream` to `NewUpstream`. The `SubpackageDir` must already exist in the package. It is a relative path within the package revision being created/modified by the upgrade task. The path may not have any leading '/', './' or .. segments.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"strategy": {
@@ -1428,7 +1449,7 @@ func schema_porch_api_porch_v1alpha1_Result(ref common.ReferenceCallback) common
 					},
 					"exec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExecPath is the the absolute os-specific path to the executable file If user provides an executable file with commands, ExecPath should contain the entire input string.",
+							Description: "ExecPath is the absolute OS-specific path to the executable file. If user provides an executable file with commands, ExecPath should contain the entire input string.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

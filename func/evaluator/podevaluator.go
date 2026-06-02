@@ -40,7 +40,7 @@ const (
 	fieldManagerName          = "krm-function-runner"
 	functionContainerName     = "function"
 	defaultManagerNamespace   = "porch-system"
-	defaultRegistry           = "gcr.io/kpt-fn/"
+	defaultRegistry           = "ghcr.io/kptdev/krm-functions-catalog/"
 	serviceDnsNameSuffix      = ".svc.cluster.local"
 	channelBufferSize         = 128
 )
