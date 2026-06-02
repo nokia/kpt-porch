@@ -167,7 +167,7 @@ func waitForFunctionConfigs(ctx context.Context, cl client.Client, store *functi
 	})
 }
 
-func (pe *podEvaluator) EvaluateFunction(ctx context.Context, req *evaluator.EvaluateFunctionRequest) (*evaluator.EvaluateFunctionResponse, error) {
+func (pe *podEvaluator) EvaluateFunction(ctx context.Context, req *proto.EvaluateFunctionRequest) (*proto.EvaluateFunctionResponse, error) {
 	starttime := time.Now()
 	var image string
 	defer func() {
@@ -198,7 +198,7 @@ func (pe *podEvaluator) EvaluateFunction(ctx context.Context, req *evaluator.Eva
 
 		defer pod.ConcurrentEvaluations.Add(-1)
 
-		resp, err := evaluator.NewFunctionEvaluatorClient(pod.GrpcConnection).EvaluateFunction(ctx, req)
+		resp, err := proto.NewFunctionEvaluatorClient(pod.GrpcConnection).EvaluateFunction(ctx, req)
 		if err != nil {
 			klog.V(4).Infof("Resource List: %s", req.ResourceList)
 			return nil, fmt.Errorf("unable to evaluate %q with pod evaluator: %w", req.Image, err)

@@ -38,7 +38,7 @@ type GRPCRuntimeOptions struct {
 
 type grpcRuntime struct {
 	cc     *grpc.ClientConn
-	client evaluator.FunctionEvaluatorClient
+	client proto.FunctionEvaluatorClient
 }
 
 func newGRPCFunctionRuntime(options GRPCRuntimeOptions) (*grpcRuntime, error) {
@@ -62,7 +62,7 @@ func newGRPCFunctionRuntime(options GRPCRuntimeOptions) (*grpcRuntime, error) {
 
 	return &grpcRuntime{
 		cc:     cc,
-		client: evaluator.NewFunctionEvaluatorClient(cc),
+		client: proto.NewFunctionEvaluatorClient(cc),
 	}, err
 }
 
@@ -91,7 +91,7 @@ func (gr *grpcRuntime) Close() error {
 
 type grpcRunner struct {
 	ctx    context.Context
-	client evaluator.FunctionEvaluatorClient
+	client proto.FunctionEvaluatorClient
 	image  string
 	tag    string
 }
@@ -104,7 +104,7 @@ func (gr *grpcRunner) Run(r io.Reader, w io.Writer) error {
 		return fmt.Errorf("failed to read function runner input: %w", err)
 	}
 
-	res, err := gr.client.EvaluateFunction(gr.ctx, &evaluator.EvaluateFunctionRequest{
+	res, err := gr.client.EvaluateFunction(gr.ctx, &proto.EvaluateFunctionRequest{
 		ResourceList: in,
 		Image:        gr.image,
 		Tag:          gr.tag,
