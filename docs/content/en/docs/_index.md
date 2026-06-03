@@ -1,7 +1,6 @@
 ---
 title: Porch Documentation
 linkTitle: Docs
-menu: {main: {weight: 20}}
 weight: 1
 description: Learn how to deploy, use, and operate Porch for Kubernetes-native package orchestration.
 ---

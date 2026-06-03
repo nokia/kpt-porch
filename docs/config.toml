@@ -14,54 +14,36 @@ enableMissingTranslationPlaceholders = true
 # Default: include everything
 ignoreFiles = []
 
+enableRobotsTXT = true
 
-[module]
-  proxy = "direct"
+theme = ["github.com/google/docsy"]
 
-  # uncomment line below for temporary local development of module
-  # replacements = "github.com/google/docsy -> ../../docsy"
+# Will give values to .Lastmod etc.
+enableGitInfo = true
 
-  [module.hugoVersion]
-    extended = true
-    min = "0.73.0"
-  [[module.imports]]
-    path = "github.com/google/docsy"
-    disable = false
-  [[module.imports]]
-    path = "github.com/google/docsy/dependencies"
-    disable = false
+# Comment out to enable taxonomies in Docsy
+disableKinds = ["taxonomy"]
+
+# Highlighting config
+pygmentsFences = true
+pygmentsUseClasses = false
+pygmentsStyle = "tango"
 
 [markup]
-
- # Changing the depth of levels displayed in the right side page navigation menu
- # from: https://gohugo.io/methods/page/tableofcontents/
-
-  [markup.tableOfContents]
-  
-    endLevel = 5
-    ordered = true
-    startLevel = 2
-
-
   [markup.goldmark]
     [markup.goldmark.renderer]
       unsafe = true
-      headingAnchors = true
     [markup.goldmark.parser]
-      autoHeadingID = true
-    [markup.highlight]
+      [markup.goldmark.parser.attribute]
+        title = true
+    [markup.goldmark.renderer.headingAnchor]
+      enable = true
+      prefix = ""
+      suffix = ""
+      plainID = true
 
-      # Setting no default style; allows style to auto adjust between light and dark default markdown themes
-
-      noClasses = false
-
-      # Uncomment if you want your chosen highlight style used for code blocks without a specified language
-
-      guessSyntax = true
-
-      # Enable syntax highlighting and copy buttons on code blocks with Prism
-
-      prism_syntax_highlighting = true      
+  [markup.highlight]
+    style = "tango"
 
 [params]
 
@@ -114,7 +96,7 @@ github_project_repo = "https://github.com/kptdev/porch/tree/main/docs"
 
 # Specify a value here if your content directory is not in your repo's root directory
 
-#github_subdir = ""
+github_subdir = "docs"
 
 time_format_blog = "Monday, January 02, 2006"
 time_format_default = "January 2, 2006"
@@ -138,43 +120,13 @@ offlineSearchSummaryLength = 70
 offlineSearchMaxResults = 10
 
 # User interface configuration
-
 [params.ui]
-
-# Enable anchor links (clickable # icons)
-
-anchor = true
-
-# Enable Visibility of Light/Dark Mode Toggle
-
-showLightDarkModeMenu = true
-
-# Enable to show the side bar menu in its compact state.
-
-sidebar_menu_compact = true
-
-# With the compact menu (.ui.sidebar_menu_compact = true), only the current page’s ancestors, siblings and direct
-# descendants are shown. You can use the optional parameter .ui.ul_show to set a desired menu depth to always be
-# visible. For example, with .ui.ul_show = 1 the first menu level is always displayed.
-# from: https://www.docsy.dev/docs/adding-content/navigation/
-
-ul_show = 1
-
-#  Set to true to disable breadcrumb navigation.
-
 breadcrumb_disable = false
-
-#  Set to true to hide the sidebar search box (the top nav search box will still be displayed if search is enabled)
-
-sidebar_search_disable = false
-
-#  Set to false to prevent the menu sub-sections from being foldable
-
-sidebar_menu_foldable = true
-
-#  Set to false if you don't want to display a logo (/assets/icons/logo.svg) in the top nav bar
-
+footer_about_disable = true
 navbar_logo = true
+navbar_translucent_over_cover_disable = false
+sidebar_menu_compact = true
+sidebar_search_disable = false
 
 # Adds a H2 section titled "Feedback" to the bottom of each doc. The responses are sent to Google Analytics as events.
 # This feature depends on [services.googleAnalytics] and will be disabled if "services.googleAnalytics.id" is not set.
@@ -243,3 +195,20 @@ enable = false
 [[params.versions]]
   version = "latest"
   url = "https://docs.porch.nephio.org/docs/"
+
+[[menu.main]]
+  name = "Book"
+  url = "https://kpt.dev/book/"
+  weight = 10
+[[menu.main]]
+  name = "References"
+  url = "https://kpt.dev/reference/"
+  weight = 20
+[[menu.main]]
+  name = "Functions Catalog"
+  url = "https://catalog.kpt.dev/"
+  weight = 30
+[[menu.main]]
+  name = "Guides"
+  url = "https://kpt.dev/guides/"
+  weight = 40

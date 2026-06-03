@@ -2,27 +2,28 @@
   "name": "porch-project-docs",
   "version": "1.0.0",
   "description": "Documentation website for Porch - an orchestrator system for kpt packages",
-  "main": "postcss.config.js",
   "scripts": {
     "build": "hugo --gc --minify",
-    "serve": "hugo server -D",
-    "lint": "echo \"No linting configured\" && exit 0",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "serve": "hugo server -D"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kptdev/porch.git"
   },
-  "keywords": ["kpt", "kptdev", "kubernetes", "documentation", "cloud-native", "network-automation", "5g", "hugo", "docsy"],
-  "author": "Gergely Csatari <gegrely.csatari@nokia.com>",
+  "keywords": ["kpt", "kptdev", "kubernetes", "documentation", "cloud-native", "hugo", "docsy"],
+  "author": "kpt contributors",
   "license": "CC-BY-4.0",
   "bugs": {
     "url": "https://github.com/kptdev/porch/issues"
   },
   "homepage": "https://github.com/kptdev/porch#readme",
   "devDependencies": {
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.31",
-    "postcss-cli": "^10.1.0"
+    "autoprefixer": "^10.4.21",
+    "hugo-extended": "^0.161.1",
+    "postcss": "^8.5.6",
+    "postcss-cli": "^11.0.1"
+  },
+  "engines": {
+    "node": "24.15.0"
   }
 }

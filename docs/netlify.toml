@@ -3,13 +3,13 @@
 
 [build]
   base = "docs"
-  command = "hugo --environment $HUGO_ENV --config config.toml,config/$HUGO_ENV.toml"
+  command = "hugo --environment $HUGO_ENV"
   publish = "public"
   ignore = "false"  # Always build
 
 [build.environment]
-  GO_VERSION = "1.24.5"
-  HUGO_VERSION = "v0.148.2"
+  GO_VERSION = "1.26.3"
+  HUGO_VERSION = "0.161.1"
   HUGO_ENV = "production"
 
 [context.production.environment]

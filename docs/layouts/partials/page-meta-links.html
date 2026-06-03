@@ -1,0 +1,33 @@
+{{ $path := "" }}
+
+{{ if .File }}
+  {{ $path = .File.Path }}
+{{ else }}
+  {{ if .Page.File }}
+    {{ $path = .Page.File.Path }}
+  {{ else }}
+    {{ if or (eq .RelPermalink "/") (eq .Title "Home") }}
+      {{ $path = "_index.md" }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+
+{{ if ne $path "" }}
+  {{ $pathFormatted := replace $path "\\" "/" }}
+
+  {{ $gh_repo := $.Site.Params.github_repo }}
+  {{ $gh_subdir := $.Site.Params.github_subdir | default "" }}
+
+  {{ $gh_repo_path := printf "%s/content/en/%s" $gh_subdir $pathFormatted }}
+  {{ $editURL := printf "%s/edit/main/%s" $gh_repo $gh_repo_path }}
+  {{ $issuesURL := printf "%s/issues/new?title=%s" $gh_repo (urlquery $.Title) }}
+
+  <div class="td-page-meta ms-2 pb-1 pt-2 mb-0">
+    <a href="{{ $editURL }}" target="_blank">
+      <i class="fa fa-edit fa-fw"></i> Edit this page
+    </a>
+    <a href="{{ $issuesURL }}" target="_blank">
+      <i class="fab fa-github fa-fw"></i> Create documentation issue
+    </a>
+  </div>
+{{ end }}
