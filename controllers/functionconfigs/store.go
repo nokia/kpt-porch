@@ -41,9 +41,9 @@ const (
 
 type InternalCacheEntry struct {
 	Entry map[string]map[string]configapi.FunctionConfigSpec
-	// objName stores what cluster object the entry was read from.
+	// objKey stores what cluster object the entry was read from.
 	// Used to check for conflicts/duplicate definitions.
-	objName client.ObjectKey
+	objKey client.ObjectKey
 }
 
 type FunctionConfigStore struct {
@@ -84,11 +84,11 @@ func (s *FunctionConfigStore) Store(obj *configapi.FunctionConfig) error {
 	spec := &obj.Spec
 
 	objKey := client.ObjectKeyFromObject(obj)
-	if entry, ok := s.internalCache[spec.Image]; ok && entry.objName != objKey {
+	if entry, ok := s.internalCache[spec.Image]; ok && entry.objKey != objKey {
 		return apierrors.NewConflict(
 			configapi.TypeFunctionConfig.GroupResource(),
 			client.ObjectKeyFromObject(obj).String(),
-			pkgerrors.Errorf("Image %q is already configured from object %q", spec.Image, objKey),
+			pkgerrors.Errorf("Image %q is already configured from object %q", spec.Image, entry.objKey),
 		)
 	}
 
@@ -128,8 +128,8 @@ func (s *FunctionConfigStore) Store(obj *configapi.FunctionConfig) error {
 	}
 
 	s.internalCache[spec.Image] = InternalCacheEntry{
-		Entry:   make(map[string]map[string]configapi.FunctionConfigSpec),
-		objName: objKey,
+		Entry:  make(map[string]map[string]configapi.FunctionConfigSpec),
+		objKey: objKey,
 	}
 	for _, prefix := range prefixes {
 		// One tag can technically have multiple types of configurations,
@@ -179,7 +179,7 @@ func (s *FunctionConfigStore) DeleteByObjName(key client.ObjectKey) {
 	defer s.mu.Unlock()
 
 	for imageName, entry := range s.internalCache {
-		if entry.objName == key {
+		if entry.objKey == key {
 			delete(s.internalCache, imageName)
 			return
 		}

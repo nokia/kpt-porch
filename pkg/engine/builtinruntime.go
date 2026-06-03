@@ -49,7 +49,6 @@ func (br *builtinRuntime) GetRunner(ctx context.Context, funct *kptfilev1.Functi
 	if funct.Tag != "" {
 		ref, err := regclientref.New(funct.Image)
 		if err != nil {
-			klog.Infof("????")
 			return nil, fmt.Errorf("failed to parse image %q as reference: %w", funct.Image, err)
 		}
 		// If the image already carries an inline tag, strip it

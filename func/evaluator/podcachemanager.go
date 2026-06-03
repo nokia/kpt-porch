@@ -284,7 +284,7 @@ func (pcm *podCacheManager) warmupCache(defaultImagePrefix string) error {
 	for spec := range pcm.functionConfigMap.IterPodConfigSpecs() {
 		if spec.PodExecutor != nil {
 			image := spec.Image
-			if len(spec.PodExecutor.Tags[0]) > 0 {
+			if len(spec.PodExecutor.Tags) > 0 && len(spec.PodExecutor.Tags[0]) > 0 {
 				image += ":" + spec.PodExecutor.Tags[0]
 			} else {
 				image += ":latest"
