@@ -219,7 +219,7 @@ Kubernetes cluster is lost with all nodes; Git repositories and DB cache databas
 
 **Data backed up:** Porch custom resources
 
-**Data stores lost:** Kubernetes control plane. The entire Kubernetes cluster deleted.
+**Data stores lost:** Kubernetes control plane. The entire Kubernetes cluster is deleted.
 
 #### Restoration steps:
 1. Recreate Kubernetes cluster
@@ -251,7 +251,7 @@ with grace-period 0).
 - Git repository contents
 - DB cache database contents
 
-**Data stores lost:** None. Porch will immediately begin to re-sync all repositories, resulting in a **decrease in quality of service** until all repositories are deemed Ready. **Porch API will be unavailable** to perform operations on package revisions You can use `get` or `list` operations to monitor Porch for API availability and repository status.
+**Data stores lost:** None. Porch will immediately begin to re-sync all repositories, resulting in a **decrease in quality of service** until all repositories are deemed Ready. **Porch API will be unavailable** to perform operations on package revisions. You can use `get` or `list` operations to monitor Porch for API availability and repository status.
 
 #### Restoration steps:
 1. Wait until all Porch pods return to Ready state

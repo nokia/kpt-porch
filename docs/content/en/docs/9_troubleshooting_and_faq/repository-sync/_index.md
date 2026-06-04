@@ -29,7 +29,7 @@ kubectl logs -n porch-system deployment/porch-controllers | grep "sync.*<repo-na
 kubectl logs -n porch-system deployment/porch-controllers | grep "<repo-name>.*error"
 ```
 
-**Common causes** invalid cron expression falls back to default frequency, repository authentication issues or network connectivity problems.
+**Common causes:** invalid cron expression falls back to default frequency, repository authentication issues or network connectivity problems.
 
 ### Authentication Failures
 
@@ -118,7 +118,7 @@ date -u  # Compare with runOnceAt value
 kubectl logs -n porch-system deployment/porch-controllers | grep "runOnceAt"
 ```
 
-**Solutions**: Ensure the timestamp is at least 1 minute in future and verify that the namespace is correct.
+**Solutions**: Ensure the timestamp is at least 1 minute in the future and verify that the namespace is correct.
 
 ## Error Messages & Diagnostic Steps
 
