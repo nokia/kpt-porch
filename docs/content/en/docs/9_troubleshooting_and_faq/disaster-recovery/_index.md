@@ -228,7 +228,7 @@ Kubernetes cluster is lost with all nodes; Git repositories and DB cache databas
 
    To ensure data compatibility, backup must be restored into the DB cache of the same version of Porch.
 
-   In step 2, ensure Porch is reinstalled with the same version as before the cluster was lost!
+   **In step 2, ensure Porch is reinstalled with the same version as before the cluster was lost!**
    {{% /alert %}}
 3. Perform GitOps reconciliation, gradually (in batches of 20) re-creating all backed-up Porch Repository objects
     1. For each batch, wait until all Repository objects have condition with type "Ready" and status set "True"
