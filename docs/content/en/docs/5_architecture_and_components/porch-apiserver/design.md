@@ -12,7 +12,7 @@ See [Functionality]({{% relref "/docs/5_architecture_and_components/porch-apiser
 
 The Porch API Server implements Kubernetes' REST storage interface to provide custom storage backends for Porch resources. Unlike standard Kubernetes resources that store data in etcd, Porch resources delegate to the Engine which manages package data in Git repositories through the Cache.
 
-The Storage Interface implements standard Kubernetes storage. It provides CRUD operations (Create, Get, List, Update, Delete), supports watch for real-time change notifications and delegates all operations to CaD Engine However, it has no direct etcd storage, as the packages are stored in Git.
+The Storage Interface implements standard Kubernetes storage. It provides CRUD operations (Create, Get, List, Update, Delete), supports watch for real-time change notifications and delegates all operations to CaD Engine. However, it has no direct etcd storage, as the packages are stored in Git.
 
 - **packageRevisions** manage PackageRevision resources
 - **packageRevisionResources** manage PackageRevisionResources (package content)
@@ -26,15 +26,15 @@ The API Server uses Kubernetes' strategy pattern to customize resource behavior:
 
 ### Validation Strategy
 
-The purpose of the validation stategy is to validate resource specifications before persistence. There are three validation types: create, update and status. The create validation ensures that the fields present and the lifecycle constraints enforced. The update validation validates resource version, lifecycle transitions and immutability rules. The status validation validates status subresource updates.
+The purpose of the validation strategy is to validate resource specifications before persistence. There are three validation types: create, update and status. The create validation ensures that the fields present and the lifecycle constraints enforced. The update validation validates resource version, lifecycle transitions and immutability rules. The status validation validates status subresource updates.
 
 ### Admission Strategy
 
-The purpose of the admission strategy is to apply admission control policies and defaults. There are three admission oprations: PrepareForCreate, PrepareForUpdate and Canonicalize. PrepareForCreate sets defaults, generates names and initializes status. PrepareForUpdate validates resource version and enforces immutability. Canonicalize normalizes resource representation.
+The purpose of the admission strategy is to apply admission control policies and defaults. There are three admission operations: PrepareForCreate, PrepareForUpdate and Canonicalize. PrepareForCreate sets defaults, generates names and initializes status. PrepareForUpdate validates resource version and enforces immutability. Canonicalize normalizes resource representation.
 
 ### Table Conversion Strategy
 
-The purpose of the table conversion strategy is to conver esources to table format for kubectl display. The table conversion defines columns for kubectl output (Name, Package, Workspace, Revision, Lifecycle), extracts values from resource specifications, formats data for human-readable display and supports both list as well as individual resource views.
+The purpose of the table conversion strategy is to convert resources to table format for kubectl display. The table conversion defines columns for kubectl output (Name, Package, Workspace, Revision, Lifecycle), extracts values from resource specifications, formats data for human-readable display and supports both list as well as individual resource views.
 
 ## API Groups
 
@@ -85,7 +85,7 @@ Kubernetes strategy pattern for validation and admission control is used.
 
 Following Kubernetes conventions, this approach separates validation logic from storage logic, which enables reuse across different storage implementations and provides consistent validation behavior.
 
-Two alternatives were considered. Either validate in engine or webhook-based validation. However, validation in engine duplocated valiation logic, while webhook-based validation adds network overhead and complexity.
+Two alternatives were considered. Either validate in engine or webhook-based validation. However, validation in engine duplicated validation logic, while webhook-based validation adds network overhead and complexity.
 
 This decision has some trade-offs. The strategy pattern, while adding an abstraction layer, provides a clean separation of concerns and enables independent testing of validation.
 
@@ -109,14 +109,14 @@ Three alternatives were considered: background goroutines in the API server, syn
 
 This decision has some trade-offs. The introduction of a dedicated Repository Controller as an additional deployment component offers significant advantages, including a better separation of concerns, enhanced operational flexibility, and improved observability through specialized controller metrics and status reporting.
 
-The Repository Controller manages Repository CRs through standard Kubernetes reconciliation to manage Repository Custom Resources (CRs). Its core functions include watching for changes in Repository specifications, conducting scheduled health checks and full synchronizations, updating the repository status with synchronization results and package metadata, and managing repository deletion and cache cleanup.For more inforamtion, see [Repository Controller]({{% relref "/docs/5_architecture_and_components/controllers/repository-controller/_index.md" %}}).
+The Repository Controller manages Repository CRs through standard Kubernetes reconciliation to manage Repository Custom Resources (CRs). Its core functions include watching for changes in Repository specifications, conducting scheduled health checks and full synchronizations, updating the repository status with synchronization results and package metadata, and managing repository deletion and cache cleanup. For more information, see [Repository Controller]({{% relref "/docs/5_architecture_and_components/controllers/repository-controller/_index.md" %}}).
 
 ### Dependency Injection
 
-Engine, Cache, and clients are configures through dependency injection.
+Engine, Cache, and clients are configured through dependency injection.
 
 This approach is justified by its ability to enable testing with mock implementations, provide flexible configuration options, separate the construction of components from their usage, and support various deployment scenarios.
 
-Two alternatives wee considered. Either global singletons or a service locator. However, global singletons are hard to test and configure, and a serivce locator hides dependencies.
+Two alternatives were considered. Either global singletons or a service locator. However, global singletons are hard to test and configure, and a service locator hides dependencies.
 
 This decision has some trade-offs. While it requires explicit wiring during initialization, it offers the significant benefits of a clear dependency graph and enables flexible testing and configuration.

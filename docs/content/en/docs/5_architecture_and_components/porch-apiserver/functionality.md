@@ -81,7 +81,7 @@ Strategies enforce validation rules before Engine operations:
 
 ### Create Validation
 
-**Validation rules:** Include requiring a resource version for optimistic locking, ensuring lifecycle transition validity, enforcing immutability constraints for Published packages, making tasks append-only (meaning tasks cannot be removed), and restricting metadata updates.
+**Validation rules:** Include ensuring required fields are present (such as package name and repository), adhering to lifecycle constraints (preventing creation of Published/DeletionProposed states), validating tasks (allowing a maximum of one task), confirming the correct workspace name format, and verifying package path validity.
 
 **Validation process:** Calling strategy is validated before any Engine operation. Specific field errors are returned for invalid specifications, effectively preventing invalid resources from reaching the Engine and providing clear error messages to clients.
 
@@ -117,7 +117,7 @@ Strategies apply admission policies and defaults:
 
 ### Canonicalization
 
-**Operations:** Normalizing resource representation, removing redundant fields, appling default values, and ensuring a consistent format.
+**Operations:** Normalizing resource representation, removing redundant fields, applying default values, and ensuring a consistent format.
 
 **Canonicalization process:** Called after validation, it ensures a consistent storage format, simplifies comparison operations, and improves cache efficiency.
 
@@ -130,14 +130,14 @@ Strategies convert resources to table format for kubectl:
 ### Column Definitions
 
 **PackageRevision columns**
-| Column Name | Description           |
-| :---------- | :-------------------- |
-| Name        | Resource name         |
-| Package     | Package name          |
-| WorkspaceName | Workspace identifier  |
-| Revision    | Revision number       |
-| Lifecycle   | Current lifecycle state |
-| Repository  | Source repository     |
+| Column Name     | Description                       |
+|-----------------|-----------------------------------|
+| Name            | Resource name                     |
+| Package         | Package name                      |
+| WorkspaceName   | Workspace identifier              |
+| Revision        | Revision number                   |
+| Lifecycle       | Current lifecycle state           |
+| Repository      | Source repository                 |
 
 The table format adheres to Kubernetes conventions, supports sorting and filtering, and provides human-readable output consistent with kubectl expectations.
 
