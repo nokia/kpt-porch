@@ -58,11 +58,7 @@ Kubernetes API Request
 ```
 
 **Translation characteristics:**
-- REST storage translates API operations to Engine calls
-- Strategies validate before Engine invocation
-- Engine returns repository objects
-- REST storage converts to Kubernetes API objects
-- Errors propagated back to client
+The REST storage component translates API operations into calls for the Engine, with validation strategies ensuring data integrity before Engine invocation. The Engine then processes these calls and returns repository objects, which the REST storage converts into standard Kubernetes API objects before propagating any errors back to the client.
 
 ### Operation Mapping
 
@@ -87,14 +83,7 @@ Kubernetes API Request
 
 ### Context Propagation
 
-**Context flow:**
-- Client request includes Kubernetes request context
-- REST storage extracts user info from context
-- Context passed to Engine for all operations
-- Engine uses context for:
-  - Cancellation and timeouts
-  - User info for audit trails (PublishedBy)
-  - Tracing and logging
+Client requests carry a Kubernetes request context, from which the REST storage extracts user information before passing the entire context to the Engine for all subsequent operations. The Engine then leverages this context for critical functions such as managing cancellations and timeouts, incorporating user details into audit trails (PublishedBy), and facilitating comprehensive tracing and logging.
 
 ## Cache Integration
 
@@ -120,11 +109,7 @@ API Request
   API Response
 ```
 
-**Access characteristics:**
-- API Server never directly accesses Cache
-- All cache operations through Engine
-- Engine manages repository lifecycle
-- Cache provides repository abstractions
+**Access characteristics:** The API Server interacts with the cache exclusively through the Engine, which is responsible for all cache operations, manages the repository lifecycle, and provides the API Server with abstract representations of the stored data.
 
 ### Background Synchronization
 
@@ -157,24 +142,16 @@ Kubernetes API Server
   REST Storage Handlers
 ```
 
-**Aggregation characteristics:**
-- Porch API Server registered as aggregated API
-- Kubernetes API Server proxies requests to Porch
-- Authentication and authorization handled by Kubernetes
-- Porch API Server receives authenticated requests
+**Aggregation characteristics:** The Porch API Server is registered as an aggregated API, allowing the Kubernetes API Server to proxy requests to it. Authentication and authorization are handled by Kubernetes, ensuring that the Porch API Server only receives pre-authenticated requests.
 
 ### RBAC Integration
 
-**Authorization flow:**
-- Kubernetes API Server enforces RBAC policies
-- Porch API Server receives authorized requests
-- User info available in request context
-- Porch enforces additional business rules
+**Authorization flow:** The Kubernetes API Server enforces RBAC policies, ensuring that the Porch API Server only receives authorized requests. With user information available in the request context, Porch then applies additional business-specific authorization rules.
 
 **RBAC resources:**
-- PackageRevision: get, list, watch, create, update, delete
-- PackageRevisionResources: get, list, watch, update
-- Package: get, list, watch, create, delete
+- **PackageRevision:** get, list, watch, create, update, delete
+- **PackageRevisionResources:** get, list, watch, update
+- **Package:** get, list, watch, create, delete
 
 ### Client Integration
 
@@ -184,11 +161,7 @@ Kubernetes API Server
 - **Porchctl**: Porch-specific CLI
 - **Custom controllers**: Automation and workflows
 
-**Client operations:**
-- CRUD operations on Porch resources
-- Watch streams for real-time updates
-- Approval workflows (lifecycle transitions)
-- Package content updates
+**Client operations:** Clients can perform CRUD (Create, Read, Update, Delete) operations on Porch resources, subscribe to watch streams for real-time updates, manage approval workflows for lifecycle transitions, and update package content.
 
 ## Watch Stream Management
 
@@ -218,11 +191,7 @@ Client Watch Request
   • Deleted
 ```
 
-**Watch integration:**
-- Clients subscribe via standard Kubernetes watch API
-- REST storage delegates to Engine's WatcherManager
-- Events filtered and delivered through component chain
-- Automatic cleanup on client disconnect
+**Watch integration:** Clients subscribe to watch streams using the standard Kubernetes watch API. The REST storage layer delegates these requests to the Engine's WatcherManager, which then filters and delivers events through a component chain. Resources are automatically cleaned up when a client disconnects.
 
 ### Event Delivery
 
@@ -258,21 +227,13 @@ Repository Controller
   Clients Receive Events
 ```
 
-**Integration flow:**
-- Repository Controller manages the sync lifecycle independently
-- Controller watches Repository resources and reconciles based on sync schedules
-- Sync operations update the Cache directly
-- Cache notifications propagate through the API Server to clients
-- API Server observes and delivers events but does not initiate sync
+**Integration flow:** The integration flow operates with the Repository Controller independently managing the synchronization lifecycle. This controller monitors Repository resources and performs reconciliations according to defined sync schedules. All synchronization operations directly update the Cache, and subsequent notifications from the Cache are propagated through the API Server to connected clients. It is important to note that the API Server's role is to observe and deliver these events, not to initiate the synchronization process itself.
 
 ### Cleanup Coordination
 
 See [Functionality]({{% relref "/docs/5_architecture_and_components/porch-apiserver/functionality.md#resource-cleanup" %}}) for detailed cleanup operations.
 
-**Integration flow:**
-- Repository deletion detected via Kubernetes API
-- Cleanup coordinated through Engine and Cache
-- Notifications propagated to active watchers
+**Integration flow:** When a repository deletion is detected through the Kubernetes API, the cleanup process is coordinated via the Engine and Cache components. Following this cleanup, notifications regarding the deletion are then propagated to all active watchers.
 
 ## Error Handling
 
@@ -288,18 +249,11 @@ The API Server translates errors across component boundaries:
 - **Conflict errors**: Translated to 409 Conflict
 - **Internal errors**: Translated to 500 Internal Server Error
 
-**Translation pattern:**
-- Engine returns typed errors
-- REST storage translates to Kubernetes status
-- Status includes error message and details
-- Client receives standard Kubernetes error response
+**Translation pattern:** In this translation pattern, the Engine returns typed errors. These errors are then converted by the REST storage layer into a standard Kubernetes Status object. This Status object is designed to include a clear error message along with any relevant details. Ultimately, the client interacting with the system receives this standardized Kubernetes error response, ensuring consistent error handling.
 
 ### Watch Error Handling
 
-**Integration error handling:**
-- Registration errors from WatcherManager returned to client
-- Delivery errors trigger stream closure and cleanup
-- Automatic cleanup on client disconnection
+**Integration error handling:** Registration errors originating from the WatcherManager are returned directly to the client, while delivery errors lead to the closure and cleanup of the affected stream, and an automatic cleanup process is also initiated upon client disconnection.
 
 ### Background Job Errors
 
@@ -308,10 +262,7 @@ The API Server translates errors across component boundaries:
 - Kubernetes API errors
 - Resource cleanup failures
 
-**Handling strategy:**
-- Errors logged with context
-- Operations continue for other resources
-- Repository sync errors are handled by the Repository Controller
+**Handling strategy:** For the handling strategy, errors are logged with their context, operations continue for other resources despite an error, and any repository synchronization errors are specifically managed by the Repository Controller.
 
 ## Concurrency and Safety
 
@@ -321,9 +272,5 @@ The API Server coordinates concurrent operations across components:
 
 ### Request Concurrency
 
-**Integration patterns:**
-- Request concurrency managed through Engine
-- Optimistic locking enforced at API Server and Engine boundary
-- Watch streams isolated per client
-- Repository sync operations coordinated by Repository Controller
+Integration patterns involve managing request concurrency through the Engine, enforcing optimistic locking at the API Server and Engine boundary, isolating watch streams per client, and coordinating repository synchronization operations via the Repository Controller.
 

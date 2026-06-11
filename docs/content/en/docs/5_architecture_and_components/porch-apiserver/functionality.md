@@ -50,17 +50,9 @@ The API Server implements custom REST storage for each Porch resource type:
 - **Update**: Validates resource version, calls Engine to update package revision, returns updated resource
 - **Delete**: Calls Engine to delete package revision, returns delete status
 
-**Watch support:**
-- Delegates to Engine cache for package revision watches
-- Filters events based on watch criteria
-- Delivers real-time change notifications
-- Automatically cleans up on client disconnect
+Watch support delegates to the Engine cache for package revision watches. This system filters events based on defined watch criteria, delivers real-time change notifications, and automatically cleans up resources upon client disconnection.
 
-**Storage characteristics:**
-- No etcd storage - delegates to Engine
-- Engine manages package data in Git via Cache
-- Supports all standard Kubernetes operations
-- Implements storage.Interface fully
+Regarding storage characteristics, there is no direct etcd storage; instead, it delegates to the Engine. The Engine is responsible for managing package data in Git via its Cache, supports all standard Kubernetes operations, and fully implements the storage.Interface.
 
 ### PackageRevisionResources Storage
 
@@ -69,17 +61,9 @@ The API Server implements custom REST storage for each Porch resource type:
 - **List**: Lists resources for package revisions
 - **Update**: Updates package content via Engine
 
-**Content handling:**
-- Resources stored as map of filename to content
-- Supports large package content (not limited by etcd)
-- Updates trigger render pipeline execution
-- Returns RenderStatus with function results
+Content handling involves storing resources as a map where each filename is associated with its content. This design supports large package content, bypassing limitations that might be imposed by etcd. Furthermore, any updates to this content automatically trigger the execution of the render pipeline, and the system provides a RenderStatus along with the function results.
 
-**Storage characteristics:**
-- Read-only for most operations
-- Update only allowed on Draft packages
-- Content retrieved on-demand (not cached in API server)
-- Delegates to Engine for all operations
+Regarding storage characteristics, the system is primarily read-only for most operations. Updates are exclusively permitted on Draft packages. Content is retrieved on-demand, meaning it is not cached within the API server, and all storage-related operations are delegated to the Engine.
 
 ### Package Storage
 
@@ -87,11 +71,7 @@ The API Server implements custom REST storage for each Porch resource type:
 - **Get**: Filters Engine package list by name
 - **List**: Calls Engine to list packages with filters
 
-**Package aggregation:**
-- Represents package across all revisions
-- Tracks latest revision
-- Provides package-level metadata
-
+Package aggregation serves to represent a complete package by encompassing all its revisions, tracking the latest version, and providing essential package-level metadata.
 
 ## Validation Strategies
 
@@ -101,47 +81,21 @@ Strategies enforce validation rules before Engine operations:
 
 ### Create Validation
 
-**Validation rules:**
-- Required fields present (package name, repository)
-- Lifecycle constraints (cannot create Published/DeletionProposed)
-- Task validation (maximum one task)
-- Workspace name format
-- Package path validity
+**Validation rules:** Include requiring a resource version for optimistic locking, ensuring lifecycle transition validity, enforcing immutability constraints for Published packages, making tasks append-only (meaning tasks cannot be removed), and restricting metadata updates.
 
-**Validation process:**
-- Strategy validation called before Engine operation
-- Returns field errors for invalid specifications
-- Prevents invalid resources from reaching Engine
-- Provides clear error messages to clients
+**Validation process:** Calling strategy is validated before any Engine operation. Specific field errors are returned for invalid specifications, effectively preventing invalid resources from reaching the Engine and providing clear error messages to clients.
 
 ### Update Validation
 
-**Validation rules:**
-- Resource version required (optimistic locking)
-- Lifecycle transition validity
-- Immutability constraints (Published packages)
-- Task append-only (cannot remove tasks)
-- Metadata update restrictions
+**Validation rules:** Include requiring a resource version for optimistic locking, ensuring lifecycle transition validity, enforcing immutability constraints for Published packages, making tasks append-only (meaning tasks cannot be removed), and restricting metadata updates.
 
-**Validation process:**
-- Strategy validation called before Engine update operation
-- Compares old and new objects
-- Validates changes are allowed
-- Returns field errors for invalid updates
+**Validation process:** Involves invoking strategy validation prior to any Engine update operation. This process meticulously compares old and new objects to confirm that all proposed changes are permissible, and it subsequently returns field errors for any updates that are deemed invalid.
 
 ### Status Validation
 
-**Validation rules:**
-- Status subresource updates validated separately
-- Conditions format validation
-- RenderStatus structure validation
-- DownstreamTargets validation
+**Validation rules:** Status subresource updates should be validated separately. Condition format, RenderStatus structure as well as DownstreamTargets should be validated.
 
-**Validation process:**
-- Strategy.ValidateStatusUpdate called for status updates
-- Ensures status updates don't modify spec
-- Validates status structure
-- Returns field errors for invalid status
+**Validation process:** Involves calling Strategy.ValidateStatusUpdate for all status updates. This ensures that status updates do not inadvertently modify the specification, validates the overall status structure, and returns detailed field errors when an invalid status is detected.
 
 ## Admission Control
 
@@ -151,47 +105,21 @@ Strategies apply admission policies and defaults:
 
 ### PrepareForCreate
 
-**Operations:**
-- Generate name if not provided
-- Set default lifecycle (Draft)
-- Initialize status conditions
-- Set creation timestamp
-- Add default labels/annotations
+**Operations:** Generating a name if one is not provided, setting the default lifecycle to Draft, initializing status conditions, setting the creation timestamp, and adding default labels/annotations.
 
-**Admission process:**
-- Called before validation
-- Modifies resource in-place
-- Ensures consistent initial state
-- Prepares resource for Engine
+**Admission process:** Called before validation, it modifies the resource in-place to ensure a consistent initial state and prepares the resource for the Engine.
 
 ### PrepareForUpdate
 
-**Operations:**
-- Validate resource version
-- Enforce immutability rules
-- Preserve status on spec updates
-- Update modification timestamp
-- Merge labels/annotations
+**Operations:** Validating the resource version, enforcing immutability rules, preserving status on specification updates, updating the modification timestamp, and merging labels/annotations.
 
-**Admission process:**
-- Called before validation
-- Checks current vs desired state
-- Enforces business rules
-- Prepares resource for Engine
+**Admission process:** Called before validation, it checks the current versus desired state, enforces business rules, and prepares the resource for the Engine.
 
 ### Canonicalization
 
-**Operations:**
-- Normalize resource representation
-- Remove redundant fields
-- Apply default values
-- Ensure consistent format
+**Operations:** Normalizing resource representation, removing redundant fields, appling default values, and ensuring a consistent format.
 
-**Canonicalization process:**
-- Called after validation
-- Ensures consistent storage format
-- Simplifies comparison operations
-- Improves cache efficiency
+**Canonicalization process:** Called after validation, it ensures a consistent storage format, simplifies comparison operations, and improves cache efficiency.
 
 ## Table Conversion
 
@@ -201,34 +129,23 @@ Strategies convert resources to table format for kubectl:
 
 ### Column Definitions
 
-**PackageRevision columns:**
-- Name: Resource name
-- Package: Package name
-- WorkspaceName: Workspace identifier
-- Revision: Revision number
-- Lifecycle: Current lifecycle state
-- Repository: Source repository
+**PackageRevision columns**
+| Column Name | Description           |
+| :---------- | :-------------------- |
+| Name        | Resource name         |
+| Package     | Package name          |
+| WorkspaceName | Workspace identifier  |
+| Revision    | Revision number       |
+| Lifecycle   | Current lifecycle state |
+| Repository  | Source repository     |
 
-**Table format:**
-- Follows Kubernetes table conventions
-- Supports sorting and filtering
-- Provides human-readable output
-- Consistent with kubectl expectations
+The table format adheres to Kubernetes conventions, supports sorting and filtering, and provides human-readable output consistent with kubectl expectations.
 
 ### Conversion Process
 
-**Conversion flow:**
-- kubectl requests table format
-- REST storage calls Strategy.ConvertToTable
-- Strategy extracts column values
-- Returns metav1.Table with rows
-- kubectl formats for display
+**Conversion flow:** When kubectl requests a table format, the REST storage calls Strategy.ConvertToTable. This strategy then extracts the necessary column values and returns a metav1.Table with rows, which kubectl subsequently formats for display.
 
-**Conversion characteristics:**
-- Supports both list and individual resources
-- Handles missing fields gracefully
-- Provides consistent formatting
-- Enables kubectl get commands
+**Conversion characteristics:** This conversion process supports both list and individual resources, gracefully handles missing fields, provides consistent formatting, and enables various kubectl get commands.
 
 ## Watch Stream Management
 
@@ -238,18 +155,9 @@ The API Server provides real-time watch streams:
 
 ### Watch Registration
 
-**Registration process:**
-- Client sends watch request with filters
-- REST storage calls Engine cache to watch package revisions
-- WatcherManager registers watcher with filters
-- Returns watch interface to client
-- Client receives events as they occur
+**Registration process:** The registration process begins when a client sends a watch request that includes specific filters. The REST storage then calls the Engine cache to watch for package revisions, and the WatcherManager registers a watcher with these filters. Subsequently, a watch interface is returned to the client, allowing the client to receive events as they occur.
 
-**Filter support:**
-- Namespace filtering
-- Label selectors
-- Field selectors
-- Resource version (resume from point)
+**Filter support:** The system offers robust filter support, including namespace filtering, label selectors, field selectors, and the ability to resume from a specific resource version.
 
 ### Event Delivery
 
@@ -258,11 +166,7 @@ The API Server provides real-time watch streams:
 - **Modified**: Package revision updated
 - **Deleted**: Package revision removed
 
-**Delivery characteristics:**
-- Events delivered in real-time
-- Filtered based on watch criteria
-- Ordered per resource
-- Best-effort delivery (network failures may drop events)
+Events are delivered in real-time, filtered based on watch criteria, and ordered per resource. However, delivery is best-effort, meaning network failures may result in dropped events.
 
 ### Watch Lifecycle
 
@@ -272,11 +176,7 @@ The API Server provides real-time watch streams:
 - **Disconnection**: Client closes connection or timeout
 - **Cleanup**: WatcherManager removes watcher automatically
 
-**Cleanup triggers:**
-- Client disconnects
-- Context cancellation
-- Watch timeout
-- Error during event delivery
+Cleanup triggers include the client disconnecting, cancelling context, watch timeout and error during event delivery.
 
 ## Background Operations
 
@@ -297,23 +197,11 @@ See the [Repository Controller documentation]({{% relref "/docs/5_architecture_a
 
 ### Resource Cleanup
 
-**Cleanup operations:**
-- Remove PackageRev CRs for deleted repositories
-- Clean up orphaned cache entries
-- Remove stale watch registrations
-- Garbage collect expired resources
+**Cleanup operations:** These operations include removing PackageRev CRs for deleted repositories, cleaning up orphaned cache entries, removing stale watch registrations, and garbage collecting expired resources.
 
-**Cleanup triggers:**
-- Repository deletion
-- Cache eviction
-- Watch disconnection
-- Periodic maintenance
+**Cleanup triggers:** Various events can trigger these cleanup processes, including repository deletion, cache eviction, and watch disconnection. Periodic maintenance routines also initiate cleanup to ensure system health.
 
-**Cleanup coordination:**
-- Triggered by lifecycle events
-- Runs asynchronously
-- Ensures consistency
-- Prevents resource leaks
+**Cleanup coordination:** Cleanup is coordinated by being triggered through lifecycle events and runs asynchronously. This approach ensures consistency across the system and effectively prevents resource leaks.
 
 ## Performance Optimization
 
@@ -321,44 +209,21 @@ The API Server employs several optimization strategies:
 
 ### List Operation Optimization
 
-**Optimization techniques:**
-- Concurrent repository listing (configurable max concurrency)
-- Per-repository timeout (prevents slow repos from blocking)
-- Early termination on context cancellation
-- Efficient filtering at Engine level
+**Optimization techniques:** Concurrent repository listing with configurable maximum concurrency, per-repository timeouts to prevent slow repositories from blocking, early termination on context cancellation, and efficient filtering at the Engine level.
 
-**Configuration:**
-- MaxConcurrentLists: Maximum concurrent repository operations
-- ListTimeoutPerRepository: Timeout per repository
-- Prevents slow repositories from impacting overall performance
+**Configuration:** MaxConcurrentLists for maximum concurrent repository operations and ListTimeoutPerRepository which sets a timeout per repository, preventing slow repositories from impacting overall performance.
 
 ### Watch Stream Efficiency
 
-**Efficiency mechanisms:**
-- WatcherManager provides efficient fan-out
-- Events filtered at source (not delivered then filtered)
-- Automatic cleanup of inactive watchers
-- No polling overhead
+**Efficiency mechanisms:** The WatcherManager provides efficient fan-out. Events are filtered at the source rather than being delivered and then filtered, automatic cleanup of inactive watchers, and eliminating polling overhead.
 
-**Scalability:**
-- Supports many concurrent watchers
-- Minimal overhead per watcher
-- Efficient event delivery
-- Scales with number of clients
+**Scalability:** The system supports many concurrent watchers with minimal overhead per watcher, ensures efficient event delivery, and scales effectively with the number of clients.
 
 ### Cache Integration
 
-**Cache benefits:**
-- Engine caches repository data
-- Reduces Git operations
-- Faster list operations
-- Consistent performance
+**Cache benefits:** The Engine caches repository data, which significantly reduces Git operations, leading to faster list operations and more consistent performance.
 
-**Cache coordination:**
-- Repository Controller keeps cache fresh via periodic sync
-- Watch notifications on cache updates
-- Automatic cache invalidation
-- Transparent to API clients
+**Cache coordination:** Managed by the Repository Controller, which keeps the cache fresh through periodic synchronization. Watch notifications are used for cache updates, and automatic cache invalidation occurs transparently to API clients.
 
 ## Error Handling
 
@@ -368,11 +233,7 @@ The API Server handles errors at multiple levels:
 
 ### Validation Errors
 
-**Error handling:**
-- Strategy validation returns field errors
-- Converted to 400 Bad Request
-- Includes field path and error message
-- Client receives detailed error information
+**Error handling:** Strategy validation processes field errors, which are then converted into a 400 Bad Request response, including the specific field path and an informative error message, ensuring the client receives detailed error information.
 
 **Error examples:**
 - "spec.lifecycle: cannot create Published package"
@@ -381,11 +242,7 @@ The API Server handles errors at multiple levels:
 
 ### Engine Errors
 
-**Error handling:**
-- Engine returns typed errors
-- REST storage translates to Kubernetes status
-- Appropriate HTTP status code
-- Error details in status message
+**Error handling:** The Engine returns typed errors, which the REST storage then translates into a Kubernetes status, providing an appropriate HTTP status code and detailed error information within the status message.
 
 **Error types:**
 - NotFound → 404 Not Found
@@ -395,17 +252,9 @@ The API Server handles errors at multiple levels:
 
 ### Watch Errors
 
-**Error handling:**
-- Registration errors returned immediately
-- Delivery errors close watch stream
-- Client receives error event
-- Automatic cleanup on error
+**Error handling:** Registration errors are returned immediately upon occurrence. Should delivery errors arise, the watch stream is closed, an error event is sent to the client, and an automatic cleanup process is initiated.
 
-**Error recovery:**
-- Client can re-establish watch
-- Resume from last resource version
-- No data loss on transient errors
-- Graceful degradation
+**Error recovery:** For error recovery, clients have the capability to re-establish the watch, resuming from the last known resource version. This mechanism ensures that there is no data loss during transient errors, allowing for graceful degradation of service.
 
 ## Concurrency Control
 
@@ -415,37 +264,16 @@ The API Server handles concurrent operations:
 
 ### Request Concurrency
 
-**Concurrency characteristics:**
-- Multiple clients can make requests concurrently
-- Each request processed independently
-- Engine provides concurrency control
-- Optimistic locking prevents conflicts
+**Concurrency characteristics:** Multiple clients can make requests concurrently, with each request processed independently. The Engine provides concurrency control, utilizing optimistic locking to prevent conflicts.
 
-**Concurrency patterns:**
-- Read operations fully concurrent
-- Write operations serialized per package (Engine mutex)
-- Watch streams independent
-- Resource cleanup operations concurrent
+**Concurrency patterns:** Regarding concurrency patterns, read operations are fully concurrent, while write operations are serialized per package using an Engine mutex. Watch streams operate independently, and resource cleanup operations are also concurrent.
 
 ### Optimistic Locking
 
-**Locking mechanism:**
-- Clients provide resource version on updates
-- API Server validates version before Engine call
-- Engine compares with current version
-- Conflict returned if mismatch
-- Client must re-read and retry
+**Locking mechanism:** When clients initiate updates, they are required to provide a resource version. The API Server then validates this version before making a call to the Engine, which in turn compares the provided version with its current version. If a mismatch is detected, a conflict is returned, necessitating the client to re-read the resource and retry the operation.
 
-**Locking benefits:**
-- Prevents lost updates
-- No distributed locks needed
-- Scales well
-- Standard Kubernetes pattern
+**Locking benefits:** This locking mechanism offers several benefits, including the prevention of lost updates and the elimination of the need for complex distributed locks. It scales effectively and aligns with standard Kubernetes patterns.
 
 ### Watch Stream Safety
 
-**Safety guarantees:**
-- Each watch stream independent
-- No shared state between watchers
-- Thread-safe event delivery
-- Automatic cleanup prevents leaks
+Each watch stream operates independently with no shared state between watchers. Event delivery is thread-safe, and automatic cleanup mechanisms are in place to prevent leaks, collectively providing robust safety guarantees.

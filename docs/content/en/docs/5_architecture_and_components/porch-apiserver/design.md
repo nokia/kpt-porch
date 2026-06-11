@@ -12,17 +12,11 @@ See [Functionality]({{% relref "/docs/5_architecture_and_components/porch-apiser
 
 The Porch API Server implements Kubernetes' REST storage interface to provide custom storage backends for Porch resources. Unlike standard Kubernetes resources that store data in etcd, Porch resources delegate to the Engine which manages package data in Git repositories through the Cache.
 
-**Storage interface characteristics:**
-- Implements standard Kubernetes storage.Interface
-- Provides CRUD operations (Create, Get, List, Update, Delete)
-- Supports Watch for real-time change notifications
-- Delegates all operations to CaD Engine
-- No direct etcd storage - packages stored in Git
+The Storage Interface implements standard Kubernetes storage. It provides CRUD operations (Create, Get, List, Update, Delete), supports watch for real-time change notifications and delegates all operations to CaD Engine However, it has no direct etcd storage, as the packages are stored in Git.
 
-**Storage implementations:**
-- **packageRevisions**: Manages PackageRevision resources
-- **packageRevisionResources**: Manages PackageRevisionResources (package content)
-- **packages**: Manages Package resources
+- **packageRevisions** manage PackageRevision resources
+- **packageRevisionResources** manage PackageRevisionResources (package content)
+- **packages** manage Package resources.
 
 ## Strategy Pattern
 
@@ -32,31 +26,15 @@ The API Server uses Kubernetes' strategy pattern to customize resource behavior:
 
 ### Validation Strategy
 
-**Purpose**: Validates resource specifications before persistence
-
-**Validation types:**
-- **Create validation**: Ensures required fields present, lifecycle constraints enforced
-- **Update validation**: Validates resource version, lifecycle transitions, immutability rules
-- **Status validation**: Validates status subresource updates
+The purpose of the validation stategy is to validate resource specifications before persistence. There are three validation types: create, update and status. The create validation ensures that the fields present and the lifecycle constraints enforced. The update validation validates resource version, lifecycle transitions and immutability rules. The status validation validates status subresource updates.
 
 ### Admission Strategy
 
-**Purpose**: Applies admission control policies and defaults
-
-**Admission operations:**
-- **PrepareForCreate**: Sets defaults, generates names, initializes status
-- **PrepareForUpdate**: Validates resource version, enforces immutability
-- **Canonicalize**: Normalizes resource representation
+The purpose of the admission strategy is to apply admission control policies and defaults. There are three admission oprations: PrepareForCreate, PrepareForUpdate and Canonicalize. PrepareForCreate sets defaults, generates names and initializes status. PrepareForUpdate validates resource version and enforces immutability. Canonicalize normalizes resource representation.
 
 ### Table Conversion Strategy
 
-**Purpose**: Converts resources to table format for kubectl display
-
-**Table conversion:**
-- Defines columns for kubectl output (Name, Package, Workspace, Revision, Lifecycle)
-- Extracts values from resource specifications
-- Formats data for human-readable display
-- Supports both list and individual resource views
+The purpose of the table conversion strategy is to conver esources to table format for kubectl display. The table conversion defines columns for kubectl output (Name, Package, Workspace, Revision, Lifecycle), extracts values from resource specifications, formats data for human-readable display and supports both list as well as individual resource views.
 
 ## API Groups
 
@@ -69,16 +47,9 @@ The Porch API Server registers two API groups with Kubernetes:
 - **PackageRevisionResources**: Contains the actual resource content of a package revision
 - **Package**: Represents a package across all its revisions
 
-**Versions:**
-- v1alpha1: Current version with all resources
+**Versions:** v1alpha1: Current version with all resources
 
-**Characteristics:**
-- Primary API group for package management
-- All resources namespaced
-- Served via Kubernetes API aggregation (not CRDs)
-- Supports full CRUD and Watch operations
-- Integrates with Engine for all operations
-- Uses custom REST storage (Git-backed, not etcd)
+**Characteristics:** The porch.kpt.dev API group is the primary API group for package management, and all its resources are namespaced. It is served via Kubernetes API aggregation, not CRDs, and supports full CRUD and Watch operations. This group integrates with Engine for all operations and uses custom REST storage, which is Git-backed, not etcd.
 
 ### config.porch.kpt.dev API Group (CRDs)
 
@@ -86,16 +57,9 @@ The Porch API Server registers two API groups with Kubernetes:
 - **Repository**: Configures Git repositories for package storage
 - **PackageRev**: Internal metadata resource for tracking package revisions
 
-**Versions:**
-- v1alpha1: Current version for all resources
+**Versions:** v1alpha1: Current version for all resources
 
-**Characteristics:**
-- Configuration API group for repository management
-- All resources are namespaced
-- Implemented as standard Kubernetes CRDs
-- Managed by separate controllers, not directly by API server
-- Stored in etcd (standard Kubernetes CRD storage)
-- PackageRev is an internal resource used for metadata tracking
+**Characteristics:** The config.porch.kpt.dev API group serves as the configuration API group for repository management, with all its resources being namespaced. It is implemented as standard Kubernetes CRDs and is managed by separate controllers, not directly by the API server. Its data is stored in etcd, which is the standard Kubernetes CRD storage. Within this group, PackageRev is used an internal resource specifically for metadata tracking.
 
 ## Background Operations
 
@@ -107,105 +71,52 @@ See [Functionality]({{% relref "/docs/5_architecture_and_components/porch-apiser
 
 ### REST Storage vs etcd
 
-**Decision**: Implement custom REST storage that delegates to Engine instead of using etcd.
+Instead of using etcd, custom REST storage is implemented that delegates to Engine.
 
-**Rationale:**
-- Package data naturally lives in Git repositories
-- etcd not suitable for large package content
-- Engine provides necessary abstraction over Git
-- Enables draft-commit workflow for package modifications
+Package data naturally lives in Git repositories, and etcd is not suitable for storing large package content. The Engine provides the necessary abstraction over Git, which enables a draft-commit workflow for package modifications.
 
-**Alternatives considered:**
-- **Store in etcd**: Would require duplicating package content, large storage overhead
-- **Hybrid approach**: Metadata in etcd, content in Git - adds complexity
+Using etcd would require duplicating package content, causing large storage overhead. As an alternative, a hybrid approach was considered as well. Metadata would be stored in etcd, content in Git. However, that would add complexity.
 
-**Trade-offs:**
-- Custom storage more complex than standard etcd
-- Enables Git-native package management
-- Better scalability for large packages
+This decision has some trade-offs. Custom storage, while more complex than standard etcd, offers the significant advantages of enabling Git-native package management and providing better scalability for large packages.
 
 ### Strategy-Based Validation
 
-**Decision**: Use Kubernetes strategy pattern for validation and admission control.
+Kubernetes strategy pattern for validation and admission control is used.
 
-**Rationale:**
-- Follows Kubernetes conventions
-- Separates validation logic from storage logic
-- Enables reuse across different storage implementations
-- Provides consistent validation behavior
+Following Kubernetes conventions, this approach separates validation logic from storage logic, which enables reuse across different storage implementations and provides consistent validation behavior.
 
-**Alternatives considered:**
-- **Validation in Engine**: Would duplicate validation logic
-- **Webhook-based validation**: Adds network overhead and complexity
+Two alternatives were considered. Either validate in engine or webhook-based validation. However, validation in engine duplocated valiation logic, while webhook-based validation adds network overhead and complexity.
 
-**Trade-offs:**
-- Strategy pattern adds abstraction layer
-- Provides clean separation of concerns
-- Enables testing validation independently
+This decision has some trade-offs. The strategy pattern, while adding an abstraction layer, provides a clean separation of concerns and enables independent testing of validation.
 
 ### Watch via WatcherManager
 
-**Decision**: Implement watch streams using Engine's WatcherManager.
+Watch streams using Engine's WatcherManager is implemented.
 
-**Rationale:**
-- Engine knows when package revisions change
-- WatcherManager provides efficient fan-out to multiple watchers
-- Avoids polling or etcd watch overhead
-- Enables real-time notifications
+The engine knows when package revisions change. Combined with the WatcherManager's efficient fan-out, this solution enables real-time notifications while avoiding the overhead of polling or etcd watches.
 
-**Alternatives considered:**
-- **etcd watch**: Would require storing all data in etcd
-- **Polling**: Inefficient and high latency
+Two alternatives were considered, either etcd watch or polling. However, etcd watch requires storing all data in etcd, while polling is inefficient and causes high latency.
 
-**Trade-offs:**
-- Custom watch implementation more complex
-- Provides efficient real-time updates
-- Scales to many concurrent watchers
+This decision has some trade-offs. A custom watch implementation, while more complex to develop, offers efficient real-time updates and scales effectively to support many concurrent watchers.
 
 ### Repository Management Pattern
 
-**Decision**: Extract repository synchronization into a dedicated Repository Controller using controller-runtime framework.
+Repository synchronization is extracted into a dedicated Repository Controller using controller-runtime framework.
 
-**Rationale:**
-- Separates concerns: API server handles requests, controller manages repository lifecycle
-- Controller-runtime provides proven patterns (watch management, work queues, leader election)
-- Better scalability with concurrent reconciliation and rate limiting
-- Independent deployment and scaling of repository management
-- Cleaner shutdown and error handling
+This design separates concerns by dedicating the API server to request handling and the controller to managing the repository lifecycle. Leveraging controller-runtime provides proven patterns for watch management, work queues, and leader election, leading to better scalability through concurrent reconciliation and rate limiting. This architecture also allows for independent deployment and scaling of repository management, and facilitates cleaner shutdown and error handling.
 
-**Alternatives considered:**
-- **Background goroutines in API server**: Mixes request handling with background sync logic
-- **Sync on demand**: Would add latency to API requests
-- **Custom controller implementation**: Reinvents controller-runtime features
+Three alternatives were considered: background goroutines in the API server, sync on demand or the implementation of custom controller. However, background goroutines mix request handling with background sync logic, sync on demand adds latency to API requests and custom controller implementation reinvents controller-runtime features.
 
-**Trade-offs:**
-- Additional deployment component (Repository Controller)
-- Better separation of concerns and operational flexibility
-- Improved observability with controller metrics and status
+This decision has some trade-offs. The introduction of a dedicated Repository Controller as an additional deployment component offers significant advantages, including a better separation of concerns, enhanced operational flexibility, and improved observability through specialized controller metrics and status reporting.
 
-**Implementation:**
-The Repository Controller manages Repository CRs through standard Kubernetes reconciliation:
-- Watches Repository resources for spec changes
-- Performs health checks and full syncs on configurable schedules
-- Updates repository status with sync results and package metadata
-- Handles repository deletion and cache cleanup
-- See [Repository Controller]({{% relref "/docs/5_architecture_and_components/controllers/repository-controller/_index.md" %}}) for details
+The Repository Controller manages Repository CRs through standard Kubernetes reconciliation to manage Repository Custom Resources (CRs). Its core functions include watching for changes in Repository specifications, conducting scheduled health checks and full synchronizations, updating the repository status with synchronization results and package metadata, and managing repository deletion and cache cleanup.For more inforamtion, see [Repository Controller]({{% relref "/docs/5_architecture_and_components/controllers/repository-controller/_index.md" %}}).
 
 ### Dependency Injection
 
-**Decision**: Configure Engine, Cache, and clients through dependency injection.
+Engine, Cache, and clients are configures through dependency injection.
 
-**Rationale:**
-- Enables testing with mock implementations
-- Provides flexible configuration
-- Separates construction from usage
-- Supports different deployment scenarios
+This approach is justified by its ability to enable testing with mock implementations, provide flexible configuration options, separate the construction of components from their usage, and support various deployment scenarios.
 
-**Alternatives considered:**
-- **Global singletons**: Hard to test and configure
-- **Service locator**: Hides dependencies
+Two alternatives wee considered. Either global singletons or a service locator. However, global singletons are hard to test and configure, and a serivce locator hides dependencies.
 
-**Trade-offs:**
-- Requires explicit wiring during initialization
-- Provides clear dependency graph
-- Enables flexible testing and configuration
+This decision has some trade-offs. While it requires explicit wiring during initialization, it offers the significant benefits of a clear dependency graph and enables flexible testing and configuration.
