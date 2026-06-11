@@ -44,7 +44,7 @@ taking a snapshot of the cluster's etcd store. If Porch is itself being managed 
 or FluxCD, the GitOps platform is expected to have its own record of the custom resources, conducting its own reconciliation
 operations to save and restore custom resources.
 
-{{% alert title="N.B." color="primary" %}}
+{{% alert title="Note" color="primary" %}}
 
 `PackageRevisions` and `PackageRevisionResources` are not actual custom resources and **should not be backed up as such**.
 Their data and metadata are brought together by the Porch API server from separate sources in Git and the package revision
@@ -52,7 +52,7 @@ cache.
 
 {{% /alert %}}
 
-{{% alert title="N.B." color="primary" %}}
+{{% alert title="Note" color="primary" %}}
 
 In the absence of an overarching GitOps solution, the exact mechanism for backing up cluster resources may vary between
 Kubernetes distributions. Consult the documentation for your specific distribution!
@@ -67,14 +67,14 @@ server: `git push` to back up and `git clone` or `git pull` (depending on the ex
 repositories in larger numbers or containing many large Kpt packages may require more specialized approaches to back up
 the Git servers themselves
 
-{{% alert title="N.B." color="primary" %}}
+{{% alert title="Note" color="primary" %}}
 
 The exact mechanism for backing up Git servers may vary depending on your choice of Git software. Consult the documentation
 for your specific Git service!
 
 {{% /alert %}}
 
-{{% alert title="Caution!" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 
 The Git repository is the source of truth for package revision files. Even if a package revision's data is present in the
 cache, this is not enough for Porch to restore a package revision that is not already present in Git.
@@ -87,7 +87,7 @@ If the DB cache option is selected at install time, the package revision cache i
 backing up the entire contents of this database on a regular basis, as it contains all data for unpublished package revisions
 (in lifecycle stages "Draft", "Proposed", or "DeletionProposed")
 
-{{% alert title="N.B." color="primary" %}}
+{{% alert title="Note" color="primary" %}}
 
 The exact mechanism for backing up the database may vary depending on your choice of SQL software. Consult the documentation
 for your specific database!
@@ -104,7 +104,7 @@ number of Repository objects and package revisions to provide a representative w
 
 ### Test suite:
 
-{{% alert title="Caution!" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 
 The test suite was developed on a system with the following specifications:
 - CPU: 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz
@@ -166,8 +166,8 @@ guide.
 This section gives details of tested scenarios with varying combinations of backup, wipe, and restore routines for different
 data stores.
 
-{{% alert title="In case of package revision cache corruption" color="warning" %}}
-
+{{% alert title="Warning" color="warning" %}}
+In case of package revision cache corruption:
 - If the CR cache is configured and becomes corrupted, it can be recreated from the Git repositories. Porch recommends
   restarting the `porch-server` microservice to trigger this process (which will entail a decrease in quality of service
   until all repositories are deemed Ready).
@@ -199,7 +199,7 @@ Kubernetes cluster is lost with all nodes; Git repositories are lost; DB cache d
 #### Restoration steps:
 1. Recreate Kubernetes cluster
 2. Reinstall Porch with DB cache pointed to empty database server
-   {{% alert title="Compatibility" color="warning" %}}
+   {{% alert title="Warning" color="warning" %}}
 
    To ensure data compatibility, backup must be restored into the DB cache of the same version of Porch.
 
@@ -224,7 +224,7 @@ Kubernetes cluster is lost with all nodes; Git repositories and DB cache databas
 #### Restoration steps:
 1. Recreate Kubernetes cluster
 2. Reinstall Porch with DB cache pointed to same (still-existing) PostgreSQL server
-   {{% alert title="Compatibility" color="warning" %}}
+   {{% alert title="Warning" color="warning" %}}
 
    To ensure data compatibility, backup must be restored into the DB cache of the same version of Porch.
 
@@ -264,7 +264,7 @@ with grace-period 0).
 In a representative testing environment, recovery takes **less than 5 minutes** for 115 Repository objects with a `4GiB`
 memory limit applied to the `porch-server` microservice
 
-{{% alert title="However:" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 
 Recovery may take longer depending on:
 - CPU and memory resources allotted to the Porch pods
@@ -284,7 +284,7 @@ consistency. Given sufficiently low resource limits, it may enter a crash loop a
 
 Kubernetes cluster and Git repositories remain safe; DB cache database is lost.
 
-{{% alert title="N.B." color="primary" %}}
+{{% alert title="Note" color="primary" %}}
 Applicable only to Porch with DB cache configured.
 {{% /alert %}}
 
@@ -303,7 +303,7 @@ Applicable only to Porch with DB cache configured.
 
 Kubernetes cluster and Git repositories remain safe; DB cache database is lost without a valid backup.
 
-{{% alert title="N.B." color="primary" %}}
+{{% alert title="Note" color="primary" %}}
 Applicable only to Porch with DB cache configured.
 {{% /alert %}}
 

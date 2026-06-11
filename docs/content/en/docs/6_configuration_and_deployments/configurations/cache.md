@@ -69,7 +69,7 @@ args:
 - Database credentials and connection details
 - Database initialized with Porch schema (`api/sql/porch-db.sql`)
 
-{{% alert title="Important" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 Before configuring database cache:
 1. Ensure PostgreSQL is running and accessible
 2. Initialize the database schema using `api/sql/porch-db.sql`

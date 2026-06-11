@@ -18,7 +18,7 @@ Choose your cache backend based on deployment scale and requirements:
 - **CR Cache** (default): Development and small deployments (<100 repositories)
 - **DB Cache**: Production deployments requiring scale and reliability
 
-{{% alert title="Important" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 If using **DB Cache**, you must configure database settings for **both** Porch Server and Repository Controller before deployment. See [Cache Configuration]({{% relref "/docs/6_configuration_and_deployments/configurations/cache" %}}) for complete setup instructions including database initialization.
 {{% /alert %}}
 

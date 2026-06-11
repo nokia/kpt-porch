@@ -6,7 +6,7 @@ description: |
   Understanding packages in Porch: the relationship between kpt packages and Porch's PackageRevision API.
 ---
 
-{{% alert title="Important!" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 
 A "Porch package" is a collection of **package revisions on the same kpt package**. Porch does not have the concept of a
 "Package" internally - whenever an API request is received on a package, Porch composes the response from the package revisions
