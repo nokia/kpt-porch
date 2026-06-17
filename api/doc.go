@@ -15,3 +15,5 @@
 // +domain=kpt.dev
 
 package apis
+
+//go:generate go run sigs.k8s.io/controller-tools/cmd/controller-gen@v0.21.0 object:headerFile="../scripts/boilerplate.go.txt",year=$YEAR_GEN crd:crdVersions=v1,headerFile="../scripts/boilerplate.yaml.txt",year=$YEAR_GEN output:crd:artifacts:config=./generated/crds paths={./porchconfig/...,./porch/v1alpha2/...}
