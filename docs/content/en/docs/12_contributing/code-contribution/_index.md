@@ -192,14 +192,21 @@ The PR will automatically update with your new commits.
 
 ## Reviews of Your PR
 
-Before your PR is merged, it must be reviewed by community members and maintainers. Generally, in order to make the best
-use of their time, they will review your PR when:
+Before your PR is merged, it must be reviewed by community members and maintainers. Generally, in
+order to make the best use of their time, they will review your PR when:
 
 1. The code including the code changes in your PR is compiling and building
 2. The documentation is building and verified
 3. All lint checks are passing
 4. SonarCloud quality checks such as code coverage levels are passing
-5. The comments from the first run of AI on the commit of the PR are addressed (Further re-runs of AI are optional)
+5. The comments from the first run of AI on the commit of the PR are addressed (Further re-runs of
+   AI are optional)
+
+All pr-s should be approved by at least one memeber of the
+[contributors](https://github.com/orgs/kptdev/teams/contributors) and one member of the
+[maintainers](https://github.com/orgs/kptdev/teams/maintainers) group, have all checks passed and
+all discussions resolved before merge.
+
 
 {{% alert title="Note" color="primary" %}}
 If you are having difficulty in getting tests to pass, need guidance in how to address an AI-generated comment, or
