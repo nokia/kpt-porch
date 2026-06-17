@@ -207,6 +207,12 @@ want to request an exception on a quality metric such as code coverage, please a
 community members and maintainers will consider your request.
 {{% /alert %}}
 
+### Stale PR-s
+
+In the case if the comments of a pr are not addressed for more than 2 weeks the pr will be closed.
+The pr can be re-opened any time and the work can be continued if there is a willingness to continue
+the work after a break.
+
 ## Rebase on Latest Main
 
 If your PR becomes outdated with the main branch:
