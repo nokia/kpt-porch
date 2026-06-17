@@ -15,7 +15,7 @@
 package v1alpha2
 
 import (
-	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
+	kptfilev1 "github.com/kptdev/kpt/api/kptfile/v1"
 )
 
 // KptfileToPackageConditions converts Kptfile status conditions to v1alpha2 PackageConditions.
