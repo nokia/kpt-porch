@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"strings"
 
-	pkgvarapi "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
-	api "github.com/kptdev/porch/controllers/packagevariantsets/api/v1alpha2"
+	pkgvarapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
+	api "github.com/kptdev/porch/api/porchconfig/v1alpha2"
 )
 
 func validatePackageVariantSet(pvs *api.PackageVariantSet) []error {

@@ -3,7 +3,7 @@ module github.com/kptdev/porch/api
 go 1.24.0
 
 require (
-	github.com/kptdev/kpt/api v0.0.0-20260612112936-add42154f43d
+	github.com/kptdev/kpt/api v0.0.0-20260612112936-add42154f43d // TODO: replace when kpt api has actual release
 	github.com/stretchr/testify v1.11.1
 	k8s.io/api v0.34.9
 	k8s.io/apiextensions-apiserver v0.34.9

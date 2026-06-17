@@ -16,10 +16,10 @@ package packagevariants
 import (
 	"slices"
 
+	pvapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/test/e2e/suiteutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	pvapi "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
 	"github.com/kptdev/porch/controllers/packagevariantsets/pkg/controllers/packagevariantset"
 )
 

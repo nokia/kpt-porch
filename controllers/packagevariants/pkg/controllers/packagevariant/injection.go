@@ -21,12 +21,12 @@ import (
 	"sort"
 	"strings"
 
+	api "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	"github.com/kptdev/krm-functions-sdk/go/fn"
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
-	api "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

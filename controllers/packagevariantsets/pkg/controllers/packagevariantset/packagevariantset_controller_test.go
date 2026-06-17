@@ -21,8 +21,7 @@ import (
 
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	pkgvarapi "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
-	api "github.com/kptdev/porch/controllers/packagevariantsets/api/v1alpha2"
+	api "github.com/kptdev/porch/api/porchconfig/v1alpha2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -71,7 +70,7 @@ func TestUnrollDownstreamTargets(t *testing.T) {
 	pvs := &api.PackageVariantSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-pvs"},
 		Spec: api.PackageVariantSetSpec{
-			Upstream: &pkgvarapi.Upstream{Repo: "up", Package: "up", Revision: 0},
+			Upstream: &configapi.Upstream{Repo: "up", Package: "up", Revision: 0},
 			Targets: []api.Target{
 				{
 					Repositories: []api.RepositoryTarget{
@@ -124,7 +123,7 @@ func TestEnsurePackageVariants(t *testing.T) {
 		&api.PackageVariantSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "my-pvs"},
 			Spec: api.PackageVariantSetSpec{
-				Upstream: &pkgvarapi.Upstream{Repo: "up", Package: "up", Revision: 0},
+				Upstream: &configapi.Upstream{Repo: "up", Package: "up", Revision: 0},
 			},
 		},
 		&configapi.RepositoryList{},
@@ -157,7 +156,7 @@ func TestGetUpstreamPr(t *testing.T) {
 		Items: []porchapi.PackageRevision{pr1},
 	}
 
-	upstream := pkgvarapi.Upstream{}
+	upstream := configapi.Upstream{}
 
 	reconciler := PackageVariantSetReconciler{}
 

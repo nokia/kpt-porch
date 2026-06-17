@@ -29,8 +29,7 @@ import (
 	"github.com/kptdev/kpt/pkg/kptfile/kptfileutil"
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	pvapi "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
-	pvsetapi "github.com/kptdev/porch/controllers/packagevariantsets/api/v1alpha2"
+	configapi2 "github.com/kptdev/porch/api/porchconfig/v1alpha2"
 	internalapi "github.com/kptdev/porch/internal/api/porchinternal/v1alpha1"
 	"github.com/kptdev/porch/pkg/repository"
 	"github.com/stretchr/testify/assert"
@@ -517,10 +516,9 @@ func createClientScheme(t *testing.T) *runtime.Scheme {
 
 	for _, api := range (runtime.SchemeBuilder{
 		porchapi.AddToScheme,
-		pvsetapi.AddToScheme,
-		pvapi.AddToScheme,
 		internalapi.AddToScheme,
 		configapi.AddToScheme,
+		configapi2.AddToScheme,
 		coreapi.AddToScheme,
 		aggregatorv1.AddToScheme,
 		appsv1.AddToScheme,

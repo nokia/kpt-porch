@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package v1alpha1 contains API Schema definitions for the v1alpha1 API group
+// Package v1alpha2 contains API Schema definitions for the v1alpha2 API group
 // +kubebuilder:object:generate=true
 // +groupName=config.porch.kpt.dev
-package v1alpha1
+package v1alpha2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,33 +25,9 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "config.porch.kpt.dev", Version: "v1alpha1"}
+	GroupVersion = schema.GroupVersion{Group: "config.porch.kpt.dev", Version: "v1alpha2"}
 
 	// We removed SchemeBuilder to keep our dependencies small
-
-	TypeRepository = TypeInfo{
-		Kind:     "Repository",
-		Resource: GroupVersion.WithResource("repositories"),
-		objects:  []runtime.Object{&Repository{}, &RepositoryList{}},
-	}
-
-	TypeFunctionConfig = TypeInfo{
-		Kind:     "FunctionConfig",
-		Resource: GroupVersion.WithResource("functionconfigs"),
-		objects:  []runtime.Object{&FunctionConfig{}, &FunctionConfigList{}},
-	}
-
-	TypeServiceTemplate = TypeInfo{
-		Kind:     "ServiceTemplate",
-		Resource: GroupVersion.WithResource("servicetemplates"),
-		objects:  []runtime.Object{&ServiceTemplate{}, &ServiceTemplateList{}},
-	}
-
-	TypePackageVariant = TypeInfo{
-		Kind:     "PackageVariant",
-		Resource: GroupVersion.WithResource("packagevariants"),
-		objects:  []runtime.Object{&PackageVariant{}, &PackageVariantList{}},
-	}
 
 	TypePackageVariantSet = TypeInfo{
 		Kind:     "PackageVariantSet",
@@ -60,10 +36,6 @@ var (
 	}
 
 	AllKinds = []TypeInfo{
-		TypeRepository,
-		TypeFunctionConfig,
-		TypeServiceTemplate,
-		TypePackageVariant,
 		TypePackageVariantSet,
 	}
 )

@@ -17,7 +17,7 @@ package packagevariantset
 import (
 	"testing"
 
-	api "github.com/kptdev/porch/controllers/packagevariantsets/api/v1alpha2"
+	api "github.com/kptdev/porch/api/porchconfig/v1alpha2"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 )

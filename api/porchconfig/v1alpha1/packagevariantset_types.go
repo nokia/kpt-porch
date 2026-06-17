@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,7 @@
 package v1alpha1
 
 import (
-	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
-	pkgvarapi "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
+	kptfilev1 "github.com/kptdev/kpt/api/kptfile/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,17 +43,17 @@ func (o *PackageVariantSet) GetSpec() *PackageVariantSetSpec {
 
 // PackageVariantSetSpec defines the desired state of PackageVariantSet
 type PackageVariantSetSpec struct {
-	Upstream *Upstream `json:"upstream,omitempty"`
-	Targets  []Target  `json:"targets,omitempty"`
+	Upstream *PVSetUpstream `json:"upstream,omitempty"`
+	Targets  []Target       `json:"targets,omitempty"`
 
-	AdoptionPolicy pkgvarapi.AdoptionPolicy `json:"adoptionPolicy,omitempty"`
-	DeletionPolicy pkgvarapi.DeletionPolicy `json:"deletionPolicy,omitempty"`
+	AdoptionPolicy AdoptionPolicy `json:"adoptionPolicy,omitempty"`
+	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-type Upstream struct {
+type PVSetUpstream struct {
 	Package *Package `json:"package,omitempty"`
 
 	Revision int `json:"revision,omitempty"`

@@ -16,10 +16,9 @@ package packagevariantsets
 import (
 	"slices"
 
+	pvsetapi "github.com/kptdev/porch/api/porchconfig/v1alpha2"
 	"github.com/kptdev/porch/test/e2e/suiteutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	pvsetapi "github.com/kptdev/porch/controllers/packagevariantsets/api/v1alpha2"
 )
 
 func Backup(t *suiteutils.MultiClusterTestSuite) *pvsetapi.PackageVariantSetList {

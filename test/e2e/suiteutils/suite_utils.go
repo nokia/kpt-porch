@@ -32,7 +32,6 @@ import (
 	kptfilesdk "github.com/kptdev/krm-functions-sdk/go/fn/kptfileko"
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	pvapi "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
 	internalapi "github.com/kptdev/porch/internal/api/porchinternal/v1alpha1"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -576,13 +575,13 @@ func (t *TestSuite) WaitUntilAllPackageVariantsReady() {
 
 	var innerErr error
 	err := wait.PollUntilContextTimeout(t.GetContext(), time.Second, 300*time.Second, true, func(ctx context.Context) (bool, error) {
-		var repos pvapi.PackageVariantList
+		var repos configapi.PackageVariantList
 		if err := t.Reader.List(t.GetContext(), &repos, client.InNamespace(t.Namespace)); err != nil {
 			innerErr = err
 			return false, err
 		}
 
-		allReady := !slices.ContainsFunc(repos.Items, func(aRepo pvapi.PackageVariant) bool {
+		allReady := !slices.ContainsFunc(repos.Items, func(aRepo configapi.PackageVariant) bool {
 			return aRepo.Status.Conditions == nil || slices.ContainsFunc(aRepo.Status.Conditions, func(aCondition metav1.Condition) bool {
 				return aCondition.Type == configapi.RepositoryReady && aCondition.Status != metav1.ConditionTrue
 			})

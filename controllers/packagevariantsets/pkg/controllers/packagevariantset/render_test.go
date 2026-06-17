@@ -21,11 +21,10 @@ import (
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	pkgvarapi "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
-	api "github.com/kptdev/porch/controllers/packagevariantsets/api/v1alpha2"
+	api "github.com/kptdev/porch/api/porchconfig/v1alpha2"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ptr "k8s.io/utils/ptr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
@@ -56,15 +55,15 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 	var repoList configapi.RepositoryList
 	require.NoError(t, yaml.Unmarshal(repoListYaml, &repoList))
 
-	adoptExisting := pkgvarapi.AdoptionPolicyAdoptExisting
-	deletionPolicyDelete := pkgvarapi.DeletionPolicyDelete
+	adoptExisting := configapi.AdoptionPolicyAdoptExisting
+	deletionPolicyDelete := configapi.DeletionPolicyDelete
 	pvs := api.PackageVariantSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-pvs",
 			Namespace: "default",
 		},
 		Spec: api.PackageVariantSetSpec{
-			Upstream: &pkgvarapi.Upstream{Repo: "up-repo", Package: "up-pkg", Revision: 2},
+			Upstream: &configapi.Upstream{Repo: "up-repo", Package: "up-pkg", Revision: 2},
 		},
 	}
 	upstreamPR := porchapi.PackageRevision{
@@ -83,7 +82,7 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 	}
 	testCases := map[string]struct {
 		downstream   pvContext
-		expectedSpec pkgvarapi.PackageVariantSpec
+		expectedSpec configapi.PackageVariantSpec
 		expectedErrs []string
 	}{
 		"no template": {
@@ -91,9 +90,9 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 				repoDefault:    "my-repo-1",
 				packageDefault: "p",
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-1",
 					Package: "p",
 				},
@@ -110,9 +109,9 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-2",
 					Package: "p",
 				},
@@ -129,9 +128,9 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-1",
 					Package: "new-p",
 				},
@@ -147,9 +146,9 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 					DeletionPolicy: &deletionPolicyDelete,
 				},
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-1",
 					Package: "p",
 				},
@@ -172,9 +171,9 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-1",
 					Package: "p",
 				},
@@ -202,13 +201,13 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-1",
 					Package: "p",
 				},
-				PackageContext: &pkgvarapi.PackageContext{
+				PackageContext: &configapi.PackageContext{
 					Data: map[string]string{
 						"foo":   "bar",
 						"hello": "there",
@@ -229,9 +228,9 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-2",
 					Package: "my-repo-1-p",
 				},
@@ -281,9 +280,9 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-2",
 					Package: "my-repo-1-p",
 				},
@@ -329,13 +328,13 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-1",
 					Package: "p",
 				},
-				PackageContext: &pkgvarapi.PackageContext{
+				PackageContext: &configapi.PackageContext{
 					Data: map[string]string{
 						"foo":     "p",
 						"hello":   "there",
@@ -371,13 +370,13 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-1",
 					Package: "p",
 				},
-				Injectors: []pkgvarapi.InjectionSelector{
+				Injectors: []configapi.InjectionSelector{
 					{
 						Group:   ptr.To("kpt.dev"),
 						Version: ptr.To("v1alpha1"),
@@ -446,9 +445,9 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedSpec: pkgvarapi.PackageVariantSpec{
+			expectedSpec: configapi.PackageVariantSpec{
 				Upstream: pvs.Spec.Upstream,
-				Downstream: &pkgvarapi.Downstream{
+				Downstream: &configapi.Downstream{
 					Repo:    "my-repo-1",
 					Package: "p",
 				},

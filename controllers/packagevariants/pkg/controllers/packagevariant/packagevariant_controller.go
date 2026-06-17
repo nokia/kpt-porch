@@ -23,7 +23,6 @@ import (
 
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	api "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
 	pkgerrors "github.com/pkg/errors"
 
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
@@ -107,7 +106,7 @@ func (r *PackageVariantReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 		}
 		// Remove our finalizer from the list and update it.
-		controllerutil.RemoveFinalizer(pv, api.Finalizer)
+		controllerutil.RemoveFinalizer(pv, configapi.Finalizer)
 		if err := r.Update(ctx, pv); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update %s after delete finalizer: %w", req.Name, err)
 		}
@@ -115,8 +114,8 @@ func (r *PackageVariantReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// the object is not being deleted, so let's ensure that our finalizer is here
-	if !controllerutil.ContainsFinalizer(pv, api.Finalizer) {
-		controllerutil.AddFinalizer(pv, api.Finalizer)
+	if !controllerutil.ContainsFinalizer(pv, configapi.Finalizer) {
+		controllerutil.AddFinalizer(pv, configapi.Finalizer)
 		if err := r.Update(ctx, pv); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update %s after add finalizer: %w", req.Name, err)
 		}
@@ -158,8 +157,8 @@ func (r *PackageVariantReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 func (r *PackageVariantReconciler) init(ctx context.Context,
-	req ctrl.Request) (*api.PackageVariant, *porchapi.PackageRevisionList, error) {
-	var pv api.PackageVariant
+	req ctrl.Request) (*configapi.PackageVariant, *porchapi.PackageRevisionList, error) {
+	var pv configapi.PackageVariant
 	if err := r.Client.Get(ctx, req.NamespacedName, &pv); err != nil {
 		return nil, nil, client.IgnoreNotFound(err)
 	}
@@ -172,7 +171,7 @@ func (r *PackageVariantReconciler) init(ctx context.Context,
 	return &pv, &prList, nil
 }
 
-func validatePackageVariant(pv *api.PackageVariant) []string {
+func validatePackageVariant(pv *configapi.PackageVariant) []string {
 	var allErrs []string
 
 	if upstreamErrs := isValidUpstream(pv.Spec.Upstream); upstreamErrs != nil {
@@ -190,18 +189,18 @@ func validatePackageVariant(pv *api.PackageVariant) []string {
 		}
 	}
 	if pv.Spec.AdoptionPolicy == "" {
-		pv.Spec.AdoptionPolicy = api.AdoptionPolicyAdoptNone
+		pv.Spec.AdoptionPolicy = configapi.AdoptionPolicyAdoptNone
 	}
 	if pv.Spec.DeletionPolicy == "" {
-		pv.Spec.DeletionPolicy = api.DeletionPolicyDelete
+		pv.Spec.DeletionPolicy = configapi.DeletionPolicyDelete
 	}
-	if pv.Spec.AdoptionPolicy != api.AdoptionPolicyAdoptNone && pv.Spec.AdoptionPolicy != api.AdoptionPolicyAdoptExisting {
+	if pv.Spec.AdoptionPolicy != configapi.AdoptionPolicyAdoptNone && pv.Spec.AdoptionPolicy != configapi.AdoptionPolicyAdoptExisting {
 		allErrs = append(allErrs, fmt.Sprintf("spec.adoptionPolicy field can only be %q or %q",
-			api.AdoptionPolicyAdoptNone, api.AdoptionPolicyAdoptExisting))
+			configapi.AdoptionPolicyAdoptNone, configapi.AdoptionPolicyAdoptExisting))
 	}
-	if pv.Spec.DeletionPolicy != api.DeletionPolicyOrphan && pv.Spec.DeletionPolicy != api.DeletionPolicyDelete {
+	if pv.Spec.DeletionPolicy != configapi.DeletionPolicyOrphan && pv.Spec.DeletionPolicy != configapi.DeletionPolicyDelete {
 		allErrs = append(allErrs, fmt.Sprintf("spec.deletionPolicy can only be %q or %q",
-			api.DeletionPolicyOrphan, api.DeletionPolicyDelete))
+			configapi.DeletionPolicyOrphan, configapi.DeletionPolicyDelete))
 	}
 	if pc := pv.Spec.PackageContext; pc != nil {
 		invalidKeys := []string{"name", "package-path"}
@@ -236,7 +235,7 @@ func validatePackageVariant(pv *api.PackageVariant) []string {
 	return allErrs
 }
 
-func isValidUpstream(upstream *api.Upstream) []string {
+func isValidUpstream(upstream *configapi.Upstream) []string {
 	var upstreamErrs []string
 
 	if upstream == nil {
@@ -267,7 +266,7 @@ func combineErrors(errs []string) string {
 	return strings.Join(errMsgs, "; ")
 }
 
-func (r *PackageVariantReconciler) getUpstreamPR(upstream *api.Upstream,
+func (r *PackageVariantReconciler) getUpstreamPR(upstream *configapi.Upstream,
 	prList *porchapi.PackageRevisionList) (*porchapi.PackageRevision, error) {
 	for _, pr := range prList.Items {
 		if pr.Spec.RepositoryName != upstream.Repo || pr.Spec.PackageName != upstream.Package {
@@ -293,7 +292,7 @@ func (r *PackageVariantReconciler) getUpstreamPR(upstream *api.Upstream,
 }
 
 // getPublishedUpstreamByRevision searches only for published PRs, and ignores workspaceName
-func (r *PackageVariantReconciler) getPublishedUpstreamByRevision(upstream *api.Upstream, prList *porchapi.PackageRevisionList) (*porchapi.PackageRevision, error) {
+func (r *PackageVariantReconciler) getPublishedUpstreamByRevision(upstream *configapi.Upstream, prList *porchapi.PackageRevisionList) (*porchapi.PackageRevision, error) {
 	if upstream.Revision == 0 {
 		return nil, pkgerrors.Errorf("upstream cannot be published with revision number 0")
 	}
@@ -310,7 +309,7 @@ func (r *PackageVariantReconciler) getPublishedUpstreamByRevision(upstream *api.
 	return nil, pkgerrors.Errorf("could not find upstream package revision %#v", upstream)
 }
 
-func setStalledConditionsToTrue(pv *api.PackageVariant, message string) {
+func setStalledConditionsToTrue(pv *configapi.PackageVariant, message string) {
 	meta.SetStatusCondition(&pv.Status.Conditions, metav1.Condition{
 		Type:    ConditionTypeStalled,
 		Status:  "True",
@@ -336,7 +335,7 @@ func setStalledConditionsToTrue(pv *api.PackageVariant, message string) {
 //   - Delete or orphan other package revisions owned by this controller that are no
 //     longer needed.
 func (r *PackageVariantReconciler) ensurePackageVariant(ctx context.Context,
-	pv *api.PackageVariant,
+	pv *configapi.PackageVariant,
 	upstream *porchapi.PackageRevision,
 	prList *porchapi.PackageRevisionList) ([]*porchapi.PackageRevision, error) {
 
@@ -399,7 +398,7 @@ func (r *PackageVariantReconciler) ensurePackageVariant(ctx context.Context,
 }
 
 func (r *PackageVariantReconciler) findAndUpdateExistingRevisions(ctx context.Context,
-	pv *api.PackageVariant,
+	pv *configapi.PackageVariant,
 	upstream *porchapi.PackageRevision,
 	prList *porchapi.PackageRevisionList) ([]*porchapi.PackageRevision, error) {
 	downstreams := r.getDownstreamPRs(ctx, pv, prList)
@@ -479,7 +478,7 @@ func (r *PackageVariantReconciler) findAndUpdateExistingRevisions(ctx context.Co
 // revision, return them all. If there are no drafts, return the latest published
 // package revision owned by us.
 func (r *PackageVariantReconciler) getDownstreamPRs(ctx context.Context,
-	pv *api.PackageVariant,
+	pv *configapi.PackageVariant,
 	prList *porchapi.PackageRevisionList) []*porchapi.PackageRevision {
 	downstream := pv.Spec.Downstream
 
@@ -498,7 +497,7 @@ func (r *PackageVariantReconciler) getDownstreamPRs(ctx context.Context,
 		//   we need to adopt. A mechanism to filter packagerevisions by repo/package
 		//   would be helpful for that.)
 		owned := r.hasOurOwnerReference(pv, pr.OwnerReferences)
-		if !owned && pv.Spec.AdoptionPolicy != api.AdoptionPolicyAdoptExisting {
+		if !owned && pv.Spec.AdoptionPolicy != configapi.AdoptionPolicyAdoptExisting {
 			// this package revision doesn't belong to us
 			continue
 		}
@@ -515,7 +514,7 @@ func (r *PackageVariantReconciler) getDownstreamPRs(ctx context.Context,
 		}
 
 		// this package matches, check if we need to adopt it
-		if !owned && pv.Spec.AdoptionPolicy == api.AdoptionPolicyAdoptExisting {
+		if !owned && pv.Spec.AdoptionPolicy == configapi.AdoptionPolicyAdoptExisting {
 			klog.Infoln(fmt.Sprintf("package variant %q is adopting package revision %q", pv.Name, pr.Name))
 			if err := r.adoptPackageRevision(ctx, &pr, pv); err != nil {
 				klog.Errorf("error adopting package revision: %v", err)
@@ -548,7 +547,7 @@ func compare(pr, latestPublished *porchapi.PackageRevision, latestVersion int) (
 }
 
 // check that the downstream package was created by this PackageVariant object
-func (r *PackageVariantReconciler) hasOurOwnerReference(pv *api.PackageVariant, owners []metav1.OwnerReference) bool {
+func (r *PackageVariantReconciler) hasOurOwnerReference(pv *configapi.PackageVariant, owners []metav1.OwnerReference) bool {
 	for _, owner := range owners {
 		if owner.UID == pv.UID {
 			return true
@@ -559,12 +558,12 @@ func (r *PackageVariantReconciler) hasOurOwnerReference(pv *api.PackageVariant, 
 
 func (r *PackageVariantReconciler) deleteOrOrphan(ctx context.Context,
 	pr *porchapi.PackageRevision,
-	pv *api.PackageVariant) {
+	pv *configapi.PackageVariant) {
 	switch pv.Spec.DeletionPolicy {
-	case "", api.DeletionPolicyDelete:
+	case "", configapi.DeletionPolicyDelete:
 		klog.Infoln(fmt.Sprintf("package variant %q is deleting package revision %q", pv.Name, pr.Name))
 		r.deletePackageRevision(ctx, pr)
-	case api.DeletionPolicyOrphan:
+	case configapi.DeletionPolicyOrphan:
 		klog.Infoln(fmt.Sprintf("package variant %q is orphaning package revision %q", pv.Name, pr.Name))
 		r.orphanPackageRevision(ctx, pr, pv)
 	default:
@@ -575,7 +574,7 @@ func (r *PackageVariantReconciler) deleteOrOrphan(ctx context.Context,
 
 func (r *PackageVariantReconciler) orphanPackageRevision(ctx context.Context,
 	pr *porchapi.PackageRevision,
-	pv *api.PackageVariant) {
+	pv *configapi.PackageVariant) {
 	pr.OwnerReferences = removeOwnerRefByUID(pr.OwnerReferences, pv.UID)
 	if err := r.Update(ctx, pr); err != nil {
 		klog.Errorf("error orphaning package revision: %v", err)
@@ -597,7 +596,7 @@ func removeOwnerRefByUID(ownerRefs []metav1.OwnerReference,
 // has our owner reference and also the labels/annotations specified in pv.Spec.
 func (r *PackageVariantReconciler) adoptPackageRevision(ctx context.Context,
 	pr *porchapi.PackageRevision,
-	pv *api.PackageVariant) error {
+	pv *configapi.PackageVariant) error {
 	pr.OwnerReferences = append(pr.OwnerReferences, constructOwnerReference(pv))
 	if len(pv.Spec.Labels) > 0 && pr.Labels == nil {
 		pr.Labels = make(map[string]string)
@@ -634,7 +633,7 @@ func (r *PackageVariantReconciler) deletePackageRevision(ctx context.Context, pr
 }
 
 // determine if the downstream PR needs to be updated
-func (r *PackageVariantReconciler) isUpToDate(pv *api.PackageVariant, downstream *porchapi.PackageRevision) bool {
+func (r *PackageVariantReconciler) isUpToDate(pv *configapi.PackageVariant, downstream *porchapi.PackageRevision) bool {
 	if downstream.Status.UpstreamLock == nil {
 		klog.Warningf("status.upstreamLock field is empty/missing in downstream PackageRevision: %s", pv.Name)
 		return true
@@ -661,7 +660,7 @@ func revisionFromLocator(lock *porchapi.Locator) int {
 
 func (r *PackageVariantReconciler) createUpgradeDraft(ctx context.Context,
 	source *porchapi.PackageRevision,
-	pv *api.PackageVariant,
+	pv *configapi.PackageVariant,
 	prList *porchapi.PackageRevisionList) (*porchapi.PackageRevision, error) {
 
 	newPr := createDraftTemplate(source, pv, prList)
@@ -707,7 +706,7 @@ func (r *PackageVariantReconciler) createUpgradeDraft(ctx context.Context,
 
 func (r *PackageVariantReconciler) createEditDraft(ctx context.Context,
 	source *porchapi.PackageRevision,
-	pv *api.PackageVariant,
+	pv *configapi.PackageVariant,
 	prList *porchapi.PackageRevisionList) (*porchapi.PackageRevision, error) {
 
 	newPr := createDraftTemplate(source, pv, prList)
@@ -730,7 +729,7 @@ func (r *PackageVariantReconciler) createEditDraft(ctx context.Context,
 }
 
 func createDraftTemplate(source *porchapi.PackageRevision,
-	pv *api.PackageVariant,
+	pv *configapi.PackageVariant,
 	prList *porchapi.PackageRevisionList) *porchapi.PackageRevision {
 	newPr := &porchapi.PackageRevision{
 		TypeMeta: metav1.TypeMeta{
@@ -772,7 +771,7 @@ func newWorkspaceName(prList *porchapi.PackageRevisionList, packageName, repo st
 	return fmt.Sprintf(workspaceNamePrefix+"%d", wsNum)
 }
 
-func constructOwnerReference(pv *api.PackageVariant) metav1.OwnerReference {
+func constructOwnerReference(pv *configapi.PackageVariant) metav1.OwnerReference {
 	tr := true
 	return metav1.OwnerReference{
 		APIVersion:         pv.APIVersion,
@@ -784,8 +783,8 @@ func constructOwnerReference(pv *api.PackageVariant) metav1.OwnerReference {
 	}
 }
 
-func setTargetStatusConditions(pv *api.PackageVariant, targets []*porchapi.PackageRevision) {
-	downstreams := []api.DownstreamTarget{}
+func setTargetStatusConditions(pv *configapi.PackageVariant, targets []*porchapi.PackageRevision) {
+	downstreams := []configapi.DownstreamTarget{}
 	// keep downstream status when possible
 	for _, t := range targets {
 		found := false
@@ -797,7 +796,7 @@ func setTargetStatusConditions(pv *api.PackageVariant, targets []*porchapi.Packa
 			}
 		}
 		if !found {
-			downstreams = append(downstreams, api.DownstreamTarget{
+			downstreams = append(downstreams, configapi.DownstreamTarget{
 				Name: t.GetName(),
 			})
 		}
@@ -813,7 +812,7 @@ func setTargetStatusConditions(pv *api.PackageVariant, targets []*porchapi.Packa
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PackageVariantReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := api.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := configapi.AddToScheme(mgr.GetScheme()); err != nil {
 		return err
 	}
 	if err := porchapi.AddToScheme(mgr.GetScheme()); err != nil {
@@ -829,14 +828,14 @@ func (r *PackageVariantReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	//TODO: establish watches on resource types injected in all the Package Revisions
 	//      we own, and use those to generate requests
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&api.PackageVariant{}).
+		For(&configapi.PackageVariant{}).
 		Watches(&porchapi.PackageRevision{}, handler.EnqueueRequestsFromMapFunc(mapObjectsToRequests(r.Client))).
 		Complete(r)
 }
 
 func mapObjectsToRequests(mgrClient client.Reader) handler.MapFunc {
 	return func(ctx context.Context, obj client.Object) []reconcile.Request {
-		attachedPackageVariants := &api.PackageVariantList{}
+		attachedPackageVariants := &configapi.PackageVariantList{}
 		err := mgrClient.List(ctx, attachedPackageVariants, &client.ListOptions{
 			Namespace: obj.GetNamespace(),
 		})
@@ -857,7 +856,7 @@ func mapObjectsToRequests(mgrClient client.Reader) handler.MapFunc {
 }
 
 func (r *PackageVariantReconciler) calculateDraftResources(ctx context.Context,
-	pv *api.PackageVariant,
+	pv *configapi.PackageVariant,
 	draft *porchapi.PackageRevision) (*porchapi.PackageRevisionResources, bool, error) {
 
 	// Load the PackageRevisionResources
@@ -959,7 +958,7 @@ func kptfilesEqual(a, b string) bool {
 	return equal
 }
 
-func ensurePackageContext(pv *api.PackageVariant,
+func ensurePackageContext(pv *configapi.PackageVariant,
 	prr *porchapi.PackageRevisionResources) error {
 
 	if pv.Spec.PackageContext == nil {
@@ -1029,7 +1028,7 @@ func getFileKubeObject(prr *porchapi.PackageRevisionResources, file, kind, name 
 // ensureKRMFunctions adds mutators and validators specified in the PackageVariant to the kptfile inside the PackageRevisionResources.
 // It generates a unique name that identifies the func (see func generatePVFuncname) and moves it to the top of the mutator sequence.
 // It does not preserve yaml indent-style.
-func ensureKRMFunctions(pv *api.PackageVariant,
+func ensureKRMFunctions(pv *configapi.PackageVariant,
 	prr *porchapi.PackageRevisionResources) error {
 
 	// parse kptfile
@@ -1150,7 +1149,7 @@ func generatePVFuncName(funcName, pvName string, pos int) string {
 	return fmt.Sprintf("%s.%s.%s.%d", PackageVariantFuncPrefix, pvName, funcName, pos)
 }
 
-func (r *PackageVariantReconciler) updatePackageResources(ctx context.Context, prr *porchapi.PackageRevisionResources, pv *api.PackageVariant) error {
+func (r *PackageVariantReconciler) updatePackageResources(ctx context.Context, prr *porchapi.PackageRevisionResources, pv *configapi.PackageVariant) error {
 	if err := r.Update(ctx, prr); err != nil {
 		return err
 	}
@@ -1160,7 +1159,7 @@ func (r *PackageVariantReconciler) updatePackageResources(ctx context.Context, p
 			return nil
 		}
 	}
-	pv.Status.DownstreamTargets = append(pv.Status.DownstreamTargets, api.DownstreamTarget{
+	pv.Status.DownstreamTargets = append(pv.Status.DownstreamTargets, configapi.DownstreamTarget{
 		Name:         prr.Name,
 		RenderStatus: prr.Status.RenderStatus,
 	})

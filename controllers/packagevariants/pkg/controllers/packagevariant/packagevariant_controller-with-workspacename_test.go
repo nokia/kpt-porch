@@ -21,7 +21,7 @@ import (
 
 	"github.com/kptdev/krm-functions-sdk/go/fn"
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
-	api "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
+	api "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 )

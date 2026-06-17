@@ -21,13 +21,11 @@ import (
 	"sort"
 
 	"github.com/google/cel-go/cel"
+	api "github.com/kptdev/porch/api/porchconfig/v1alpha2"
 
 	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	pkgvarapi "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
-	api "github.com/kptdev/porch/controllers/packagevariantsets/api/v1alpha2"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	// TODO: including this requires many dependency updates, at some point
@@ -45,11 +43,11 @@ const (
 )
 
 func renderPackageVariantSpec(ctx context.Context, pvs *api.PackageVariantSet, repoList *configapi.RepositoryList,
-	upstreamPR *porchapi.PackageRevision, downstream pvContext) (*pkgvarapi.PackageVariantSpec, error) {
+	upstreamPR *porchapi.PackageRevision, downstream pvContext) (*configapi.PackageVariantSpec, error) {
 
-	spec := &pkgvarapi.PackageVariantSpec{
+	spec := &configapi.PackageVariantSpec{
 		Upstream: pvs.Spec.Upstream,
-		Downstream: &pkgvarapi.Downstream{
+		Downstream: &configapi.Downstream{
 			Repo:    downstream.repoDefault,
 			Package: downstream.packageDefault,
 		},
@@ -138,14 +136,14 @@ func renderPackageVariantSpec(ctx context.Context, pvs *api.PackageVariantSet, r
 		if err != nil {
 			return nil, err
 		}
-		spec.PackageContext = &pkgvarapi.PackageContext{
+		spec.PackageContext = &configapi.PackageContext{
 			Data:       data,
 			RemoveKeys: removeKeys,
 		}
 	}
 
 	for i, injTemplate := range pvt.Injectors {
-		injector := pkgvarapi.InjectionSelector{
+		injector := configapi.InjectionSelector{
 			Group:   injTemplate.Group,
 			Version: injTemplate.Version,
 			Kind:    injTemplate.Kind,

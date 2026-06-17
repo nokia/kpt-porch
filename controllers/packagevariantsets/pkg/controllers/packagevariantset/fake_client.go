@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	pkgvarapi "github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
+	pkgvarapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"

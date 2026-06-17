@@ -19,7 +19,7 @@
 package v1alpha2
 
 import (
-	"github.com/kptdev/porch/controllers/packagevariants/api/v1alpha1"
+	"github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
