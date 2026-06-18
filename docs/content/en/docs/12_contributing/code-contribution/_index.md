@@ -202,10 +202,9 @@ order to make the best use of their time, they will review your PR when:
 5. The comments from the first run of AI on the commit of the PR are addressed (Further re-runs of
    AI are optional)
 
-All pr-s should be approved by at least one memeber of the
-[contributors](https://github.com/orgs/kptdev/teams/contributors) and one member of the
-[maintainers](https://github.com/orgs/kptdev/teams/maintainers) group, have all checks passed and
-all discussions resolved before merge.
+All PRs should be approved by at least one member of the
+[contributors](https://github.com/orgs/kptdev/teams/contributors) team and one member of the
+[maintainers](https://github.com/orgs/kptdev/teams/maintainers) team, have all checks passing, and have all discussions resolved before merge.
 
 
 {{% alert title="Note" color="primary" %}}
@@ -214,11 +213,10 @@ want to request an exception on a quality metric such as code coverage, please a
 community members and maintainers will consider your request.
 {{% /alert %}}
 
-### Stale PR-s
+### Stale PRs
 
-In the case if the comments of a pr are not addressed for more than 2 weeks the pr will be closed.
-The pr can be re-opened any time and the work can be continued if there is a willingness to continue
-the work after a break.
+If review comments on a PR are not addressed for more than two weeks, maintainers may close the PR.
+A closed PR can be reopened at any time to continue the work.
 
 ## Rebase on Latest Main
 
