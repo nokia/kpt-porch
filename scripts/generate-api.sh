@@ -84,4 +84,5 @@ kube::codegen::gen_client \
 	--boilerplate "$BOILERPLATE"
 
 # Our "go get" added dependencies that we don't need
+cd $ROOT
 go mod tidy
