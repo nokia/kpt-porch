@@ -39,7 +39,7 @@ go get "k8s.io/code-generator@v$KUBERNETES_VERSION"
 CODE_GENERATOR=$(go list -f '{{.Dir}}' -m "k8s.io/code-generator@v$KUBERNETES_VERSION")
 . "${CODE_GENERATOR}/kube_codegen.sh"
 
-cd $PORCH_API_DIR
+cd "$PORCH_API_DIR"
 
 echo 'gen_helpers...'
 
@@ -71,5 +71,5 @@ kube::codegen::gen_client \
 	--boilerplate "$BOILERPLATE"
 
 # Our "go get" added dependencies that we don't need
-cd $ROOT
+cd "$ROOT"
 go mod tidy

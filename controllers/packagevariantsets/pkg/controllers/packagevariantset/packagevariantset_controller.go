@@ -24,7 +24,7 @@ import (
 
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	configapi2 "github.com/kptdev/porch/api/porchconfig/v1alpha2"
+	api "github.com/kptdev/porch/api/porchconfig/v1alpha2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -144,9 +144,9 @@ func (r *PackageVariantSetReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return ctrl.Result{}, nil
 }
 
-func (r *PackageVariantSetReconciler) init(ctx context.Context, req ctrl.Request) (*configapi2.PackageVariantSet,
+func (r *PackageVariantSetReconciler) init(ctx context.Context, req ctrl.Request) (*api.PackageVariantSet,
 	*porchapi.PackageRevisionList, *configapi.RepositoryList, error) {
-	var pvs configapi2.PackageVariantSet
+	var pvs api.PackageVariantSet
 	if err := r.Client.Get(ctx, req.NamespacedName, &pvs); err != nil {
 		return nil, nil, nil, client.IgnoreNotFound(err)
 	}
@@ -179,14 +179,14 @@ func (r *PackageVariantSetReconciler) getUpstreamPR(upstream *configapi.Upstream
 }
 
 type pvContext struct {
-	template       *configapi2.PackageVariantTemplate
+	template       *api.PackageVariantTemplate
 	repoDefault    string
 	packageDefault string
 	object         *unstructured.Unstructured
 }
 
 func (r *PackageVariantSetReconciler) unrollDownstreamTargets(ctx context.Context,
-	pvs *configapi2.PackageVariantSet) ([]pvContext, error) {
+	pvs *api.PackageVariantSet) ([]pvContext, error) {
 
 	upstreamPackageName := pvs.Spec.Upstream.Package
 	var result []pvContext
@@ -215,7 +215,7 @@ func (r *PackageVariantSetReconciler) unrollDownstreamTargets(ctx context.Contex
 			// a label selector against a set of repositories
 			// equivlanet to object selector with apiVersion/kind pre-set
 
-			objSel = &configapi2.ObjectSelector{
+			objSel = &api.ObjectSelector{
 				LabelSelector: *target.RepositorySelector,
 				APIVersion:    configapi.TypeRepository.APIVersion(),
 				Kind:          configapi.TypeRepository.Kind,
@@ -266,7 +266,7 @@ func (r *PackageVariantSetReconciler) convertObjectToRNode(obj runtime.Object) (
 	return yaml.Parse(buffer.String())
 }
 
-func (r *PackageVariantSetReconciler) ensurePackageVariants(ctx context.Context, pvs *configapi2.PackageVariantSet,
+func (r *PackageVariantSetReconciler) ensurePackageVariants(ctx context.Context, pvs *api.PackageVariantSet,
 	repoList *configapi.RepositoryList, upstreamPR *porchapi.PackageRevision,
 	downstreams []pvContext) error {
 
@@ -373,16 +373,13 @@ func packageVariantName(pvId string) string {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PackageVariantSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := configapi2.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := api.AddToScheme(mgr.GetScheme()); err != nil {
 		return err
 	}
 	if err := porchapi.AddToScheme(mgr.GetScheme()); err != nil {
 		return err
 	}
 	if err := configapi.AddToScheme(mgr.GetScheme()); err != nil {
-		return err
-	}
-	if err := configapi2.AddToScheme(mgr.GetScheme()); err != nil {
 		return err
 	}
 	if err := scheme.AddToScheme(mgr.GetScheme()); err != nil {
@@ -394,7 +391,7 @@ func (r *PackageVariantSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.serializer = json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{Yaml: true})
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&configapi2.PackageVariantSet{}).
+		For(&api.PackageVariantSet{}).
 		Watches(&configapi.PackageVariant{},
 			handler.EnqueueRequestsFromMapFunc(mapObjectsToRequests(r.Client))).
 		Watches(&porchapi.PackageRevision{},
@@ -405,7 +402,7 @@ func (r *PackageVariantSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // https://github.com/kumahq/kuma/blob/abd89b44c5ee3bf5b57c13d7379b3c2b15ed5aba/pkg/plugins/runtime/k8s/controllers/configmap_controller.go#L100
 func mapObjectsToRequests(mgrClient client.Reader) handler.MapFunc {
 	return func(ctx context.Context, obj client.Object) []reconcile.Request {
-		attachedPackageVariants := &configapi2.PackageVariantSetList{}
+		attachedPackageVariants := &api.PackageVariantSetList{}
 		err := mgrClient.List(ctx, attachedPackageVariants, &client.ListOptions{
 			Namespace: obj.GetNamespace(),
 		})
@@ -425,7 +422,7 @@ func mapObjectsToRequests(mgrClient client.Reader) handler.MapFunc {
 	}
 }
 
-func setStalledConditionsToTrue(pvs *configapi2.PackageVariantSet, reason, message string) {
+func setStalledConditionsToTrue(pvs *api.PackageVariantSet, reason, message string) {
 	meta.SetStatusCondition(&pvs.Status.Conditions, metav1.Condition{
 		Type:    ConditionTypeStalled,
 		Status:  "True",

@@ -178,12 +178,6 @@ func buildCompleteScheme() (*runtime.Scheme, error) {
 				}
 				return nil
 			},
-			func(s *runtime.Scheme) error {
-				if e := configapi.AddToScheme(s); e != nil {
-					return fmt.Errorf("error adding internalapi to scheme: %w", e)
-				}
-				return nil
-			},
 		)
 	})
 	return completeScheme, err

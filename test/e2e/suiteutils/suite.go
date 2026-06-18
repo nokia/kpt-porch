@@ -516,7 +516,6 @@ func createClientScheme(t *testing.T) *runtime.Scheme {
 	for _, api := range (runtime.SchemeBuilder{
 		porchapi.AddToScheme,
 		configapi.AddToScheme,
-		configapi.AddToScheme,
 		configapi2.AddToScheme,
 		coreapi.AddToScheme,
 		aggregatorv1.AddToScheme,

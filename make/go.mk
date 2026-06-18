@@ -15,7 +15,7 @@
 # Core Go development tools
 
 GOLANG_CI_VER ?= 2.12.2
-GOLANG_CI_ARGS ?= "-v --fix --timeout=10m"
+GOLANG_CI_ARGS ?= -v --fix --timeout=10m
 
 ##@ Go Development
 
@@ -34,9 +34,9 @@ fix: fix-api ## Run go fix against the codebase
 .PHONY: lint
 lint: lint-api ## Run Go linter against the codebase
 	@if command -v golangci-lint >/dev/null 2>&1 && [ "$$(golangci-lint version --short)" = "$(GOLANG_CI_VER)" ]; then \
-		golangci-lint run ./... "$(GOLANG_CI_ARGS)"; \
+		golangci-lint run ./... $(GOLANG_CI_ARGS); \
 	else \
-		go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(GOLANG_CI_VER) run ./... "$(GOLANG_CI_ARGS)"; \
+		go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(GOLANG_CI_VER) run ./... $(GOLANG_CI_ARGS); \
 	fi
 
 .PHONY: fix-all

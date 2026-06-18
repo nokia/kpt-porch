@@ -189,7 +189,6 @@ func initScheme() (*runtime.Scheme, error) {
 		porchapi.AddToScheme,
 		porchv1alpha2.AddToScheme,
 		configapi.AddToScheme,
-		configapi.AddToScheme,
 	} {
 		if err := addToScheme(scheme); err != nil {
 			return nil, fmt.Errorf(errInitScheme, err)
