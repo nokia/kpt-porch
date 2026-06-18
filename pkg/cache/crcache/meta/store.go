@@ -19,7 +19,6 @@ import (
 
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	internalapi "github.com/kptdev/porch/internal/api/porchinternal/v1alpha1"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -70,7 +69,7 @@ func (c *crdMetadataStore) Get(ctx context.Context, namespacedName types.Namespa
 	ctx, span := tracer.Start(ctx, "crdMetadataStore::Get", trace.WithAttributes())
 	defer span.End()
 
-	var internalPkgRev internalapi.PackageRev
+	var internalPkgRev configapi.PackageRev
 	err := c.coreClient.Get(ctx, namespacedName, &internalPkgRev)
 	if err != nil {
 		return metav1.ObjectMeta{}, err
@@ -83,7 +82,7 @@ func (c *crdMetadataStore) List(ctx context.Context, repo *configapi.Repository)
 	ctx, span := tracer.Start(ctx, "crdMetadataStore::List", trace.WithAttributes())
 	defer span.End()
 
-	var internalPkgRevList internalapi.PackageRevList
+	var internalPkgRevList configapi.PackageRevList
 	err := c.coreClient.List(ctx, &internalPkgRevList, client.InNamespace(repo.Namespace), client.MatchingLabels(map[string]string{PkgRevisionRepoLabel: repo.Name}))
 	if err != nil {
 		return nil, err
@@ -114,7 +113,7 @@ func (c *crdMetadataStore) Create(ctx context.Context, pkgRevMeta metav1.ObjectM
 
 	finalizers := append(pkgRevMeta.Finalizers, PkgRevisionFinalizer)
 
-	internalPkgRev := internalapi.PackageRev{
+	internalPkgRev := configapi.PackageRev{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            pkgRevMeta.Name,
 			Namespace:       pkgRevMeta.Namespace,
@@ -138,7 +137,7 @@ func (c *crdMetadataStore) Update(ctx context.Context, pkgRevMeta metav1.ObjectM
 	ctx, span := tracer.Start(ctx, "crdMetadataStore::Update", trace.WithAttributes())
 	defer span.End()
 
-	var internalPkgRev internalapi.PackageRev
+	var internalPkgRev configapi.PackageRev
 	namespacedName := types.NamespacedName{
 		Name:      pkgRevMeta.Name,
 		Namespace: pkgRevMeta.Namespace,
@@ -182,7 +181,7 @@ func (c *crdMetadataStore) Delete(ctx context.Context, namespacedName types.Name
 	ctx, span := tracer.Start(ctx, "crdMetadataStore::Delete", trace.WithAttributes())
 	defer span.End()
 
-	var internalPkgRev internalapi.PackageRev
+	var internalPkgRev configapi.PackageRev
 	retriedErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		err := c.coreClient.Get(ctx, namespacedName, &internalPkgRev)
 		if err != nil {
@@ -208,7 +207,7 @@ func (c *crdMetadataStore) Delete(ctx context.Context, namespacedName types.Name
 	return toPackageRevisionMeta(ctx, &internalPkgRev), nil
 }
 
-func toPackageRevisionMeta(ctx context.Context, internalPkgRev *internalapi.PackageRev) metav1.ObjectMeta {
+func toPackageRevisionMeta(ctx context.Context, internalPkgRev *configapi.PackageRev) metav1.ObjectMeta {
 	_, span := tracer.Start(ctx, "store.go::toPackageRevisionMeta", trace.WithAttributes())
 	defer span.End()
 

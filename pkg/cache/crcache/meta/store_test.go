@@ -22,8 +22,6 @@ import (
 	"testing"
 
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	"github.com/kptdev/porch/internal/api/porchinternal/v1alpha1"
-	internalapi "github.com/kptdev/porch/internal/api/porchinternal/v1alpha1"
 	mockclient "github.com/kptdev/porch/test/mockery/mocks/external/sigs.k8s.io/controller-runtime/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -57,26 +55,26 @@ func TestCreateUpdateDeleteOK(t *testing.T) {
 		Name:      pkgRevMeta.Name,
 		Namespace: pkgRevMeta.Namespace,
 	}
-	internalPkgRev := v1alpha1.PackageRev{}
+	internalPkgRev := configapi.PackageRev{}
 
 	mockClient.EXPECT().
 		Get(mock.Anything, prKey, &internalPkgRev).
 		Return(nil).
 		Run(func(_ context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) {
-			obj.(*v1alpha1.PackageRev).Name = prKey.Name
-			obj.(*v1alpha1.PackageRev).Namespace = prKey.Namespace
+			obj.(*configapi.PackageRev).Name = prKey.Name
+			obj.(*configapi.PackageRev).Namespace = prKey.Namespace
 		})
 	gotPR, err := store.Get(ctxt, prKey)
 	assert.True(t, err == nil)
 	assert.Equal(t, gotPR.Name, prKey.Name)
 
-	internalPkgRevList := internalapi.PackageRevList{}
+	internalPkgRevList := configapi.PackageRevList{}
 	mockClient.EXPECT().
 		List(mock.Anything, &internalPkgRevList, mock.Anything, mock.Anything).
 		Return(nil).
 		Run(func(_ context.Context, list client.ObjectList, opts ...client.ListOption) {
-			list.(*v1alpha1.PackageRevList).Items = make([]v1alpha1.PackageRev, 1)
-			list.(*v1alpha1.PackageRevList).Items[0] = v1alpha1.PackageRev{
+			list.(*configapi.PackageRevList).Items = make([]configapi.PackageRev, 1)
+			list.(*configapi.PackageRevList).Items[0] = configapi.PackageRev{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: pkgRevMeta.Namespace,
 					Name:      pkgRevMeta.Name,

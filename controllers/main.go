@@ -58,7 +58,6 @@ import (
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	porchv1alpha2 "github.com/kptdev/porch/api/porch/v1alpha2"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	porchinternal "github.com/kptdev/porch/internal/api/porchinternal/v1alpha1"
 	"github.com/kptdev/porch/internal/telemetry"
 	//+kubebuilder:scaffold:imports
 )
@@ -190,7 +189,7 @@ func initScheme() (*runtime.Scheme, error) {
 		porchapi.AddToScheme,
 		porchv1alpha2.AddToScheme,
 		configapi.AddToScheme,
-		porchinternal.AddToScheme,
+		configapi.AddToScheme,
 	} {
 		if err := addToScheme(scheme); err != nil {
 			return nil, fmt.Errorf(errInitScheme, err)

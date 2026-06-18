@@ -22,7 +22,7 @@ PORCH = $(BUILDDIR)/porch
 PORCHCTL = $(BUILDDIR)/porchctl
 
 # API Modules
-API_MODULES = api internal/api
+API_MODULES = api
 
 ##@ Build
 

@@ -29,6 +29,12 @@ var (
 
 	// We removed SchemeBuilder to keep our dependencies small
 
+	TypePackageRev = TypeInfo{
+		Kind:     "PackageRev",
+		Resource: GroupVersion.WithResource("packagerevs"),
+		objects:  []runtime.Object{&PackageRev{}, &PackageRevList{}},
+	}
+
 	TypeRepository = TypeInfo{
 		Kind:     "Repository",
 		Resource: GroupVersion.WithResource("repositories"),
@@ -60,6 +66,7 @@ var (
 	}
 
 	AllKinds = []TypeInfo{
+		TypePackageRev,
 		TypeRepository,
 		TypeFunctionConfig,
 		TypeServiceTemplate,

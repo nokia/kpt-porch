@@ -28,7 +28,6 @@ import (
 	porchv1alpha2 "github.com/kptdev/porch/api/porch/v1alpha2"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/controllers/functionconfigs/reconciler"
-	internalapi "github.com/kptdev/porch/internal/api/porchinternal/v1alpha1"
 	"github.com/kptdev/porch/pkg/cache"
 	cachetypes "github.com/kptdev/porch/pkg/cache/types"
 	"github.com/kptdev/porch/pkg/engine"
@@ -180,7 +179,7 @@ func buildCompleteScheme() (*runtime.Scheme, error) {
 				return nil
 			},
 			func(s *runtime.Scheme) error {
-				if e := internalapi.AddToScheme(s); e != nil {
+				if e := configapi.AddToScheme(s); e != nil {
 					return fmt.Errorf("error adding internalapi to scheme: %w", e)
 				}
 				return nil
@@ -264,7 +263,7 @@ func (c completedConfig) buildClient(ctx context.Context) (client.WithWatch, err
 			// ClosePackageRevisionDraft/SetMeta). Since writes bypass the
 			// informer cache, a subsequent Get can miss the just-created object.
 			// This is not ideal, but crcache doesn't support a level of resources where caching makes a difference
-			&internalapi.PackageRev{},
+			&configapi.PackageRev{},
 			// v1alpha2 PackageRevision is a CRD patched by patchRenderRequestAnnotation
 			// right after a write; bypass the cache to avoid stale reads and the
 			// cluster-scope watch that the informer would require.

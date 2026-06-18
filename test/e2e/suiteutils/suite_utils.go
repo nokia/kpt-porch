@@ -32,7 +32,6 @@ import (
 	kptfilesdk "github.com/kptdev/krm-functions-sdk/go/fn/kptfileko"
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	internalapi "github.com/kptdev/porch/internal/api/porchinternal/v1alpha1"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 	coreapi "k8s.io/api/core/v1"
@@ -638,7 +637,7 @@ func (t *TestSuite) WaitUntilAllPackageRevisionsDeleted(repoName string, namespa
 func (t *TestSuite) WaitUntilAllPackageRevsDeleted(repoName string, namespace string) {
 	t.T().Helper()
 	err := wait.PollUntilContextTimeout(t.GetContext(), time.Second, 60*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		var internalPkgRevList internalapi.PackageRevList
+		var internalPkgRevList configapi.PackageRevList
 		if err := t.Reader.List(ctx, &internalPkgRevList, client.InNamespace(namespace), client.MatchingLabels{
 			"internal.porch.kpt.dev/repository": repoName,
 		}); err != nil {
@@ -1083,7 +1082,7 @@ func RunInParallel(functions ...func() any) []any {
 	return results
 }
 
-func (t *TestSuite) removePkgRevFinalizers(ctx context.Context, pkgRev *internalapi.PackageRev) {
+func (t *TestSuite) removePkgRevFinalizers(ctx context.Context, pkgRev *configapi.PackageRev) {
 	t.Logf("removing finalizers from orphaned PackageRev %s/%s", pkgRev.Namespace, pkgRev.Name)
 	pkgRev.Finalizers = []string{}
 	for range 3 {
