@@ -35,7 +35,7 @@ generate: generate-api ## Generate CRDs, other K8s manifests and helper go code
 	@for f in $(API_MODULES); do (cd $$f; echo "Generating for $$f ..."; YEAR_GEN=$(YEAR_GEN) go generate -v ./...) || exit 1; done
 
 .PHONY: tidy
-tidy:
+tidy: tidy-api
 	go mod tidy
 
 .PHONY: porch

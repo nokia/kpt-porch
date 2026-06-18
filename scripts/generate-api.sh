@@ -39,19 +39,6 @@ go get "k8s.io/code-generator@v$KUBERNETES_VERSION"
 CODE_GENERATOR=$(go list -f '{{.Dir}}' -m "k8s.io/code-generator@v$KUBERNETES_VERSION")
 . "${CODE_GENERATOR}/kube_codegen.sh"
 
-# kube_codegen expects a specific directory structure, so we will create it via a symlink
-
-#WORK=$(mktemp --directory)
-#
-#echo "work directory: $WORK"
-#
-#copy_function goodbye old_goodbye
-#function goodbye () {
-#	echo "deleting work directory: $WORK"
-#	rm -r "$WORK"
-#	old_goodbye $1
-#}
-
 cd $PORCH_API_DIR
 
 echo 'gen_helpers...'

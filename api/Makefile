@@ -1,4 +1,4 @@
-#  Copyright 2025-2026 The kpt Authors
+#  Copyright 2026 The kpt Authors
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,27 +12,29 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-# Core Go development tools
-
 GOLANG_CI_VER ?= 2.12.2
 GOLANG_CI_ARGS ?= "-v --fix --timeout=10m"
 
-##@ Go Development
+##@ API Go Development
 
 .PHONY: fmt
-fmt: fmt-api ## Run go fmt against the codebase
+fmt: ## Run go fmt against the module
 	go fmt ./...
 
 .PHONY: vet
-vet: vet-api ## Run go vet against the codebase
+vet: ## Run go vet against the module
 	go vet ./...
 
 .PHONY: fix
-fix: fix-api ## Run go fix against the codebase
+fix: ## Run go fix against the module
 	go fix ./...
 
+.PHONY: tidy
+tidy: ## Run go tidy against the module
+	go mod tidy
+
 .PHONY: lint
-lint: lint-api ## Run Go linter against the codebase
+lint: ## Run Go linter against the module
 	@if command -v golangci-lint >/dev/null 2>&1 && [ "$$(golangci-lint version --short)" = "$(GOLANG_CI_VER)" ]; then \
 		golangci-lint run ./... "$(GOLANG_CI_ARGS)"; \
 	else \
@@ -40,20 +42,4 @@ lint: lint-api ## Run Go linter against the codebase
 	fi
 
 .PHONY: fix-all
-fix-all: tidy fix vet fmt lint ## Fix headers, format code, and tidy modules
-
-.PHONY: tidy-api fix-api vet-api fmt-api lint-api
-tidy-api:
-	make -C api tidy
-
-fix-api:
-	make -C api fix
-
-vet-api:
-	make -C api vet
-
-fmt-api:
-	make -C api fmt
-
-lint-api:
-	make -C api lint
+fix-all: tidy fix vet fmt lint ## Run go mod tidy, fix, vet, fmt and then lint the module
