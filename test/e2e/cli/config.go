@@ -38,6 +38,9 @@ type Command struct {
 	Yaml bool `yaml:"yaml,omitempty"`
 	// IgnoreWhitespace indicates that whitespace differences should be ignored in the output
 	IgnoreWhitespace bool `yaml:"ignoreWhitespace,omitempty"`
+	// IgnoreColumns lists column names to strip from both expected and actual table output
+	// before comparison. Useful for non-deterministic columns like AGE.
+	IgnoreColumns []string `yaml:"ignoreColumns,omitempty"`
 	// StdErrTabToWhitespace replaces "\t" (tab) character with whitespace "  "
 	StdErrTabToWhitespace bool `yaml:"stdErrTabToWhitespace,omitempty"`
 	// ContainsErrorString changes Stderr check from exact string match to contains string match

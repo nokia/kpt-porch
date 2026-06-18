@@ -163,7 +163,7 @@ When TLS is enabled, Function Runner attempts connection in this order:
 3. Without TLS as fallback
 4. Returns error if all attempts fail
 
-{{% alert title="Important" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 Ensure Kubernetes nodes are configured with the same TLS certificate information. The Function Runner can pull images, but KRM function pods need node-level certificate configuration to run successfully.
 {{% /alert %}}
 

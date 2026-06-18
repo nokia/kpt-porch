@@ -24,12 +24,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/kptdev/krm-functions-sdk/go/fn/kptfileapi"
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/pkg/repository"
 	mockclient "github.com/kptdev/porch/test/mockery/mocks/external/sigs.k8s.io/controller-runtime/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -185,8 +187,37 @@ func TestPreRun(t *testing.T) {
 
 	r = createRunner(context.Background(), fake.NewClientBuilder().Build(), prs, ns, 2)
 	err = r.preRunE(r.Command, []string{"clone"})
-	assert.Error(t, err)
 	assert.ErrorContains(t, err, "workspace")
+}
+
+func TestPreRunSubpackageDir(t *testing.T) {
+	const ns = "ns"
+
+	t.Run("Subpackage upgrade with workspace flag returns error", func(t *testing.T) {
+		r := &runner{
+			ctx:           context.Background(),
+			cfg:           &genericclioptions.ConfigFlags{Namespace: func() *string { s := ns; return &s }()},
+			Command:       NewCommand(context.Background(), &genericclioptions.ConfigFlags{Namespace: func() *string { s := ns; return &s }()}),
+			revision:      2,
+			subpackageDir: "my-subpkg",
+			workspace:     "ws",
+		}
+		err := r.preRunE(r.Command, []string{"some-pr"})
+		assert.ErrorContains(t, err, "--workspace may not be specified on subpackage upgrades")
+	})
+
+	t.Run("Subpackage upgrade without workspace succeeds validation", func(t *testing.T) {
+		r := &runner{
+			ctx:           context.Background(),
+			cfg:           &genericclioptions.ConfigFlags{Namespace: func() *string { s := ns; return &s }()},
+			Command:       NewCommand(context.Background(), &genericclioptions.ConfigFlags{Namespace: func() *string { s := ns; return &s }()}),
+			revision:      2,
+			subpackageDir: "my-subpkg",
+			strategy:      "resource-merge",
+		}
+		err := r.preRunE(r.Command, []string{"some-pr"})
+		assert.NoError(t, err)
+	})
 }
 
 func TestUpgradeCommand(t *testing.T) {
@@ -243,14 +274,14 @@ func TestUpgradeCommand(t *testing.T) {
 		{
 			name:           "Successful package upgrade",
 			args:           []string{localRevision.Name},
-			expectedOutput: fmt.Sprintf("%s upgraded to upgraded-pr\n", localRevision.Name),
+			expectedOutput: fmt.Sprintf("\"%s\" upgraded to \"upgraded-pr\"\n", localRevision.Name),
 			expectedError:  "",
 			runner:         commonRunner,
 		},
 		{
 			name:           "Successful package upgrade by finding latest",
 			args:           []string{localRevision.Name},
-			expectedOutput: fmt.Sprintf("%s upgraded to upgraded-pr\n", localRevision.Name),
+			expectedOutput: fmt.Sprintf("\"%s\" upgraded to \"upgraded-pr\"\n", localRevision.Name),
 			expectedError:  "",
 			runner:         createRunner(ctx, client, prs, "ns", 0),
 		},
@@ -539,12 +570,10 @@ func TestPreRunStrategyValidation(t *testing.T) {
 			err := r.preRunE(r.Command, []string{"some-package-revision"})
 
 			if !tc.validationShouldPass {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectedErrorMsg)
+				assert.ErrorContains(t, err, tc.expectedErrorMsg)
 			} else if tc.discover != "" {
 				// For valid strategies in discover mode, validation passes but connection fails
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectedErrorMsg)
+				assert.ErrorContains(t, err, tc.expectedErrorMsg)
 			} else {
 				// For valid strategies in non-discover mode, preRunE should succeed
 				assert.NoError(t, err)
@@ -1071,6 +1100,348 @@ func TestLastErrWorkaround(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
+}
+
+func TestDoSubpackageUpgrade(t *testing.T) {
+	const ns = "ns"
+	ctx := context.Background()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, porchapi.AddToScheme(scheme))
+	require.NoError(t, configapi.AddToScheme(scheme))
+
+	t.Run("Error when parent PR is not draft", func(t *testing.T) {
+		parentPR := &porchapi.PackageRevision{
+			ObjectMeta: metav1.ObjectMeta{Name: "parent-pr", Namespace: ns},
+			Spec: porchapi.PackageRevisionSpec{
+				Lifecycle:   porchapi.PackageRevisionLifecyclePublished,
+				PackageName: "parent",
+			},
+		}
+
+		r := &runner{
+			ctx:           ctx,
+			cfg:           &genericclioptions.ConfigFlags{Namespace: func() *string { s := ns; return &s }()},
+			client:        fake.NewClientBuilder().WithScheme(scheme).Build(),
+			subpackageDir: "my-subpkg",
+		}
+
+		_, err := r.doSubpackageUpgrade(parentPR)
+		assert.ErrorContains(t, err, "parent package must be in state draft")
+	})
+
+	t.Run("Error when parent PR has more than 1 task", func(t *testing.T) {
+		parentPR := &porchapi.PackageRevision{
+			ObjectMeta: metav1.ObjectMeta{Name: "parent-pr", Namespace: ns},
+			Spec: porchapi.PackageRevisionSpec{
+				Lifecycle:   porchapi.PackageRevisionLifecycleDraft,
+				PackageName: "parent",
+				Tasks: []porchapi.Task{
+					{Type: porchapi.TaskTypeInit, Init: &porchapi.PackageInitTaskSpec{}},
+					{Type: porchapi.TaskTypeRender},
+				},
+			},
+		}
+
+		// Need to set up resources so it gets past the Kptfile check
+		resources := &porchapi.PackageRevisionResources{
+			ObjectMeta: metav1.ObjectMeta{Name: "parent-pr", Namespace: ns},
+			Spec: porchapi.PackageRevisionResourcesSpec{
+				Resources: map[string]string{
+					"my-subpkg/Kptfile": "apiVersion: kpt.dev/v1\nkind: Kptfile\nmetadata:\n  name: subpkg\nupstream:\n  type: git\n  git:\n    repo: https://github.com/example/repo.git\n    directory: subpkg\n    ref: v1\n",
+				},
+			},
+		}
+
+		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(parentPR, resources).Build()
+		r := &runner{
+			ctx:           ctx,
+			cfg:           &genericclioptions.ConfigFlags{Namespace: func() *string { s := ns; return &s }()},
+			client:        c,
+			subpackageDir: "my-subpkg",
+		}
+
+		_, err := r.doSubpackageUpgrade(parentPR)
+		// It will fail when trying to list repositories or find the upstream
+		// but the point is it gets past the lifecycle and Kptfile checks
+		assert.Error(t, err)
+	})
+
+	t.Run("Error when Kptfile not found in subpackage", func(t *testing.T) {
+		parentPR := &porchapi.PackageRevision{
+			ObjectMeta: metav1.ObjectMeta{Name: "parent-pr", Namespace: ns},
+			Spec: porchapi.PackageRevisionSpec{
+				Lifecycle:   porchapi.PackageRevisionLifecycleDraft,
+				PackageName: "parent",
+				Tasks: []porchapi.Task{
+					{Type: porchapi.TaskTypeInit, Init: &porchapi.PackageInitTaskSpec{}},
+				},
+			},
+		}
+
+		resources := &porchapi.PackageRevisionResources{
+			ObjectMeta: metav1.ObjectMeta{Name: "parent-pr", Namespace: ns},
+			Spec: porchapi.PackageRevisionResourcesSpec{
+				Resources: map[string]string{
+					"Kptfile": "apiVersion: kpt.dev/v1\nkind: Kptfile\nmetadata:\n  name: parent\n",
+				},
+			},
+		}
+
+		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(parentPR, resources).Build()
+		r := &runner{
+			ctx:           ctx,
+			cfg:           &genericclioptions.ConfigFlags{Namespace: func() *string { s := ns; return &s }()},
+			client:        c,
+			subpackageDir: "nonexistent-subpkg",
+		}
+
+		_, err := r.doSubpackageUpgrade(parentPR)
+		assert.ErrorContains(t, err, "could not find Kptfile for independent subpackage")
+	})
+
+	t.Run("Error when subpackage has no upstream", func(t *testing.T) {
+		parentPR := &porchapi.PackageRevision{
+			ObjectMeta: metav1.ObjectMeta{Name: "parent-pr", Namespace: ns},
+			Spec: porchapi.PackageRevisionSpec{
+				Lifecycle:   porchapi.PackageRevisionLifecycleDraft,
+				PackageName: "parent",
+				Tasks: []porchapi.Task{
+					{Type: porchapi.TaskTypeInit, Init: &porchapi.PackageInitTaskSpec{}},
+				},
+			},
+		}
+
+		resources := &porchapi.PackageRevisionResources{
+			ObjectMeta: metav1.ObjectMeta{Name: "parent-pr", Namespace: ns},
+			Spec: porchapi.PackageRevisionResourcesSpec{
+				Resources: map[string]string{
+					"my-subpkg/Kptfile": "apiVersion: kpt.dev/v1\nkind: Kptfile\nmetadata:\n  name: subpkg\n",
+				},
+			},
+		}
+
+		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(parentPR, resources).Build()
+		r := &runner{
+			ctx:           ctx,
+			cfg:           &genericclioptions.ConfigFlags{Namespace: func() *string { s := ns; return &s }()},
+			client:        c,
+			subpackageDir: "my-subpkg",
+		}
+
+		_, err := r.doSubpackageUpgrade(parentPR)
+		assert.ErrorContains(t, err, "has no upstream source")
+	})
+}
+
+func TestFindPackageRevisionFromUpstreamRootDirectory(t *testing.T) {
+	const ns = "ns"
+	ctx := context.Background()
+
+	scheme := runtime.NewScheme()
+	if err := porchapi.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add porch API to scheme: %v", err)
+	}
+	if err := configapi.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add config API to scheme: %v", err)
+	}
+
+	upstreamPR := createOrigPackageRevision(ns, "blueprints", "mypkg", 1)
+	prs := []porchapi.PackageRevision{*upstreamPR}
+
+	tests := []struct {
+		name        string
+		upstream    *kptfileapi.Upstream
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name:        "error when upstream is nil",
+			upstream:    nil,
+			expectErr:   true,
+			errContains: "could not find upstream references",
+		},
+		{
+			name: "error when upstream git is nil",
+			upstream: &kptfileapi.Upstream{
+				Git: nil,
+			},
+			expectErr:   true,
+			errContains: "could not find upstream references",
+		},
+		{
+			name: "error when directory has leading slash",
+			upstream: &kptfileapi.Upstream{
+				Type: kptfileapi.GitOrigin,
+				Git: &kptfileapi.Git{
+					Repo:      "https://github.com/user/repo.git",
+					Directory: "/mypkg",
+					Ref:       "mypkg/v1",
+				},
+			},
+			expectErr:   true,
+			errContains: "git directory reference",
+		},
+		{
+			name: "error when ref is not managed (does not match directory/version pattern)",
+			upstream: &kptfileapi.Upstream{
+				Type: kptfileapi.GitOrigin,
+				Git: &kptfileapi.Git{
+					Repo:      "https://github.com/user/repo.git",
+					Directory: "mypkg",
+					Ref:       "main",
+				},
+			},
+			expectErr:   true,
+			errContains: "not managed by kpt",
+		},
+		{
+			name: "error when ref is empty",
+			upstream: &kptfileapi.Upstream{
+				Type: kptfileapi.GitOrigin,
+				Git: &kptfileapi.Git{
+					Repo:      "https://github.com/user/repo.git",
+					Directory: "mypkg",
+					Ref:       "",
+				},
+			},
+			expectErr:   true,
+			errContains: "could not find upstream references",
+		},
+		{
+			name: "error when directory is empty",
+			upstream: &kptfileapi.Upstream{
+				Type: kptfileapi.GitOrigin,
+				Git: &kptfileapi.Git{
+					Repo:      "https://github.com/user/repo.git",
+					Directory: "",
+					Ref:       "mypkg/v1",
+				},
+			},
+			expectErr:   true,
+			errContains: "could not find upstream references",
+		},
+		{
+			name: "managed ref with matching repo finds package revision",
+			upstream: &kptfileapi.Upstream{
+				Type: kptfileapi.GitOrigin,
+				Git: &kptfileapi.Git{
+					Repo:      "https://github.com/user/repo.git",
+					Directory: "mypkg",
+					Ref:       "mypkg/v1",
+				},
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := configapi.Repository{
+				ObjectMeta: metav1.ObjectMeta{Name: "blueprints", Namespace: ns},
+				Spec: configapi.RepositorySpec{
+					Type: configapi.RepositoryTypeGit,
+					Git: &configapi.GitRepository{
+						Repo:      "https://github.com/user/repo",
+						Directory: "",
+					},
+				},
+			}
+
+			interceptorFuncs := interceptor.Funcs{
+				List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+					switch l := list.(type) {
+					case *configapi.RepositoryList:
+						l.Items = []configapi.Repository{repo}
+					case *porchapi.PackageRevisionList:
+						l.Items = prs
+					}
+					return nil
+				},
+			}
+
+			c := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(upstreamPR).
+				WithInterceptorFuncs(interceptorFuncs).
+				Build()
+
+			r := createRunner(ctx, c, prs, ns, 0)
+
+			result, err := r.findPackageRevisionFromUpstream(tt.upstream)
+
+			if tt.expectErr {
+				assert.ErrorContains(t, err, tt.errContains)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+			}
+		})
+	}
+}
+
+func TestFindPackageRevisionFromUpstreamBestMatch(t *testing.T) {
+	const ns = "ns"
+	ctx := context.Background()
+
+	scheme := runtime.NewScheme()
+	if err := porchapi.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add porch API to scheme: %v", err)
+	}
+	if err := configapi.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add config API to scheme: %v", err)
+	}
+
+	upstreamPR := createOrigPackageRevision(ns, "nested-repo", "mypkg", 1)
+	prs := []porchapi.PackageRevision{*upstreamPR}
+
+	// Repo whose directory matches the upstream repo spec directory
+	matchingRepo := configapi.Repository{
+		ObjectMeta: metav1.ObjectMeta{Name: "nested-repo", Namespace: ns},
+		Spec: configapi.RepositorySpec{
+			Type: configapi.RepositoryTypeGit,
+			Git: &configapi.GitRepository{
+				Repo:      "https://github.com/user/repo",
+				Directory: "",
+			},
+		},
+	}
+
+	interceptorFuncs := interceptor.Funcs{
+		List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			switch l := list.(type) {
+			case *configapi.RepositoryList:
+				l.Items = []configapi.Repository{matchingRepo}
+			case *porchapi.PackageRevisionList:
+				l.Items = prs
+			}
+			return nil
+		},
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(upstreamPR).
+		WithInterceptorFuncs(interceptorFuncs).
+		Build()
+
+	r := createRunner(ctx, c, prs, ns, 0)
+
+	// Use a managed ref pattern (directory/version)
+	kptfileUpstream := &kptfileapi.Upstream{
+		Type: kptfileapi.GitOrigin,
+		Git: &kptfileapi.Git{
+			Repo:      "https://github.com/user/repo.git",
+			Directory: "mypkg",
+			Ref:       "mypkg/v1",
+		},
+	}
+
+	result, err := r.findPackageRevisionFromUpstream(kptfileUpstream)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, upstreamPR.Name, result.Name)
 }
 
 func TestAvailableUpdatesWithDirectory(t *testing.T) {

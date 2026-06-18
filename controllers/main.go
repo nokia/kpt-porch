@@ -25,12 +25,15 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"golang.org/x/exp/slices"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
-	"golang.org/x/exp/slices"
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/klog/v2"
@@ -44,7 +47,6 @@ import (
 	"github.com/kptdev/porch/controllers/packagevariants/pkg/controllers/packagevariant"
 	"github.com/kptdev/porch/controllers/packagevariantsets/pkg/controllers/packagevariantset"
 	"github.com/kptdev/porch/controllers/repositories/pkg/controllers/repository"
-	porchotel "github.com/kptdev/porch/internal/otel"
 	"github.com/kptdev/porch/pkg/cache/contentcache"
 	"github.com/kptdev/porch/pkg/controllerrestmapper"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,6 +61,7 @@ import (
 	porchv1alpha2 "github.com/kptdev/porch/api/porch/v1alpha2"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	porchinternal "github.com/kptdev/porch/internal/api/porchinternal/v1alpha1"
+	"github.com/kptdev/porch/internal/telemetry"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -123,7 +126,18 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	mgr, err := newManager(ctx, scheme)
+	otel.SetLogger(klog.NewKlogr())
+	otelResources, err := telemetry.SetupOpenTelemetry(ctx)
+	if err != nil {
+		return fmt.Errorf("error setting up OpenTelemetry: %w", err)
+	}
+	defer func() {
+		if shutdownErr := otelResources.ShutdownWithTimeout(10 * time.Second); shutdownErr != nil {
+			klog.Warningf("failed to gracefully shutdown OpenTelemetry: %v", shutdownErr)
+		}
+	}()
+
+	mgr, err := newManager(scheme)
 	if err != nil {
 		return err
 	}
@@ -189,7 +203,7 @@ func initScheme() (*runtime.Scheme, error) {
 
 // --- Manager ---
 
-func newManager(ctx context.Context, scheme *runtime.Scheme) (ctrl.Manager, error) {
+func newManager(scheme *runtime.Scheme) (ctrl.Manager, error) {
 	config := textlogger.NewConfig(
 		textlogger.Verbosity(4),
 		textlogger.Output(os.Stdout),
@@ -200,11 +214,6 @@ func newManager(ctx context.Context, scheme *runtime.Scheme) (ctrl.Manager, erro
 	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
 		klog.Infof("Wrapping client-go transport with OpenTelemetry")
 		return otelhttp.NewTransport(rt)
-	}
-
-	otel.SetLogger(klog.NewKlogr())
-	if err := porchotel.SetupOpenTelemetry(ctx); err != nil {
-		return nil, fmt.Errorf("error setting up OpenTelemetry: %w", err)
 	}
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{

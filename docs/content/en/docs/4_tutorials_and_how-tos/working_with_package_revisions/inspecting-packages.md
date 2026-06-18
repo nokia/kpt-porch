@@ -99,7 +99,7 @@ Key fields to inspect:
 - **spec.tasks**: History of operations performed on this PackageRevision
 - **status.publishTimestamp**: When the PackageRevision was published
 
-{{% alert title="Tip" color="primary" %}}
+{{% alert title="Note" color="primary" %}}
 Use `jq` to extract specific fields: `porchctl rpkg get <name> -n default -o json | jq '.metadata'`
 {{% /alert %}}
 

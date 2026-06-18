@@ -9,7 +9,7 @@ description: Common repository sync issues and their solutions
 
 ### Repository Not Syncing
 
-**Problem**: Repository shows as Ready but packages aren't updating
+**Problem**: Repository shows as Ready but packages are not updating
 
 **Solutions**:
 ```bash
@@ -29,10 +29,7 @@ kubectl logs -n porch-system deployment/porch-controllers | grep "sync.*<repo-na
 kubectl logs -n porch-system deployment/porch-controllers | grep "<repo-name>.*error"
 ```
 
-**Common causes**:
-- Invalid cron expression falls back to default frequency
-- Repository authentication issues
-- Network connectivity problems
+**Common causes:** invalid cron expression falls back to default frequency, repository authentication issues or network connectivity problems.
 
 ### Authentication Failures
 
@@ -103,14 +100,11 @@ kubectl logs -n porch-system deployment/porch-server | grep "repositorySync.*<re
 git ls-remote <repo-url>  # For Git repos
 ```
 
-**Common causes**:
-- Large repository taking time to clone/sync
-- Network timeouts
-- Repository structure issues
+**Common causes**: large repository taking time to clone/sync, network timeouts or repository structure issues.
 
 ### One-time Sync Not Triggering
 
-**Problem**: `porchctl repo sync` command succeeds but sync doesn't happen
+**Problem**: `porchctl repo sync` command succeeds but sync does not happen
 
 **Diagnostic steps**:
 ```bash
@@ -124,9 +118,7 @@ date -u  # Compare with runOnceAt value
 kubectl logs -n porch-system deployment/porch-controllers | grep "runOnceAt"
 ```
 
-**Solutions**:
-- Ensure timestamp is at least 1 minute in future
-- Verify namespace is correct
+**Solutions**: Ensure the timestamp is at least 1 minute in the future and verify that the namespace is correct.
 
 ## Error Messages & Diagnostic Steps
 
@@ -213,10 +205,7 @@ See [Repository Controller Configuration]({{% relref "/docs/6_configuration_and_
 **A**: Yes, periodic scheduling and one-time sync work independently. One-time synchronization executes regardless of the periodic schedule.
 
 ### Q: Why is my cron expression not working?
-**A**: Porch uses standard 5-field cron format. Common mistakes:
-- Using 6 fields (seconds not supported)
-- Missing fields
-- Invalid ranges or values
+**A**: Porch uses standard 5-field cron format. Common mistakes include using 6 fields (seconds not supported), missing fields, or invalid ranges or values.
 
 ### Q: How do I stop repository syncing?
 **A**: Repository synchronization cannot be completely stopped. Porch continuously monitors repositories for changes. You can only modify the sync frequency by updating the sync schedule configuration or remove custom schedules to use the default frequency.

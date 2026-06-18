@@ -346,7 +346,7 @@ Error from server (Forbidden): cannot delete package revision, it is referenced 
 
 After deleting PackageRevisions, you may notice "main" branch-tracking PackageRevisions still exist. These are automatically created by Porch when packages are published and must be deleted separately.
 
-{{% alert title="Important" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 Main branch-tracking PackageRevisions (with workspace name "main" and revision "-1") are managed automatically by Porch. Do not modify, propose, approve, or otherwise interact with them except for deletion after all regular PackageRevisions of that specific package have been removed.
 {{% /alert %}}
 

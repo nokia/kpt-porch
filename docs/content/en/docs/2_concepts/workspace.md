@@ -6,7 +6,7 @@ description: |
   Understanding workspaces: how Porch isolates concurrent work on packages.
 ---
 
-{{% alert title="Important" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 
 **Workspace is merely a unique ID for a package revision!**
 

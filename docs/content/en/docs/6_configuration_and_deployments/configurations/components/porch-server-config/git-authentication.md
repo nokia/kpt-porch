@@ -93,8 +93,8 @@ For Git repositories with custom TLS certificates. The CA bundle secret must:
 
 #### Enable TLS Support
 
-{{% alert title="Pre-deployment Required" color="warning" %}}
-The `--use-git-cabundle=true` argument must be added to the Porch Server deployment **before** deployment. This cannot be configured post-deployment.
+{{% alert title="Warning" color="warning" %}}
+Pre-deployment requirement. The `--use-git-cabundle=true` argument must be added to the Porch Server deployment **before** deployment. This cannot be configured post-deployment.
 {{% /alert %}}
 
 Add the `--use-git-cabundle=true` argument to the Porch Server deployment.

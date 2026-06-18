@@ -30,7 +30,7 @@ Git repositories are the primary and fully-supported storage backend for Porch. 
 
 OCI (Open Container Initiative) registries provide an alternative storage backend. Packages are stored as OCI artifacts (similar to container images). Support is experimental and may be unstable. This option is useful in environments that already use OCI registries.
 
-{{% alert title="Note" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 OCI repository support is **experimental** and **may be unstable**. Git repositories are recommended for production use.
 {{% /alert %}}
 
@@ -48,7 +48,7 @@ When a Repository resource is registered with Porch, Porch automatically conduct
 
 ## Immutability
 
-{{% alert title="Important" color="warning" %}}
+{{% alert title="Warning" color="warning" %}}
 The following fields are **immutable** after repository creation and cannot be modified:
 - `spec.type`
 - `spec.git.repo`

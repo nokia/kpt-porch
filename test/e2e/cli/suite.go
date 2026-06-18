@@ -1,4 +1,4 @@
-// Copyright 2024-2025 The kpt Authors
+// Copyright 2024-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -188,6 +188,11 @@ func (s *CliTestSuite) RunTestCase(t *testing.T, tc TestCaseConfig) {
 			stderrStr = strings.ReplaceAll(stderrStr, "\t", "  ") // Replace tabs with spaces
 		}
 
+		if len(command.IgnoreColumns) > 0 {
+			stdoutStr = stripColumns(stdoutStr, command.IgnoreColumns)
+			command.Stdout = stripColumns(command.Stdout, command.IgnoreColumns)
+		}
+
 		if command.IgnoreWhitespace {
 			command.Stdout = normalizeWhitespace(command.Stdout)
 			command.Stderr = normalizeWhitespace(command.Stderr)
@@ -195,7 +200,14 @@ func (s *CliTestSuite) RunTestCase(t *testing.T, tc TestCaseConfig) {
 			stderrStr = normalizeWhitespace(stderrStr)
 		}
 
+		if strings.Contains(command.Stdout, placeholderAny) {
+			command.Stdout = replacePlaceholders(command.Stdout, stdoutStr)
+		}
+
 		if os.Getenv(updateGoldenFiles) != "" {
+			// NOTE: updateCommand overwrites Stdout/Stderr with raw output,
+			// discarding {{ANY}} placeholders and ignoreColumns transformations.
+			// After regenerating golden files, manually restore placeholders.
 			updateCommand(command, err, stdout.String(), stderr.String())
 		}
 
@@ -297,6 +309,153 @@ func normalizeWhitespace(s1 string) string {
 		}
 	}
 	return strings.Join(words, " ")
+}
+
+// placeholderAny matches any non-empty value in a cell position during output comparison.
+const placeholderAny = "{{ANY}}"
+
+// stripColumns removes named columns from table-formatted output.
+// It parses the header row to find column byte offsets, then removes
+// those byte ranges from all rows. Returns the input unchanged if
+// the header doesn't contain any of the named columns.
+func stripColumns(output string, columns []string) string {
+	if len(columns) == 0 || output == "" {
+		return output
+	}
+
+	lines := strings.Split(output, "\n")
+	if len(lines) == 0 {
+		return output
+	}
+
+	ranges := findColumnRanges(lines[0], columns)
+	if len(ranges) == 0 {
+		return output
+	}
+
+	var result []string
+	for _, line := range lines {
+		stripped := removeRanges(line, ranges)
+		stripped = strings.TrimRight(stripped, " ")
+		result = append(result, stripped)
+	}
+	return strings.Join(result, "\n")
+}
+
+// colRange represents a byte range [start, end) within a line.
+type colRange struct{ start, end int }
+
+// findColumnRanges locates the byte ranges for the given column names in the header.
+// Returns ranges sorted right-to-left for safe removal.
+// For the last column in a row (no subsequent column), the range extends to end-of-line
+// so data values wider than the header label are fully removed.
+// Column names are matched as whole words (bounded by start-of-string, end-of-string, or spaces).
+func findColumnRanges(header string, columns []string) []colRange {
+	var ranges []colRange
+	for _, col := range columns {
+		idx := findWholeColumn(header, col)
+		if idx == -1 {
+			continue
+		}
+		end := idx + len(col)
+		// Consume trailing spaces to reach the next column header.
+		for end < len(header) && header[end] == ' ' {
+			end++
+		}
+		// If we reached end-of-header, this is the last column — mark end as -1
+		// so removeRanges extends to end-of-line for each row.
+		if end >= len(header) {
+			ranges = append(ranges, colRange{idx, -1})
+		} else {
+			ranges = append(ranges, colRange{idx, end})
+		}
+	}
+	sort.Slice(ranges, func(i, j int) bool {
+		return ranges[i].start > ranges[j].start
+	})
+	return ranges
+}
+
+// findWholeColumn finds a column name in the header that is bounded by
+// start-of-string/spaces on the left and end-of-string/spaces on the right.
+// Returns -1 if not found as a whole word.
+func findWholeColumn(header, col string) int {
+	start := 0
+	for {
+		idx := strings.Index(header[start:], col)
+		if idx == -1 {
+			return -1
+		}
+		idx += start
+		leftOK := idx == 0 || header[idx-1] == ' '
+		rightEnd := idx + len(col)
+		rightOK := rightEnd >= len(header) || header[rightEnd] == ' '
+		if leftOK && rightOK {
+			return idx
+		}
+		start = idx + 1
+	}
+}
+
+// removeRanges strips the given byte ranges from a line (ranges must be sorted right-to-left).
+// A range with end == -1 means "to end of line" (last column).
+func removeRanges(line string, ranges []colRange) string {
+	for _, r := range ranges {
+		if r.start >= len(line) {
+			continue
+		}
+		end := r.end
+		if end == -1 || end > len(line) {
+			end = len(line)
+		}
+		line = line[:r.start] + line[end:]
+	}
+	return line
+}
+
+// replacePlaceholders replaces {{ANY}} tokens in the expected string with the
+// corresponding whitespace-delimited value from the actual string. This allows
+// non-deterministic values (timestamps, ages, resource versions) to be ignored
+// in comparisons.
+//
+// NOTE: This function uses strings.Fields internally, which normalizes whitespace.
+// It should be used with ignoreWhitespace: true to ensure consistent behavior.
+func replacePlaceholders(expected, actual string) string {
+	if !strings.Contains(expected, placeholderAny) {
+		return expected
+	}
+
+	expectedLines := strings.Split(expected, "\n")
+	actualLines := strings.Split(actual, "\n")
+
+	var result []string
+	for i, eLine := range expectedLines {
+		if !strings.Contains(eLine, placeholderAny) || i >= len(actualLines) {
+			result = append(result, eLine)
+			continue
+		}
+		result = append(result, replacePlaceholdersInLine(eLine, actualLines[i]))
+	}
+	return strings.Join(result, "\n")
+}
+
+// replacePlaceholdersInLine replaces {{ANY}} tokens in a single line with
+// the corresponding word from the actual line.
+func replacePlaceholdersInLine(expectedLine, actualLine string) string {
+	eWords := strings.Fields(expectedLine)
+	aWords := strings.Fields(actualLine)
+
+	var replaced []string
+	aIdx := 0
+	for _, ew := range eWords {
+		if ew == placeholderAny && aIdx < len(aWords) {
+			replaced = append(replaced, aWords[aIdx])
+		} else {
+			replaced = append(replaced, ew)
+		}
+		aIdx++
+	}
+	return strings.Join(replaced, " ")
 }
 
 func removeArmPlatformWarning(got string) string {
