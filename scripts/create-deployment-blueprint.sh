@@ -22,6 +22,7 @@ set -o pipefail # Check errors in piped commands
 source "$(dirname "$0")/common.sh"
 
 PORCH_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+CRDS_DIR="$PORCH_DIR/api/generated/crds"
 STARLARK_IMG="${PORCH_GHCR_PREFIX_URL}/starlark:v0.5"
 SEARCH_REPLACE_IMG="${PORCH_GHCR_PREFIX_URL}/search-replace:v0.2"
 SET_IMAGE_IMG="${PORCH_GHCR_PREFIX_URL}/set-image:v0.2.2"
@@ -222,7 +223,7 @@ function enable_v1alpha2_packagerevisions() {
     echo "Enabling v1alpha2 PackageRevision CRD creation and PR controller"
 
     # Install the v1alpha2 PackageRevision CRD
-    cp "${PORCH_DIR}/api/porch/v1alpha2/porch.kpt.dev_packagerevisions.yaml" \
+    cp "${CRDS_DIR}/porch.kpt.dev_packagerevisions.yaml" \
        "${DESTINATION}/0-v1alpha2-packagerevisions.yaml"
 
     # Flip the controller flag
@@ -341,17 +342,17 @@ function adjust_reconcilers_for_cache_type() {
 
 function main() {
   # Repository CRD
-  cp "./api/porchconfig/v1alpha1/config.porch.kpt.dev_repositories.yaml" \
+  cp "${CRDS_DIR}/config.porch.kpt.dev_repositories.yaml" \
    "${DESTINATION}/0-repositories.yaml"
 
   # PackageRev CRD
-  cp "./internal/api/porchinternal/v1alpha1/config.porch.kpt.dev_packagerevs.yaml" \
+  cp "${CRDS_DIR}/config.porch.kpt.dev_packagerevs.yaml" \
      "${DESTINATION}/0-packagerevs.yaml"
 
-  cp "./api/porchconfig/v1alpha1/config.porch.kpt.dev_functionconfigs.yaml" \
+  cp "${CRDS_DIR}/config.porch.kpt.dev_functionconfigs.yaml" \
      "${DESTINATION}/0-functionconfigs.yaml"
 
-  cp "./api/porchconfig/v1alpha1/config.porch.kpt.dev_servicetemplates.yaml" \
+  cp "${CRDS_DIR}/config.porch.kpt.dev_servicetemplates.yaml" \
      "${DESTINATION}/0-servicetemplates.yaml"
 
   # Porch Deployment Config
@@ -381,9 +382,9 @@ function main() {
   # have been added to ENABLED_RECONCILERS (e.g. by enable_v1alpha2_packagerevisions).
   IFS=',' read -ra RECONCILERS <<< "$ENABLED_RECONCILERS"
   for i in "${RECONCILERS[@]}"; do
-    if [[ -f "${PORCH_DIR}/controllers/config/crd/bases/config.porch.kpt.dev_${i}.yaml" ]]; then
+    if [[ -f "${CRDS_DIR}/config.porch.kpt.dev_${i}.yaml" ]]; then
       # Copy over the CRD (if it exists)
-      cp "${PORCH_DIR}/controllers/config/crd/bases/config.porch.kpt.dev_${i}.yaml" \
+      cp "${CRDS_DIR}/config.porch.kpt.dev_${i}.yaml" \
          "${DESTINATION}/0-${i}.yaml"
     fi
 

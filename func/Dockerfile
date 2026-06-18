@@ -32,14 +32,13 @@ FROM ${PORCH_GHCR_PREFIX_URL}/upsert-resource:v0.2.3 AS upsert-resource
 FROM ${DOCKERHUB_MIRROR}/golang:${GOLANG_ALPINE_VERSION} AS builder
 WORKDIR /go/src
 
-RUN go install github.com/grpc-ecosystem/grpc-health-probe@v0.4.11
-RUN cp $GOPATH/bin/grpc-health-probe /grpc-health-probe
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install github.com/grpc-ecosystem/grpc-health-probe@v0.4.11 && \
+    cp $GOPATH/bin/grpc-health-probe /grpc-health-probe
 
 COPY go.mod go.sum ./
 COPY ./third_party ./third_party
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
-
 COPY ./api ./api
 COPY ./cmd ./cmd
 COPY ./pkg ./pkg

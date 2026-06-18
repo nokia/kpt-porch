@@ -25,10 +25,6 @@ WORKDIR /go/src
 COPY go.mod go.sum ./
 COPY ./third_party ./third_party
 
-RUN --mount=type=cache,target=/go/pkg/mod \
-    echo "Downloading porch modules ..." \
- && go mod download
-
 ENV CGO_ENABLED=0
 
 COPY ./api ./api
