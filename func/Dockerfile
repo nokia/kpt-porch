@@ -34,7 +34,7 @@ WORKDIR /go/src
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install github.com/grpc-ecosystem/grpc-health-probe@v0.4.11 && \
+    go install github.com/grpc-ecosystem/grpc-health-probe@v0.4.52 && \
     cp $GOPATH/bin/grpc-health-probe /grpc-health-probe
 
 COPY go.mod go.sum ./
