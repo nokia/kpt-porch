@@ -21,7 +21,7 @@ import (
 	"path"
 	"strings"
 
-	fnresult "github.com/kptdev/kpt/pkg/api/fnresult/v1"
+	fnresult "github.com/kptdev/kpt/api/fnresult/v1"
 	"github.com/kptdev/kpt/pkg/fn"
 	"github.com/kptdev/kpt/pkg/lib/kptops"
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"

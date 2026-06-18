@@ -18,7 +18,7 @@ import (
 	"context"
 	"io"
 
-	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
+	kptfilev1 "github.com/kptdev/kpt/api/kptfile/v1"
 	"github.com/kptdev/kpt/pkg/fn"
 	"github.com/kptdev/krm-functions-catalog/functions/go/apply-setters/applysetters"
 	"sigs.k8s.io/kustomize/kyaml/fn/framework"

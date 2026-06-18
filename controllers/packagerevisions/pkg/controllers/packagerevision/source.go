@@ -21,7 +21,7 @@ import (
 	"maps"
 	"strings"
 
-	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
+	kptfilev1 "github.com/kptdev/kpt/api/kptfile/v1"
 	"github.com/kptdev/kpt/pkg/kptfile/kptfileutil"
 	"github.com/kptdev/kpt/pkg/kptpkg"
 	"github.com/kptdev/kpt/pkg/lib/kptops"

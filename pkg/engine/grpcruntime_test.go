@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	v1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
+	v1 "github.com/kptdev/kpt/api/kptfile/v1"
 	"github.com/kptdev/porch/controllers/functionconfigs/reconciler"
 	"github.com/kptdev/porch/func/evaluator"
 	"github.com/stretchr/testify/assert"

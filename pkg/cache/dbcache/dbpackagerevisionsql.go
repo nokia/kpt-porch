@@ -19,7 +19,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	kptfile "github.com/kptdev/kpt/pkg/api/kptfile/v1"
+	kptfile "github.com/kptdev/kpt/api/kptfile/v1"
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	cachetypes "github.com/kptdev/porch/pkg/cache/types"
 	"github.com/kptdev/porch/pkg/repository"

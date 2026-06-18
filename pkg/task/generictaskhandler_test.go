@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	kptfilev1 "github.com/kptdev/kpt/pkg/api/kptfile/v1"
+	kptfilev1 "github.com/kptdev/kpt/api/kptfile/v1"
 	kptfn "github.com/kptdev/krm-functions-sdk/go/fn"
 	kptfileko "github.com/kptdev/krm-functions-sdk/go/fn/kptfileko"
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
@@ -1157,8 +1157,8 @@ func TestApplySubpackageTask_SuccessfulUpgrade(t *testing.T) {
 		Resources: &porchapi.PackageRevisionResources{
 			Spec: porchapi.PackageRevisionResourcesSpec{
 				Resources: map[string]string{
-					"Kptfile":              "apiVersion: kpt.dev/v1\nkind: Kptfile\nmetadata:\n  name: parent\n",
-					"my-subpkg/Kptfile":    kptfileContent,
+					"Kptfile":                 "apiVersion: kpt.dev/v1\nkind: Kptfile\nmetadata:\n  name: parent\n",
+					"my-subpkg/Kptfile":       kptfileContent,
 					"my-subpkg/resource.yaml": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: original\n",
 				},
 			},
@@ -1172,8 +1172,8 @@ func TestApplySubpackageTask_SuccessfulUpgrade(t *testing.T) {
 	// Parent resources with existing subpackage content at "my-subpkg/"
 	parentResources := repository.PackageResources{
 		Contents: map[string]string{
-			"Kptfile":              "parent-kptfile",
-			"my-subpkg/Kptfile":    kptfileContent,
+			"Kptfile":                 "parent-kptfile",
+			"my-subpkg/Kptfile":       kptfileContent,
 			"my-subpkg/resource.yaml": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: original\n",
 		},
 	}
