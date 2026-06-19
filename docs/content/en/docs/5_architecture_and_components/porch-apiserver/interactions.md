@@ -191,7 +191,7 @@ Client Watch Request
   • Deleted
 ```
 
-**Watch integration:** Clients subscribe to watch streams using the standard Kubernetes watch API. The REST storage layer delegates these requests to the Engine's WatcherManager, which then filters and delivers events through a component chain. Resources are automatically cleaned up when a client disconnects.
+**Watch integration:** Clients can subscribe to watch streams using the standard Kubernetes watch API. The REST storage layer delegates these requests to the Engine's WatcherManager, which then filters and delivers events through a component chain. Resources are automatically cleaned up when a client disconnects.
 
 ### Event Delivery
 
@@ -249,7 +249,7 @@ The API Server translates errors across component boundaries:
 - **Conflict errors**: Translated to 409 Conflict
 - **Internal errors**: Translated to 500 Internal Server Error
 
-**Translation pattern:** In this translation pattern, the Engine returns typed errors. These errors are then converted by the REST storage layer into a standard Kubernetes Status object. This Status object is designed to include a clear error message along with any relevant details. Ultimately, the client interacting with the system receives this standardized Kubernetes error response, ensuring consistent error handling.
+**Translation pattern:** The goal of these error translations is to make sure the Engine returns typed errors instead of just generic 500 error codes. These errors are then converted by the REST storage layer into a standard Kubernetes Status object. This Status object is designed to include a clear error message along with any relevant details. Ultimately, the client interacting with the system receives this standardized Kubernetes error response, ensuring consistent error handling.
 
 ### Watch Error Handling
 
@@ -262,7 +262,7 @@ The API Server translates errors across component boundaries:
 - Kubernetes API errors
 - Resource cleanup failures
 
-**Handling strategy:** For the handling strategy, errors are logged with their context, operations continue for other resources despite an error, and any repository synchronization errors are specifically managed by the Repository Controller.
+**Handling strategy:** The handling strategy for background job errors is to log them with their context. Operations continue for other resources despite an error, and any repository synchronization errors are specifically managed by the Repository Controller.
 
 ## Concurrency and Safety
 
@@ -272,5 +272,5 @@ The API Server coordinates concurrent operations across components:
 
 ### Request Concurrency
 
-Integration patterns involve managing request concurrency through the Engine, enforcing optimistic locking at the API Server and Engine boundary, isolating watch streams per client, and coordinating repository synchronization operations via the Repository Controller.
+Request concurrency is integrated in several ways, like managing request concurrency through the Engine, enforcing optimistic locking at the API Server and Engine boundary, isolating watch streams per client, and coordinating repository synchronization operations via the Repository Controller.
 

@@ -50,9 +50,9 @@ The API Server implements custom REST storage for each Porch resource type:
 - **Update**: Validates resource version, calls Engine to update package revision, returns updated resource
 - **Delete**: Calls Engine to delete package revision, returns delete status
 
-Watch support delegates to the Engine cache for package revision watches. This system filters events based on defined watch criteria, delivers real-time change notifications, and automatically cleans up resources upon client disconnection.
+The Porch API server supports watches by delegating to the Engine cache. This system filters events based on defined watch criteria, delivers real-time change notifications, and automatically cleans up resources upon client disconnection.
 
-Regarding storage characteristics, there is no direct etcd storage; instead, it delegates to the Engine. The Engine is responsible for managing package data in Git via its Cache, supports all standard Kubernetes operations, and fully implements the storage.Interface.
+The storage of PackageRevisions is also delegated to the Engine; there is no direct etcd storage. The Engine is responsible for managing package data in Git via its Cache, supports all standard Kubernetes operations, and fully implements the storage.Interface.
 
 ### PackageRevisionResources Storage
 
@@ -61,9 +61,9 @@ Regarding storage characteristics, there is no direct etcd storage; instead, it 
 - **List**: Lists resources for package revisions
 - **Update**: Updates package content via Engine
 
-Content handling involves storing resources as a map where each filename is associated with its content. This design supports large package content, bypassing limitations that might be imposed by etcd. Furthermore, any updates to this content automatically trigger the execution of the render pipeline, and the system provides a RenderStatus along with the function results.
+Package contents are handled by storing resources as a map where each filename is associated with its content. This design supports large package content, bypassing limitations that might be imposed by etcd. Furthermore, any updates to this content automatically trigger the execution of the render pipeline, and the system provides a RenderStatus along with the function results.
 
-Regarding storage characteristics, the system is primarily read-only for most operations. Updates are exclusively permitted on Draft packages. Content is retrieved on-demand, meaning it is not cached within the API server, and all storage-related operations are delegated to the Engine.
+PackageRevisionResources storage is handled such that operations are primarily read-only for most operations. Updates are exclusively permitted on Draft packages. Content is retrieved on-demand, meaning it is not cached within the API server, and all storage-related operations are delegated to the Engine.
 
 ### Package Storage
 
@@ -81,21 +81,21 @@ Strategies enforce validation rules before Engine operations:
 
 ### Create Validation
 
-**Validation rules:** Include ensuring required fields are present (such as package name and repository), adhering to lifecycle constraints (preventing creation of Published/DeletionProposed states), validating tasks (allowing a maximum of one task), confirming the correct workspace name format, and verifying package path validity.
+**Validation rules:** Includes ensuring required fields are present (such as package name and repository), adhering to lifecycle constraints (preventing creation of Published/DeletionProposed states), validating tasks (allowing a maximum of one task), confirming the correct workspace name format, and verifying package path validity.
 
-**Validation process:** Calling strategy is validated before any Engine operation. Specific field errors are returned for invalid specifications, effectively preventing invalid resources from reaching the Engine and providing clear error messages to clients.
+**Validation process:** Validation is done for each strategy before any Engine operation. Specific field errors are returned for invalid specifications, effectively preventing invalid resources from reaching the Engine and providing clear error messages to clients.
 
 ### Update Validation
 
-**Validation rules:** Include requiring a resource version for optimistic locking, ensuring lifecycle transition validity, enforcing immutability constraints for Published packages, making tasks append-only (meaning tasks cannot be removed), and restricting metadata updates.
+**Validation rules:** Includes requiring a resource version for optimistic locking, ensuring lifecycle transition validity, enforcing immutability constraints for Published packages, making tasks append-only (meaning tasks cannot be removed), and restricting metadata updates.
 
 **Validation process:** Involves invoking strategy validation prior to any Engine update operation. This process meticulously compares old and new objects to confirm that all proposed changes are permissible, and it subsequently returns field errors for any updates that are deemed invalid.
 
 ### Status Validation
 
-**Validation rules:** Status subresource updates should be validated separately. Condition format, RenderStatus structure as well as DownstreamTargets should be validated.
+**Validation rules:** Status subresource updates are validated separately. This includes condition format, RenderStatus structure as well as DownstreamTargets.
 
-**Validation process:** Involves calling Strategy.ValidateStatusUpdate for all status updates. This ensures that status updates do not inadvertently modify the specification, validates the overall status structure, and returns detailed field errors when an invalid status is detected.
+**Validation process:** Involves calling `Strategy.ValidateStatusUpdate` for all status updates. This ensures that status updates do not inadvertently modify the specification, validates the overall status structure, and returns detailed field errors when an invalid status is detected.
 
 ## Admission Control
 
@@ -139,13 +139,13 @@ Strategies convert resources to table format for kubectl:
 | Lifecycle       | Current lifecycle state           |
 | Repository      | Source repository                 |
 
-The table format adheres to Kubernetes conventions, supports sorting and filtering, and provides human-readable output consistent with kubectl expectations.
+The table format adheres to Kubernetes conventions, supports sorting and filtering, and provides human-readable output consistent with `kubectl` expectations.
 
 ### Conversion Process
 
-**Conversion flow:** When kubectl requests a table format, the REST storage calls Strategy.ConvertToTable. This strategy then extracts the necessary column values and returns a metav1.Table with rows, which kubectl subsequently formats for display.
+**Conversion flow:** When `kubectl` requests a table format, the REST storage calls `Strategy.ConvertToTable`. This strategy then extracts the necessary column values and returns a `metav1.Table` with rows, which kubectl subsequently formats for display.
 
-**Conversion characteristics:** This conversion process supports both list and individual resources, gracefully handles missing fields, provides consistent formatting, and enables various kubectl get commands.
+**Conversion characteristics:** This conversion process supports both list and individual resources, gracefully handles missing fields, provides consistent formatting, and enables various `kubectl` get commands.
 
 ## Watch Stream Management
 
@@ -211,7 +211,10 @@ The API Server employs several optimization strategies:
 
 **Optimization techniques:** Concurrent repository listing with configurable maximum concurrency, per-repository timeouts to prevent slow repositories from blocking, early termination on context cancellation, and efficient filtering at the Engine level.
 
-**Configuration:** MaxConcurrentLists for maximum concurrent repository operations and ListTimeoutPerRepository which sets a timeout per repository, preventing slow repositories from impacting overall performance.
+**Configuration:**
+- MaxConcurrentLists: Maximum concurrent repository operations
+- ListTimeoutPerRepository: Timeout per repository
+- Prevents slow repositories from impacting overall performance
 
 ### Watch Stream Efficiency
 
@@ -254,7 +257,7 @@ The API Server handles errors at multiple levels:
 
 **Error handling:** Registration errors are returned immediately upon occurrence. Should delivery errors arise, the watch stream is closed, an error event is sent to the client, and an automatic cleanup process is initiated.
 
-**Error recovery:** For error recovery, clients have the capability to re-establish the watch, resuming from the last known resource version. This mechanism ensures that there is no data loss during transient errors, allowing for graceful degradation of service.
+**Error recovery:** For error recovery, clients are able to re-establish the watch and resume from the last known resource version. This mechanism ensures that there is no data loss during transient errors, allowing for graceful degradation of service.
 
 ## Concurrency Control
 
@@ -270,7 +273,7 @@ The API Server handles concurrent operations:
 
 ### Optimistic Locking
 
-**Locking mechanism:** When clients initiate updates, they are required to provide a resource version. The API Server then validates this version before making a call to the Engine, which in turn compares the provided version with its current version. If a mismatch is detected, a conflict is returned, necessitating the client to re-read the resource and retry the operation.
+**Locking mechanism:** When clients initiate updates, they are required to provide a resource version. The API Server then validates this version before making a call to the Engine, which in turn compares the provided version with its current version. If a mismatch is detected, a conflict is returned, necessitating the client to re-read the resource and retry the operation. This is how the base Kubernetes apiserver works as well.
 
 **Locking benefits:** This locking mechanism offers several benefits, including the prevention of lost updates and the elimination of the need for complex distributed locks. It scales effectively and aligns with standard Kubernetes patterns.
 

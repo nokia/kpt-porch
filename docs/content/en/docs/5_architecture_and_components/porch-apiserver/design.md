@@ -12,7 +12,7 @@ See [Functionality]({{% relref "/docs/5_architecture_and_components/porch-apiser
 
 The Porch API Server implements Kubernetes' REST storage interface to provide custom storage backends for Porch resources. Unlike standard Kubernetes resources that store data in etcd, Porch resources delegate to the Engine which manages package data in Git repositories through the Cache.
 
-The Storage Interface implements standard Kubernetes storage. It provides CRUD operations (Create, Get, List, Update, Delete), supports watch for real-time change notifications and delegates all operations to CaD Engine. However, it has no direct etcd storage, as the packages are stored in Git.
+The Storage Interface implements standard Kubernetes storage. It provides CRUD operations (Create, Get, List, Update, Delete), supports Watch for real-time change notifications and delegates all operations to CaD Engine. However, it has no direct etcd storage, as the packages are stored in Git.
 
 - **packageRevisions** manage PackageRevision resources
 - **packageRevisionResources** manage PackageRevisionResources (package content)
@@ -26,15 +26,15 @@ The API Server uses Kubernetes' strategy pattern to customize resource behavior:
 
 ### Validation Strategy
 
-The purpose of the validation strategy is to validate resource specifications before persistence. There are three validation types: create, update and status. The create validation ensures that the fields present and the lifecycle constraints enforced. The update validation validates resource version, lifecycle transitions and immutability rules. The status validation validates status subresource updates.
+The purpose of the this strategy is to validate resource specifications before persistence. It has three types: create, update and status. The create validation ensures that the fields present and the lifecycle constraints enforced. The update validation checks resource version, lifecycle transitions and immutability rules. And the status validation checks status subresource updates.
 
 ### Admission Strategy
 
-The purpose of the admission strategy is to apply admission control policies and defaults. There are three admission operations: PrepareForCreate, PrepareForUpdate and Canonicalize. PrepareForCreate sets defaults, generates names and initializes status. PrepareForUpdate validates resource version and enforces immutability. Canonicalize normalizes resource representation.
+The purpose of this strategy is to apply admission control policies and defaults. There are three admission operations: PrepareForCreate, PrepareForUpdate and Canonicalize. PrepareForCreate sets defaults, generates names and initializes status. PrepareForUpdate validates resource version and enforces immutability. Canonicalize normalizes resource representation.
 
 ### Table Conversion Strategy
 
-The purpose of the table conversion strategy is to convert resources to table format for kubectl display. The table conversion defines columns for kubectl output (Name, Package, Workspace, Revision, Lifecycle), extracts values from resource specifications, formats data for human-readable display and supports both list as well as individual resource views.
+The purpose of the table conversion strategy is to convert resources to table format for `kubectl` display. The table conversion defines columns for `kubectl` output (Name, Package, Workspace, Revision, Lifecycle), extracts values from resource specifications, and formats data for human-readable display. It supports both list and individual resource views.
 
 ## API Groups
 
@@ -101,9 +101,9 @@ This decision has some trade-offs. A custom watch implementation, while more com
 
 ### Repository Management Pattern
 
-Repository synchronization is extracted into a dedicated Repository Controller using controller-runtime framework.
+Repository synchronization is extracted into a dedicated Repository Controller using `controller-runtime` framework.
 
-This design separates concerns by dedicating the API server to request handling and the controller to managing the repository lifecycle. Leveraging controller-runtime provides proven patterns for watch management, work queues, and leader election, leading to better scalability through concurrent reconciliation and rate limiting. This architecture also allows for independent deployment and scaling of repository management, and facilitates cleaner shutdown and error handling.
+This design separates concerns by dedicating the API server to request handling and the controller to managing the repository lifecycle. Leveraging `controller-runtime` provides proven patterns for watch management, work queues, and leader election, leading to better scalability through concurrent reconciliation and rate limiting. This architecture also allows for independent deployment and scaling of repository management, and facilitates cleaner shutdown and error handling.
 
 Three alternatives were considered: background goroutines in the API server, sync on demand or the implementation of custom controller. However, background goroutines mix request handling with background sync logic, sync on demand adds latency to API requests and custom controller implementation reinvents controller-runtime features.
 
