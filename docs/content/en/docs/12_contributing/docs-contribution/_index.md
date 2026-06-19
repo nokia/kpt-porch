@@ -150,7 +150,16 @@ See [Package Lifecycle]({{%/* relref "package-lifecycle" */%}}).
 [Kubernetes documentation](https://kubernetes.io/docs/)
 ```
 
-**Alerts (info/warning boxes)**: Use [Docsy alert shortcodes](https://www.docsy.dev/docs/content/shortcodes/#alert)
+**Alerts (note/warning/caution boxes)**: There are three alert types available based on the importance of the information:
+
+| Alert type | Code              | Alert color |
+|------------|-------------------|-------------|
+| Note       | `color="primary"` | Blue        |
+| Warning    | `color="warning"` | Yellow      |
+| Critical   | `color="danger"`  | Red         |
+
+Make sure not to change the title of the alert type. It should always be either Note, Warning or Critical.
+
 ```markdown
 {{%/* alert title="Note" color="primary" */%}}
 Important information here.
