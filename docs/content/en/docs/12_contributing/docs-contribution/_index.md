@@ -150,7 +150,7 @@ See [Package Lifecycle]({{%/* relref "package-lifecycle" */%}}).
 [Kubernetes documentation](https://kubernetes.io/docs/)
 ```
 
-**Alerts (note/warning/caution boxes)**: There are three alert types available based on the importance of the information:
+**Alerts (note/warning/critical boxes)**: There are three alert types available based on the importance of the information:
 
 | Alert type | Code              | Alert color |
 |------------|-------------------|-------------|
