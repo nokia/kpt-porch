@@ -159,7 +159,7 @@ func OpenRepository(ctx context.Context, name, namespace string, spec *configapi
 	}
 
 	// Get or create shared repository - let SharedDirectory handle cleanup
-	sharedDir, err := globalDirectoryPool.getOrCreateSharedRepository(dir, name)
+	sharedDir, err := globalDirectoryPool.getOrCreateSharedRepository(dir, name, opts)
 	if err != nil {
 		return nil, pkgerrors.Wrapf(err, "error cloning git repository %+v", spec.Repo)
 	}

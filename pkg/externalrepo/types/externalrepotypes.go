@@ -33,4 +33,6 @@ type ExternalRepoOptions struct {
 	CaBundleResolver           repository.CredentialResolver
 	UserInfoProvider           repository.UserInfoProvider
 	RepoOperationRetryAttempts int
+	GoGitRepoCacheSize         int
+	GoGitCacheMaxFileSize      int64
 }

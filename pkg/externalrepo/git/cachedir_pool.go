@@ -41,7 +41,7 @@ var globalDirectoryPool = &directoryPool{
 }
 
 // getOrCreateSharedRepository safely initializes or reuses a cached git directory
-func (p *directoryPool) getOrCreateSharedRepository(dir, reponame string) (*sharedDirectory, error) {
+func (p *directoryPool) getOrCreateSharedRepository(dir, reponame string, opts GitRepositoryOptions) (*sharedDirectory, error) {
 	// Fast path: check if directory already exists
 	if sharedDir, exists := p.directories.Load(dir); exists {
 		p.mutex.Lock()
@@ -72,7 +72,7 @@ func (p *directoryPool) getOrCreateSharedRepository(dir, reponame string) (*shar
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
-		repo, err = initEmptyRepository(dir)
+		repo, err = initEmptyRepository(dir, opts)
 		if err != nil {
 			if removeErr := os.RemoveAll(dir); removeErr != nil {
 				klog.Errorf("Failed to remove partially created directory %s: %v", dir, removeErr)
@@ -82,7 +82,7 @@ func (p *directoryPool) getOrCreateSharedRepository(dir, reponame string) (*shar
 	} else if !fi.IsDir() {
 		return nil, fmt.Errorf("cache location %q is not a directory", dir)
 	} else {
-		repo, err = openRepository(dir)
+		repo, err = openRepository(dir, opts)
 		if err != nil {
 			if removeErr := os.RemoveAll(dir); removeErr != nil {
 				klog.Errorf("Failed to open repository %s: %v (also failed to remove corrupted directory: %v)", dir, err, removeErr)

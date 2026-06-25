@@ -68,6 +68,9 @@ type PorchServerOptions struct {
 	DbMaxConnLifetime    time.Duration
 	DbPushDrafsToGit     bool
 
+	GoGitRepoCacheSize    int
+	GoGitCacheMaxFileSize int64
+
 	DefaultImagePrefix       string
 	FunctionRunnerAddress    string
 	LocalStandaloneDebugging bool // Enables local standalone running/debugging of the apiserver.
@@ -331,6 +334,8 @@ func (o *PorchServerOptions) Config() (*apiserver.Config, error) {
 				ExternalRepoOptions: externalrepotypes.ExternalRepoOptions{
 					LocalDirectory:         o.CacheDirectory,
 					UseUserDefinedCaBundle: o.UseUserDefinedCaBundle,
+					GoGitRepoCacheSize:     o.GoGitRepoCacheSize,
+					GoGitCacheMaxFileSize:  o.GoGitCacheMaxFileSize,
 				},
 				RepoOperationRetryAttempts: o.RepoOperationRetryAttempts,
 				CacheType:                  cachetypes.CacheType(o.CacheType),
@@ -394,6 +399,10 @@ func (o *PorchServerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.DbCacheDriver, "db-cache-driver", cachetypes.DefaultDBCacheDriver, "Database driver to use when for the database cache")
 	fs.StringVar(&o.DbCacheDataSource, "db-cache-data-source", "", "Address of the database, for example \"postgresql://user:pass@hostname:port/database\"")
 	fs.BoolVar(&o.DbPushDrafsToGit, "db-push-drafts-to-git", false, "If true, Porch will push draft package revisions to git when using the DB cache")
+
+	//GoGit configuration
+	fs.IntVar(&o.GoGitRepoCacheSize, "gogit-repo-cache-size", 8, "Size of the in-memory cache for git repositories when using gogit (in MiB)")
+	fs.Int64Var(&o.GoGitCacheMaxFileSize, "gogit-cache-max-file-size", 1*1024*512, "Maximum file size (in bytes) that will be read into the in-memory cache for git repositories when using gogit; files larger than this will be streamed from disk to avoid memory pressure")
 
 	// Function runner configuration
 	fs.StringVar(&o.DefaultImagePrefix, "default-image-prefix", runneroptions.GHCRImagePrefix, "Default prefix for unqualified function names")

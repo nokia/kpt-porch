@@ -27,7 +27,7 @@ import (
 
 // This file contains helpers for interacting with gogit.
 
-func initEmptyRepository(path string) (*git.Repository, error) {
+func initEmptyRepository(path string, opts GitRepositoryOptions) (*git.Repository, error) {
 	isBare := true // Porch only uses bare repositories
 	repo, err := git.PlainInit(path, isBare)
 	if err != nil {
@@ -36,7 +36,9 @@ func initEmptyRepository(path string) (*git.Repository, error) {
 	if err := initializeDefaultBranches(repo); err != nil {
 		return nil, pkgerrors.Wrapf(err, "gogit: default branch initialize failed on repo for path %q", path)
 	}
-	return repo, nil
+	// Re-open with tuned storage settings to avoid the default 96MiB in-memory LRU cache
+	// that PlainInit creates, since this repo will be long-lived in the directory pool.
+	return openRepository(path, opts)
 }
 
 func initializeDefaultBranches(repo *git.Repository) error {
@@ -52,11 +54,28 @@ func initializeDefaultBranches(repo *git.Repository) error {
 	return nil
 }
 
-func openRepository(path string) (*git.Repository, error) {
+func openRepository(path string, opts GitRepositoryOptions) (*git.Repository, error) {
 	dot := osfs.New(path)
-	storage := filesystem.NewStorageWithOptions(dot, cache.NewObjectLRUDefault(), filesystem.Options{
-		ExclusiveAccess: true,
-	})
+
+	const (
+		defaultRepoCacheSizeMiB = 8
+		defaultMaxFileSize      = 512 * 1024
+	)
+	cacheSizeMiB := opts.GoGitRepoCacheSize
+	if cacheSizeMiB <= 0 {
+		cacheSizeMiB = defaultRepoCacheSizeMiB
+	}
+	maxFileSize := opts.GoGitCacheMaxFileSize
+	if maxFileSize <= 0 {
+		maxFileSize = defaultMaxFileSize
+	}
+	objectCache := cache.NewObjectLRU(cache.FileSize(cacheSizeMiB) * cache.MiByte)
+
+	fileOpts := filesystem.Options{
+		ExclusiveAccess:      true,
+		LargeObjectThreshold: maxFileSize,
+	}
+	storage := filesystem.NewStorageWithOptions(dot, objectCache, fileOpts)
 	return git.Open(storage, dot)
 }
 
