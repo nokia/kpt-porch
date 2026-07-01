@@ -153,6 +153,8 @@ func (r *RepositoryReconciler) buildCacheOptions(
 			CaBundleResolver:           caBundleResolver,
 			UserInfoProvider:           userInfoProvider,
 			RepoOperationRetryAttempts: r.RepoOperationRetryAttempts,
+			GoGitRepoCacheSize:         r.GoGitRepoCacheSize,
+			GoGitCacheMaxFileSize:      r.GoGitCacheMaxFileSize,
 		},
 		RepoPRChangeNotifier: cachetypes.NewNoOpRepoPRChangeNotifier(),
 		DbPushDraftsToGit:    r.PushDraftsToGit,

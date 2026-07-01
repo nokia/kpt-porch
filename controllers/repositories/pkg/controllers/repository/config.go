@@ -29,6 +29,8 @@ const (
 	defaultSyncStaleTimeout           = 20 * time.Minute
 	defaultRepoOperationRetryAttempts = 3
 	defaultCacheDirectory             = "/cache"
+	defaultGoGitRepoCacheSize         = 8           // MiB
+	defaultGoGitCacheMaxFileSize      = 1 * 1024 * 512 // bytes (512 KiB)
 )
 
 // InitDefaults initializes default values for standalone controller
@@ -41,6 +43,8 @@ func (r *RepositoryReconciler) InitDefaults() {
 	r.RepoOperationRetryAttempts = defaultRepoOperationRetryAttempts
 	r.cacheType = string(cachetypes.DBCacheType)
 	r.cacheDirectory = defaultCacheDirectory
+	r.GoGitRepoCacheSize = defaultGoGitRepoCacheSize
+	r.GoGitCacheMaxFileSize = defaultGoGitCacheMaxFileSize
 	r.validateConfig()
 }
 
@@ -57,6 +61,8 @@ func (r *RepositoryReconciler) BindFlags(prefix string, flags *flag.FlagSet) {
 	flags.BoolVar(&r.useUserDefinedCaBundle, prefix+"use-user-defined-ca-bundle", false, "Enable custom CA bundle support from secrets")
 	flags.BoolVar(&r.CreateV1Alpha2Rpkg, prefix+"create-v1alpha2-rpkg", false, "Create v1alpha2 PackageRevision resources during repository sync")
 	flags.BoolVar(&r.PushDraftsToGit, prefix+"push-drafts-to-git", false, "Push draft and proposed branches to git when using DB cache")
+	flags.IntVar(&r.GoGitRepoCacheSize, prefix+"gogit-repo-cache-size", defaultGoGitRepoCacheSize, "Size of the in-memory cache for git repositories when using gogit (in MiB)")
+	flags.Int64Var(&r.GoGitCacheMaxFileSize, prefix+"gogit-cache-max-file-size", defaultGoGitCacheMaxFileSize, "Maximum file size (in bytes) that will be read into the in-memory cache for git repositories when using gogit; files larger than this will be streamed from disk")
 }
 
 // validateConfig ensures configuration values are valid
@@ -95,7 +101,9 @@ func (r *RepositoryReconciler) LogConfig(log interface {
 		"cacheType", r.cacheType,
 		"cacheDirectory", r.cacheDirectory,
 		"createV1Alpha2Rpkg", r.CreateV1Alpha2Rpkg,
-		"pushDraftsToGit", r.PushDraftsToGit)
+		"pushDraftsToGit", r.PushDraftsToGit,
+		"goGitRepoCacheSize", r.GoGitRepoCacheSize,
+		"goGitCacheMaxFileSize", r.GoGitCacheMaxFileSize)
 
 	if r.HealthCheckFrequency < defaultHealthCheckFrequency {
 		log.Info("Health check frequency is lower than recommended default",

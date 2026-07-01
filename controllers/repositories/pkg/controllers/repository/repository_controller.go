@@ -60,6 +60,10 @@ type RepositoryReconciler struct {
 	CreateV1Alpha2Rpkg bool // Create v1alpha2 PackageRevision resources during repo sync
 	PushDraftsToGit    bool // Push draft/proposed branches to git (DB cache only)
 
+	// GoGit cache configuration
+	GoGitRepoCacheSize    int   // In-memory cache size for git repositories (MiB)
+	GoGitCacheMaxFileSize int64 // Max file size (bytes) to read into the in-memory git cache
+
 	// Configuration (set via flags or defaults)
 	cacheType              string // Cache type (DB or CR)
 	cacheDirectory         string // Directory for git repository cache
