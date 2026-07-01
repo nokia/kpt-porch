@@ -52,7 +52,7 @@ archives:
       - src: ".build/deploy/*"
         dst: "."
         strip_parent: true
-    name_template: '{{ .ProjectName }}_blueprint'
+    name_template: '{{ .ProjectName }}-kpt-package'
 
 checksum:
   name_template: "checksums.txt"
