@@ -11,3 +11,7 @@ project as of December 2023.
 ## Documentation
 
 Documentation of Porch is available in the [Porch documentation page](https://docs.porch.nephio.org/).
+
+## License compliance
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkptdev%2Fporch.svg?type=large&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkptdev%2Fporch?ref=badge_large&issueType=license)
