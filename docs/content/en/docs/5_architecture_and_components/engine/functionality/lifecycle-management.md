@@ -485,8 +485,8 @@ Actual Deletion
 
 ### Tracking Benefits
 
-One of the benefits of tracking is compliance. It is visible who approved a package revisions for production,
-when package revisions were approved, and what changes were made.
+One benefit of tracking is compliance: it shows who approved package revisions for production, when they were approved,
+and what changes were made.
 
 Debugging is easier due to the package revision evolution history, the task execution sequence, and the lifecycle
 transition timeline.
@@ -494,4 +494,4 @@ transition timeline.
 With rollback, previous stable versions can be identified. It is easier to understand changes between versions, and
 possible to revert to known-good states.
 
-Finally, governance, enforce approval workflows. Package revision modifications are audited and package lineage is tracked.
+Finally, governance is improved by enforcing approval workflows, auditing package revision modifications, and tracking package lineage.

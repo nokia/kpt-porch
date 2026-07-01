@@ -209,7 +209,7 @@ Compare Task Lists
   Apply New Tasks
 ```
 
-**Comparison logic:** Tasks are append-only (never removed) and task list lengths are compared.. New tasks are those
+**Comparison logic:** Tasks are append-only (never removed) and task list lengths are compared. New tasks are those
 beyond old list length. New tasks are applied in order.
 
 **Task application:** Each new task is executed sequentially. The Draft is modified by each task. In case of an error,
@@ -261,7 +261,7 @@ PackageRevision is the current package revision from the repository, which provi
 It contains the function pipeline configuration.
 
 Draft is a mutable workspace for modifications. The resources are updated directly and it is modified by
-new tasks.
+resource mutations (including the render task).
 
 Old PackageRevisionResources is the previous resource content, which is used for comparison (not currently used).
 It has an audit trail.
@@ -395,8 +395,8 @@ Task List: [init/clone/edit/upgrade]
   Return Success
 ```
 
-Tasks are executed sequentially. This means, that typically one task init, clone, edit, or upgrade) is executed at the time
-and ach task must succeed before the next. The first error stops the execution. No parallel task execution is allowed.
+Tasks are executed sequentially. This means that typically one task (init, clone, edit, or upgrade) is executed at a time,
+and each task must succeed before the next. The first error stops execution. No parallel task execution is allowed.
 
 This is needed because tasks may depend on previous tasks. This way, error handling is simplified and consistent state
 is maintained.
@@ -451,8 +451,8 @@ The Engine interacts with Task Handler through a defined interface:
 
 ### Interface Characteristics
 
-The interface is context-aware. All methods accept context for cancellation Timeout and deadline is supported.
-Tracing and logging context.
+The interface is context-aware. All methods accept context for cancellation. Timeout and deadline is supported.
+Tracing and logging context is propagated as well.
 
 It is draft-based, meaning that all methods work with draft workspaces and no direct repository modification
 is performed. Includes isolation and atomicity.
@@ -471,7 +471,7 @@ enforces business rules.
 The Task Handler implements task logic, transforms package content, executes functions, and
 returns results.
 
-The benefit of this separation is that both component has clear responsibilities. Testing and maintenance is easier, and
+The benefit of this separation is that both component have clear responsibilities. Testing and maintenance are easier, and
 pluggable task implementations can be applied. Additionally, evolution of the components is independent.
 
 ### Extensibility

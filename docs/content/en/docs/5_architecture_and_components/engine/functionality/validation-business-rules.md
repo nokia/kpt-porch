@@ -77,8 +77,8 @@ CreatePackageRevision
 
 **Rationale:**
 
-The packages must progress through Draft/Proposed states before being published. This prevents the bypassing of the review/approval
-workflows. This way all packages have a draft history.
+Packages must progress through the Draft/Proposed states before being published. This prevents bypassing the review/approval
+workflows and ensures all packages have a draft history.
 
 ### Update Lifecycle Validation
 
@@ -146,7 +146,7 @@ CreatePackageRevision
 **Rationale:**
 
 Only allowing one operation simplifies the creation workflow. However, you can add multiple tasks later with updates. The default init
-task provides sensible starting point.
+task provides s sensible starting point.
 
 ### Task Type Validation
 
@@ -397,7 +397,7 @@ Upgrade Task Validation
 **Rationale:**
 
 Upgrade performs a three-way merge (old upstream, new upstream, local). Source revisions must be stable (published) for reliable merge.
-This prevents upgrading from unstable draft versions
+This prevents upgrading from unstable draft versions.
 
 ### Upgrade Source Requirements
 

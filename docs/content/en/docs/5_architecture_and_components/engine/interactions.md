@@ -65,7 +65,7 @@ The engine never directly manipulates Git repositories or storage - all operatio
 
 ### Cache Invalidation
 
-The engine does not directly invalidate cache entries. Instead, the cache monitors Repository CRs for changes, and cackground sync jobs refresh
+The engine does not directly invalidate cache entries. Instead, the cache monitors Repository CRs for changes, and background sync jobs refresh
 repository state periodically. Repository operations (create, update, delete) trigger cache updates automatically. Engine operations are always
 performed on the latest cached state.
 
@@ -146,8 +146,8 @@ Update resources + render
 4. Task handler executes render task (runs function pipeline)
 5. Returns render status with function results
 
-The Engine provides the draft workspace, the Task handler modifies resources in the draft, after which the Engine commits
-the draft after task completion. The Task handler has no direct repository access.
+The Engine provides the draft workspace. The Task handler modifies resources in the draft, after which the Engine commits
+the draft. The Task handler has no direct repository access.
 
 ### Function Runtime Integration
 
@@ -254,8 +254,8 @@ API Server Watch Streams
 - **Modified**: Package revision updated (metadata or lifecycle)
 - **Deleted**: Package revision removed
 
-Notifications are sent after successful package revision creation,  after package revision updates (including lifecycle transitions),
-and after metadata-only updates on published packages. Notification are not sent on failures or during draft operations.
+Notifications are sent after successful package revision creation, after package revision updates (including lifecycle transitions),
+and after metadata-only updates on published packages. Notifications are not sent on failures or during draft operations.
 
 ### Watch Stream Support
 

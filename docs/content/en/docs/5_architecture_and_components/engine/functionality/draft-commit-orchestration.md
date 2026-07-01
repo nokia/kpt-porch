@@ -394,7 +394,7 @@ the render status with function results is returned. This does not involve a lif
 The render is executed by running a configured KRM function pipeline. These functions can validate, transform and generate resources.
 The results are returned in RenderStatus.
 
-In case of render failure handling, the default behavior is to render errors to prevent draft closure (no resources persisted).
+In case of render failure, the default behavior is for render errors to prevent draft closure (no resources persisted).
 With the `porch.kpt.dev/push-on-render-failure: "true"` annotation, the draft is closed even on render failure. The behavior of
 partially-rendered resources can be further controlled via Kptfile annotations
 (see [kpt documentation](https://kpt.dev/book/04-using-functions/#debugging-render-failures)). The error is always returned to
@@ -491,8 +491,8 @@ It captures draft and repository references and logs a warning if a cleanup fail
 
 ### Rollback Limitations
 
-The rollback may fail if the repository connection is lost, during permission errors,
-when the draft is already closed, or when the repository in inconsistent state.
+The rollback may fail if the repository connection is lost, due to permission errors,
+if the draft is already closed, or if the repository is in an inconsistent state.
 
 In case of failure, the warning is logged with error details, but the original operation error is still returned.
 The draft may remain in the repository, which means that manual cleanup may be required. However, the repository
@@ -564,10 +564,10 @@ The Engine optimizes the draft-commit workflow:
 During lazy draft creation, a draft is created only when needed. Drafts are not created for metadata-only updates,
 or for read operations.
 
-Early validation is performed before draft creation. it fails fast without expensive operations
+Early validation is performed before draft creation. It fails fast without expensive operations
 and reduces rollback frequency.
 
-Another optimization is efficient draft closure, which uses single single repository operation,
+Another optimization is efficient draft closure, which uses single repository operation,
 atomic commit to Git and minimal overhead.
 
 ### Performance Characteristics

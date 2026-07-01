@@ -53,8 +53,8 @@ This pattern ensures atomicity - either all changes succeed and are persisted, o
 ### Repository Abstraction
 
 The engine does not directly interact with Git repositories. Instead, it opens repositories through the **cache layer** and works with
-repository abstractions that hide storage implementation details. It also delegates all storage operations to repository adapters. And
-maintains separation between business logic and storage mechanisms.
+repository abstractions that hide storage implementation details. It also delegates all storage operations to repository adapters.
+Additionally, it maintains separation between business logic and storage mechanisms.
 
 ### Concurrency Model
 
@@ -119,7 +119,7 @@ The Engine exposes a single interface (`CaDEngine`) with operations grouped by r
 
 All operations are **context-aware** for cancellation and tracing. Operations accept **API objects** (porchapi types) and return
 **repository abstractions**. The interface is **synchronous**, which means that operations complete before returning. Additionally, errors
-are returned directly rather than stored in status fields
+are returned directly rather than stored in status fields.
 
 ## Package Lifecycle State Machine
 
