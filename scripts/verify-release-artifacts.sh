@@ -74,7 +74,7 @@ EXPECTED_ASSETS=(
   "porchctl_${VERSION}_darwin_arm64.tar.gz"
   "porchctl_${VERSION}_linux_amd64.tar.gz"
   "porchctl_${VERSION}_linux_arm64.tar.gz"
-  "porch_blueprint.tar.gz"
+  "porch-kpt-package.tar.gz"
   "checksums.txt"
 )
 
