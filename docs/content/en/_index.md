@@ -1,7 +1,6 @@
 ---
 title: Porch
 description: Kubernetes-native package orchestration for KRM configuration packages
-menu: {main: {weight: 50}}
 toc_hide: true
 ---
 

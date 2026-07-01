@@ -211,3 +211,7 @@ enable = false
   name = "Guides"
   url = "https://kpt.dev/guides/"
   weight = 40
+[[menu.main]]
+  name = "Porch"
+  url = "/docs/"
+  weight = 50
