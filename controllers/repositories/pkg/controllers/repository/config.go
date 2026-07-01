@@ -29,7 +29,7 @@ const (
 	defaultSyncStaleTimeout           = 20 * time.Minute
 	defaultRepoOperationRetryAttempts = 3
 	defaultCacheDirectory             = "/cache"
-	defaultGoGitRepoCacheSize         = 8           // MiB
+	defaultGoGitRepoCacheSize         = 8              // MiB
 	defaultGoGitCacheMaxFileSize      = 1 * 1024 * 512 // bytes (512 KiB)
 )
 
