@@ -16,13 +16,13 @@ mkdir porch-{{% params "latestTag" %}} && cd porch-{{% params "latestTag" %}}
 Download the latest Porch kpt package blueprint:
 
 ```bash
-curl -LO "https://github.com/kptdev/porch/releases/download/v{{% params "latestTag" %}}/porch_blueprint.tar.gz"
+curl -LO "https://github.com/kptdev/porch/releases/download/v{{% params "latestTag" %}}/porch-kpt-package.tar.gz"
 ```
 
 Extract the Porch kpt package contents:
 
 ```bash
-tar -xzf porch_blueprint.tar.gz
+tar -xzf porch-kpt-package.tar.gz
 ```
 
 Initialize and apply the Porch kpt package:
