@@ -27,7 +27,8 @@ import (
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	kptfn "github.com/kptdev/krm-functions-sdk/go/fn"
 	kptfileko "github.com/kptdev/krm-functions-sdk/go/fn/kptfileko"
-	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
+	porchapi "github.com/kptdev/porch/api/porch"
+	porchapiv1alpha1 "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/pkg/repository"
 	pkgerrors "github.com/pkg/errors"
@@ -78,7 +79,7 @@ func (th *genericTaskHandler) SetRepoOperationRetryAttempts(retryAttempts int) {
 	th.repoOperationRetryAttempts = retryAttempts
 }
 
-func (th *genericTaskHandler) ApplyTask(ctx context.Context, draft repository.PackageRevisionDraft, repositoryObj *configapi.Repository, obj *porchapi.PackageRevision, packageConfig *builtintypes.PackageConfig) error {
+func (th *genericTaskHandler) ApplyTask(ctx context.Context, draft repository.PackageRevisionDraft, repositoryObj *configapi.Repository, obj *porchapiv1alpha1.PackageRevision, packageConfig *builtintypes.PackageConfig) error {
 	if len(obj.Spec.Tasks) != 1 {
 		return pkgerrors.New("task list must contain exactly 1 task")
 	}
@@ -114,8 +115,8 @@ func (th *genericTaskHandler) ApplyTask(ctx context.Context, draft repository.Pa
 		return err
 	}
 
-	prr := &porchapi.PackageRevisionResources{
-		Spec: porchapi.PackageRevisionResourcesSpec{
+	prr := &porchapiv1alpha1.PackageRevisionResources{
+		Spec: porchapiv1alpha1.PackageRevisionResourcesSpec{
 			Resources: resources.Contents,
 		},
 	}
@@ -126,17 +127,17 @@ func (th *genericTaskHandler) ApplyTask(ctx context.Context, draft repository.Pa
 func (th *genericTaskHandler) DoPRMutations(
 	ctx context.Context,
 	repoPR repository.PackageRevision,
-	oldObj, newObj *porchapi.PackageRevision,
+	oldObj, newObj *porchapiv1alpha1.PackageRevision,
 	draft repository.PackageRevisionDraft) error {
 	ctx, span := tracer.Start(ctx, "genericTaskHandler::DoPRMutations", trace.WithAttributes())
 	defer span.End()
 
 	// Update package contents only if the package is in draft state
-	if oldObj.Spec.Lifecycle != porchapi.PackageRevisionLifecycleDraft {
+	if oldObj.Spec.Lifecycle != porchapiv1alpha1.PackageRevisionLifecycleDraft {
 		return nil
 	}
 
-	subpackageDir, err := porchapi.GetSubpackageDir(newObj)
+	subpackageDir, err := porchapiv1alpha1.GetSubpackageDir(newObj)
 	if err != nil {
 		return pkgerrors.Wrapf(err, "failed to apply subpackage task to %s, subpackageDir is invalid", draft.Key())
 	}
@@ -171,20 +172,20 @@ func (th *genericTaskHandler) DoPRMutations(
 		return renderError(err)
 	}
 
-	prr := &porchapi.PackageRevisionResources{
-		Spec: porchapi.PackageRevisionResourcesSpec{
+	prr := &porchapiv1alpha1.PackageRevisionResources{
+		Spec: porchapiv1alpha1.PackageRevisionResourcesSpec{
 			Resources: resources.Contents,
 		},
 	}
 
-	return draft.UpdateResources(ctx, prr, &porchapi.Task{Type: porchapi.TaskTypeRender})
+	return draft.UpdateResources(ctx, prr, &porchapiv1alpha1.Task{Type: porchapiv1alpha1.TaskTypeRender})
 }
 
 func (th *genericTaskHandler) DoPRResourceMutations(
 	ctx context.Context,
 	pr2Update repository.PackageRevision,
 	draft repository.PackageRevisionDraft,
-	oldRes, newRes *porchapi.PackageRevisionResources) (*porchapi.RenderStatus, error) {
+	oldRes, newRes *porchapiv1alpha1.PackageRevisionResources) (*porchapiv1alpha1.RenderStatus, error) {
 	ctx, span := tracer.Start(ctx, "genericTaskHandler::DoPRResourceMutations", trace.WithAttributes())
 	defer span.End()
 
@@ -212,8 +213,8 @@ func (th *genericTaskHandler) DoPRResourceMutations(
 	// The renderMutation always returns resources (kpt controls unrendered vs
 	// partially-rendered via the Kptfile annotation kpt.dev/save-on-render-failure).
 	var (
-		renderStatus *porchapi.RenderStatus
-		renderResult *porchapi.TaskResult
+		renderStatus *porchapiv1alpha1.RenderStatus
+		renderResult *porchapiv1alpha1.TaskResult
 	)
 	appliedResources, renderResult, rendErr := th.renderMutation(oldRes.GetNamespace()).apply(ctx, appliedResources)
 	// keep last render result on empty patch
@@ -223,27 +224,27 @@ func (th *genericTaskHandler) DoPRResourceMutations(
 			len(renderResult.RenderStatus.Result.Items) != 0) {
 		renderStatus = renderResult.RenderStatus
 	}
-	prr := &porchapi.PackageRevisionResources{
-		Spec: porchapi.PackageRevisionResourcesSpec{
+	prr := &porchapiv1alpha1.PackageRevisionResources{
+		Spec: porchapiv1alpha1.PackageRevisionResourcesSpec{
 			Resources: appliedResources.Contents,
 		},
 	}
 	if rendErr != nil {
 		klog.Error(rendErr)
-		err := draft.UpdateResources(ctx, prr, &porchapi.Task{Type: porchapi.TaskTypeRender})
+		err := draft.UpdateResources(ctx, prr, &porchapiv1alpha1.Task{Type: porchapiv1alpha1.TaskTypeRender})
 		if err != nil {
 			return renderStatus, &RenderPersistError{RenderErr: rendErr, PersistErr: err}
 		}
 		return renderStatus, &RenderError{Err: rendErr}
 	}
 
-	return renderStatus, draft.UpdateResources(ctx, prr, &porchapi.Task{Type: porchapi.TaskTypeRender})
+	return renderStatus, draft.UpdateResources(ctx, prr, &porchapiv1alpha1.Task{Type: porchapiv1alpha1.TaskTypeRender})
 }
 
 func (th *genericTaskHandler) applySubpackageTask(
 	ctx context.Context,
 	draft repository.PackageRevisionDraft,
-	obj *porchapi.PackageRevision,
+	obj *porchapiv1alpha1.PackageRevision,
 	resources repository.PackageResources) error {
 	ctx, span := tracer.Start(ctx, "genericTaskHandler::applySubpackageTask", trace.WithAttributes())
 	defer span.End()
@@ -272,7 +273,7 @@ func (th *genericTaskHandler) applySubpackageTask(
 		return pkgerrors.Wrap(err, "failed to parse subpackage Kptfile")
 	}
 
-	subpackageDir, err := porchapi.GetSubpackageDir(obj)
+	subpackageDir, err := porchapiv1alpha1.GetSubpackageDir(obj)
 	if err != nil {
 		return err
 	}
@@ -290,9 +291,9 @@ func (th *genericTaskHandler) applySubpackageTask(
 	obj.Spec.Tasks = obj.Spec.Tasks[:1]
 
 	switch taskResult.Task.Type {
-	case porchapi.TaskTypeClone:
+	case porchapiv1alpha1.TaskTypeClone:
 		return th.insertSubpackageResourcesInDraftResources(ctx, subpackageDir, resources, subpackageResources)
-	case porchapi.TaskTypeUpgrade:
+	case porchapiv1alpha1.TaskTypeUpgrade:
 		return th.upgradeSubpackageResourcesInDraftResources(ctx, subpackageDir, resources, subpackageResources)
 	default:
 		return fmt.Errorf("task of type %q not supported for subpackages", taskResult.Task.Type)
@@ -310,9 +311,9 @@ func renderError(err error) error {
 	return pkgerrors.Wrap(err, "Error rendering package in kpt function pipeline. Package NOT pushed to remote. Fix locally (until 'kpt fn render' succeeds) and retry. Details")
 }
 
-func (th *genericTaskHandler) mapTaskToMutation(obj *porchapi.PackageRevision, task *porchapi.Task, isDeployment bool, packageConfig *builtintypes.PackageConfig) (mutation, error) {
+func (th *genericTaskHandler) mapTaskToMutation(obj *porchapiv1alpha1.PackageRevision, task *porchapiv1alpha1.Task, isDeployment bool, packageConfig *builtintypes.PackageConfig) (mutation, error) {
 	switch task.Type {
-	case porchapi.TaskTypeInit:
+	case porchapiv1alpha1.TaskTypeInit:
 		if task.Init == nil {
 			return nil, fmt.Errorf("init not set for task of type %q", task.Type)
 		}
@@ -320,7 +321,7 @@ func (th *genericTaskHandler) mapTaskToMutation(obj *porchapi.PackageRevision, t
 			name: obj.Spec.PackageName,
 			task: task,
 		}, nil
-	case porchapi.TaskTypeClone:
+	case porchapiv1alpha1.TaskTypeClone:
 		if task.Clone == nil {
 			return nil, fmt.Errorf("clone not set for task of type %q", task.Type)
 		}
@@ -336,7 +337,7 @@ func (th *genericTaskHandler) mapTaskToMutation(obj *porchapi.PackageRevision, t
 			packageConfig:              packageConfig,
 		}, nil
 
-	case porchapi.TaskTypeUpgrade:
+	case porchapiv1alpha1.TaskTypeUpgrade:
 		if task.Upgrade == nil {
 			return nil, fmt.Errorf("upgrade field not set for task of type %q", task.Type)
 		}
@@ -348,7 +349,7 @@ func (th *genericTaskHandler) mapTaskToMutation(obj *porchapi.PackageRevision, t
 			pkgName:           obj.Spec.PackageName,
 		}, nil
 
-	case porchapi.TaskTypeEdit:
+	case porchapiv1alpha1.TaskTypeEdit:
 		if task.Edit == nil {
 			return nil, fmt.Errorf("edit not set for task of type %q", task.Type)
 		}
@@ -443,7 +444,7 @@ func (th *genericTaskHandler) parentSubpackageFound(subpackageDir, resourceKey s
 func PatchKptfile(
 	ctx context.Context,
 	oldPackage repository.PackageRevision,
-	newObj *porchapi.PackageRevision,
+	newObj *porchapiv1alpha1.PackageRevision,
 ) (string, bool, error) {
 	res, err := oldPackage.GetResources(ctx)
 	if err != nil {
@@ -537,7 +538,7 @@ func PatchKptfile(
 	return content, true, nil
 }
 
-func applyMetadataToKptfile(kptFile *kptfileko.KptfileKubeObject, obj *porchapi.PackageRevision, replace bool) (bool, error) {
+func applyMetadataToKptfile(kptFile *kptfileko.KptfileKubeObject, obj *porchapiv1alpha1.PackageRevision, replace bool) (bool, error) {
 	var changed bool
 
 	if obj.Spec.PackageMetadata != nil {
@@ -585,8 +586,8 @@ func applyMapMetadata(cur, desired map[string]string, replace bool, setter func(
 	return changed
 }
 
-func syncReadinessGates(kptFile *kptfileko.KptfileKubeObject, desired []porchapi.ReadinessGate) (bool, error) {
-	desiredMap := make(map[string]porchapi.ReadinessGate, len(desired))
+func syncReadinessGates(kptFile *kptfileko.KptfileKubeObject, desired []porchapiv1alpha1.ReadinessGate) (bool, error) {
+	desiredMap := make(map[string]porchapiv1alpha1.ReadinessGate, len(desired))
 	for _, rg := range desired {
 		desiredMap[rg.ConditionType] = rg
 	}
@@ -616,13 +617,13 @@ func syncReadinessGates(kptFile *kptfileko.KptfileKubeObject, desired []porchapi
 	return changed, nil
 }
 
-func convertStatusToKptfile(s porchapi.ConditionStatus) kptfilev1.ConditionStatus {
+func convertStatusToKptfile(s porchapiv1alpha1.ConditionStatus) kptfilev1.ConditionStatus {
 	switch s {
-	case porchapi.ConditionTrue:
+	case porchapiv1alpha1.ConditionTrue:
 		return kptfilev1.ConditionTrue
-	case porchapi.ConditionFalse:
+	case porchapiv1alpha1.ConditionFalse:
 		return kptfilev1.ConditionFalse
-	case porchapi.ConditionUnknown:
+	case porchapiv1alpha1.ConditionUnknown:
 		return kptfilev1.ConditionUnknown
 	default:
 		panic(fmt.Errorf("unknown condition status: %v", s))

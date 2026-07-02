@@ -30,7 +30,9 @@ import (
 	semver "github.com/Masterminds/semver/v3"
 	"github.com/google/uuid"
 	"github.com/kptdev/krm-functions-sdk/go/fn/kptfileapi"
-	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
+	porchapi "github.com/kptdev/porch/api/porch"
+	porchapiv1alpha1 "github.com/kptdev/porch/api/porch/v1alpha1"
+
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	pkgerrors "github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,7 +79,7 @@ func GetPorchApiServiceKey(ctx context.Context) (client.ObjectKey, error) {
 	}
 
 	apiSvc := registrationapi.APIService{}
-	apiSvcName := porchapi.SchemeGroupVersion.Version + "." + porchapi.SchemeGroupVersion.Group
+	apiSvcName := porchapiv1alpha1.SchemeGroupVersion.Version + "." + porchapiv1alpha1.SchemeGroupVersion.Group
 	err = c.Get(ctx, client.ObjectKey{
 		Name: apiSvcName,
 	}, &apiSvc)
@@ -284,7 +286,7 @@ func GenerateUid(prefix string, kubeNs string, kubeName string) types.UID {
 	space := uuid.MustParse(uuidSpace)
 	buff := bytes.Buffer{}
 	buff.WriteString(prefix)
-	buff.WriteString(strings.ToLower(porchapi.SchemeGroupVersion.Identifier()))
+	buff.WriteString(strings.ToLower(porchapiv1alpha1.SchemeGroupVersion.Identifier()))
 	buff.WriteString("/")
 	buff.WriteString(strings.ToLower(kubeNs))
 	buff.WriteString("/")

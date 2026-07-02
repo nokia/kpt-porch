@@ -16,17 +16,10 @@ package v1alpha1
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
-	"strings"
 
-	pkgerrors "github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/validation"
+	porchapi "github.com/kptdev/porch/api/porch"
 )
-
-// validRelativePathRegex validates the basic shape of a relative path (slash-separated segments made of allowed characters).
-// Additional constraints (e.g. no leading/trailing '/', no '.', and DNS1123-compliant name composition) are enforced in IsValidSubpackageDir.
-var validRelativePathRegex = regexp.MustCompile(`^(?:[a-zA-Z0-9._-]+(?:/[a-zA-Z0-9._-]+)*)?$`)
 
 func (pr *PackageRevision) IsPublished() bool {
 	return LifecycleIsPublished(pr.Spec.Lifecycle)
@@ -105,49 +98,10 @@ func GetSubpackageDir(pkgRev *PackageRevision) (string, error) {
 	}
 
 	subpackageDir := getSubpackageDir(pkgRev.Spec.Tasks[1])
-	if err := IsValidSubpackageDir(subpackageDir); err == nil {
+	if err := porchapi.IsValidSubpackageDir(subpackageDir); err == nil {
 		return subpackageDir, nil
 	} else {
 		return "", err
-	}
-}
-
-// IsValidSubpackageDir returns an error if subpackageDir is invalid.
-func IsValidSubpackageDir(subpackageDir string) error {
-	// Empty string is invalid, a subpackage directory must be a relative path.
-	if subpackageDir == "" {
-		return pkgerrors.Errorf("subpackage directory %q is invalid", subpackageDir)
-	}
-
-	// Check basic format and ensure it doesn't start with '/', doesn't end with '/', and doesn't contain '.'
-	if subpackageDir[0] == '/' || strings.HasSuffix(subpackageDir, "/") || strings.Contains(subpackageDir, ".") {
-		return pkgerrors.Errorf("subpackage directory %q is invalid, it cannot contain '.' or start with '/' or end with '/'", subpackageDir)
-	}
-
-	if !validRelativePathRegex.MatchString(subpackageDir) {
-		return pkgerrors.Errorf("subpackage directory %q is invalid, it must match regular expression %q", subpackageDir, validRelativePathRegex.String())
-	}
-
-	if _, err := ComposeSubpkgObjName(subpackageDir); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func ComposeSubpkgObjName(subpackageDir string) (string, error) {
-	if subpackageDir == "" {
-		return "", pkgerrors.Errorf("subpackage directory %q is invalid", subpackageDir)
-	}
-
-	subpackageName := strings.ReplaceAll(subpackageDir, "/", ".")
-
-	objNameErrs := validation.IsDNS1123Subdomain(subpackageName)
-
-	if len(objNameErrs) == 0 {
-		return subpackageName, nil
-	} else {
-		return "", pkgerrors.Errorf("subpackage resource name %q invalid: %s", subpackageName, strings.Join(objNameErrs, ","))
 	}
 }
 

@@ -18,7 +18,8 @@ import (
 	"strings"
 
 	kptfilev1 "github.com/kptdev/kpt/api/kptfile/v1"
-	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
+	porchapi "github.com/kptdev/porch/api/porch"
+	porchapiv1alpha1 "github.com/kptdev/porch/api/porch/v1alpha1"
 	suiteutils "github.com/kptdev/porch/test/e2e/suiteutils"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +82,7 @@ func (t *PorchSuite) TestSubpackageCloneIntoExisting() {
 		t.Fatalf("Clone of subpackage %v into parent PR %v subpackage directory %q failed: %v", cloneePRV1, parentPR, subpackageDir1, err)
 	}
 
-	var parentPRResources porchapi.PackageRevisionResources
+	var parentPRResources porchapiv1alpha1.PackageRevisionResources
 	t.GetF(client.ObjectKey{
 		Namespace: t.Namespace,
 		Name:      parentPR.Name,
@@ -149,7 +150,7 @@ func (t *PorchSuite) TestSubpackageUpgradeNonexisting() {
 		t.Fatalf("Clone of subpackage %v into parent PR %v subpackage directory %q failed: %v", cloneePRV1, parentPR, subpackageDir1, err)
 	}
 
-	var parentPRResources porchapi.PackageRevisionResources
+	var parentPRResources porchapiv1alpha1.PackageRevisionResources
 	t.GetF(client.ObjectKey{
 		Namespace: t.Namespace,
 		Name:      parentPR.Name,
@@ -260,7 +261,7 @@ func (t *PorchSuite) TestSubpackageCloneAndUpgradeNonOverlapping() {
 		t.Fatalf("Clone of subpackage %v into parent PR %v subpackage directory %q failed: %v", cloneePR4V1, parentPR, subpackageDir4, err)
 	}
 
-	var parentPRResources porchapi.PackageRevisionResources
+	var parentPRResources porchapiv1alpha1.PackageRevisionResources
 	t.GetF(client.ObjectKey{
 		Namespace: t.Namespace,
 		Name:      parentPR.Name,
@@ -386,7 +387,7 @@ func (t *PorchSuite) SimpleSubpackageCloneAndUpgradeScenario(subpackageRepo, sub
 		t.Fatalf("Clone of subpackage %v into parent PR %v subpackage directory %q failed: %v", cloneePRV1, parentPR, subpackageDir, err)
 	}
 
-	var parentPRResources porchapi.PackageRevisionResources
+	var parentPRResources porchapiv1alpha1.PackageRevisionResources
 	t.GetF(client.ObjectKey{
 		Namespace: t.Namespace,
 		Name:      parentPR.Name,
@@ -453,13 +454,13 @@ func (t *PorchSuite) SimpleSubpackageCloneAndUpgradeScenario(subpackageRepo, sub
 	t.deletePR(cloneePRV1)
 }
 
-func (t *PorchSuite) createPR(subpackageRepo, packageName, workspace string) *porchapi.PackageRevision {
+func (t *PorchSuite) createPR(subpackageRepo, packageName, workspace string) *porchapiv1alpha1.PackageRevision {
 	// Create PackageRevision from upstream repo
 	createdPR := t.CreatePackageSkeleton(subpackageRepo, packageName, workspace)
-	createdPR.Spec.Tasks = []porchapi.Task{
+	createdPR.Spec.Tasks = []porchapiv1alpha1.Task{
 		{
-			Type: porchapi.TaskTypeInit,
-			Init: &porchapi.PackageInitTaskSpec{
+			Type: porchapiv1alpha1.TaskTypeInit,
+			Init: &porchapiv1alpha1.PackageInitTaskSpec{
 				Description: description,
 			},
 		},
@@ -467,7 +468,7 @@ func (t *PorchSuite) createPR(subpackageRepo, packageName, workspace string) *po
 	t.CreateF(createdPR)
 
 	// Check the package exists
-	var pkg porchapi.PackageRevision
+	var pkg porchapiv1alpha1.PackageRevision
 	t.MustExist(client.ObjectKey{Namespace: t.Namespace, Name: createdPR.Name}, &pkg)
 
 	t.addPipelineToPR(createdPR)
@@ -475,14 +476,14 @@ func (t *PorchSuite) createPR(subpackageRepo, packageName, workspace string) *po
 	return createdPR
 }
 
-func (t *PorchSuite) copyPR(subpackageRepo string, sourcePr *porchapi.PackageRevision, workspace string) *porchapi.PackageRevision {
+func (t *PorchSuite) copyPR(subpackageRepo string, sourcePr *porchapiv1alpha1.PackageRevision, workspace string) *porchapiv1alpha1.PackageRevision {
 	// Copy PackageRevision from another packagerevision
 	copiedPR := t.CreatePackageSkeleton(subpackageRepo, sourcePr.Spec.PackageName, workspace)
-	copiedPR.Spec.Tasks = []porchapi.Task{
+	copiedPR.Spec.Tasks = []porchapiv1alpha1.Task{
 		{
-			Type: porchapi.TaskTypeEdit,
-			Edit: &porchapi.PackageEditTaskSpec{
-				Source: &porchapi.PackageRevisionRef{
+			Type: porchapiv1alpha1.TaskTypeEdit,
+			Edit: &porchapiv1alpha1.PackageEditTaskSpec{
+				Source: &porchapiv1alpha1.PackageRevisionRef{
 					Name: sourcePr.Name,
 				},
 			},
@@ -491,7 +492,7 @@ func (t *PorchSuite) copyPR(subpackageRepo string, sourcePr *porchapi.PackageRev
 	t.CreateF(copiedPR)
 
 	// Check the package exists
-	var pkg porchapi.PackageRevision
+	var pkg porchapiv1alpha1.PackageRevision
 	t.MustExist(client.ObjectKey{Namespace: t.Namespace, Name: copiedPR.Name}, &pkg)
 
 	t.addPipelineToPR(copiedPR)
@@ -499,13 +500,13 @@ func (t *PorchSuite) copyPR(subpackageRepo string, sourcePr *porchapi.PackageRev
 	return copiedPR
 }
 
-func (t *PorchSuite) cloneSubpackage(parentPR, cloneePR *porchapi.PackageRevision, subpackage string) (*porchapi.PackageRevision, error) {
-	parentPR.Spec.Tasks = append(parentPR.Spec.Tasks, porchapi.Task{
-		Type: porchapi.TaskTypeClone,
-		Clone: &porchapi.PackageCloneTaskSpec{
-			Upstream: porchapi.UpstreamPackage{
-				Type: porchapi.RepositoryTypeGit,
-				UpstreamRef: &porchapi.PackageRevisionRef{
+func (t *PorchSuite) cloneSubpackage(parentPR, cloneePR *porchapiv1alpha1.PackageRevision, subpackage string) (*porchapiv1alpha1.PackageRevision, error) {
+	parentPR.Spec.Tasks = append(parentPR.Spec.Tasks, porchapiv1alpha1.Task{
+		Type: porchapiv1alpha1.TaskTypeClone,
+		Clone: &porchapiv1alpha1.PackageCloneTaskSpec{
+			Upstream: porchapiv1alpha1.UpstreamPackage{
+				Type: porchapiv1alpha1.RepositoryTypeGit,
+				UpstreamRef: &porchapiv1alpha1.PackageRevisionRef{
 					Name: cloneePR.Name,
 				},
 			},
@@ -517,17 +518,17 @@ func (t *PorchSuite) cloneSubpackage(parentPR, cloneePR *porchapi.PackageRevisio
 	return parentPR, err
 }
 
-func (t *PorchSuite) upgradeSubpackage(parentPR, oldCloneePR, newCloneePR *porchapi.PackageRevision, subpackage string) (*porchapi.PackageRevision, error) {
-	parentPR.Spec.Tasks = append(parentPR.Spec.Tasks, porchapi.Task{
-		Type: porchapi.TaskTypeUpgrade,
-		Upgrade: &porchapi.PackageUpgradeTaskSpec{
-			OldUpstream: porchapi.PackageRevisionRef{
+func (t *PorchSuite) upgradeSubpackage(parentPR, oldCloneePR, newCloneePR *porchapiv1alpha1.PackageRevision, subpackage string) (*porchapiv1alpha1.PackageRevision, error) {
+	parentPR.Spec.Tasks = append(parentPR.Spec.Tasks, porchapiv1alpha1.Task{
+		Type: porchapiv1alpha1.TaskTypeUpgrade,
+		Upgrade: &porchapiv1alpha1.PackageUpgradeTaskSpec{
+			OldUpstream: porchapiv1alpha1.PackageRevisionRef{
 				Name: oldCloneePR.Name,
 			},
-			NewUpstream: porchapi.PackageRevisionRef{
+			NewUpstream: porchapiv1alpha1.PackageRevisionRef{
 				Name: newCloneePR.Name,
 			},
-			LocalPackageRevisionRef: porchapi.PackageRevisionRef{
+			LocalPackageRevisionRef: porchapiv1alpha1.PackageRevisionRef{
 				Name: parentPR.Name,
 			},
 			SubpackageDir: subpackage,
@@ -538,13 +539,13 @@ func (t *PorchSuite) upgradeSubpackage(parentPR, oldCloneePR, newCloneePR *porch
 	return parentPR, err
 }
 
-func (t *PorchSuite) deletePR(pr *porchapi.PackageRevision) {
+func (t *PorchSuite) deletePR(pr *porchapiv1alpha1.PackageRevision) {
 	// Handle deletion if required
-	if pr.Spec.Lifecycle == porchapi.PackageRevisionLifecyclePublished {
-		pr.Spec.Lifecycle = porchapi.PackageRevisionLifecycleDeletionProposed
+	if pr.Spec.Lifecycle == porchapiv1alpha1.PackageRevisionLifecyclePublished {
+		pr.Spec.Lifecycle = porchapiv1alpha1.PackageRevisionLifecycleDeletionProposed
 		t.UpdateApprovalF(pr)
 	}
-	t.DeleteE(&porchapi.PackageRevision{
+	t.DeleteE(&porchapiv1alpha1.PackageRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.Namespace,
 			Name:      pr.Name,
@@ -553,15 +554,15 @@ func (t *PorchSuite) deletePR(pr *porchapi.PackageRevision) {
 	t.MustNotExist(pr)
 }
 
-func (t *PorchSuite) approvePR(pr *porchapi.PackageRevision) {
-	pr.Spec.Lifecycle = porchapi.PackageRevisionLifecycleProposed
+func (t *PorchSuite) approvePR(pr *porchapiv1alpha1.PackageRevision) {
+	pr.Spec.Lifecycle = porchapiv1alpha1.PackageRevisionLifecycleProposed
 	t.UpdateF(pr)
-	pr.Spec.Lifecycle = porchapi.PackageRevisionLifecyclePublished
+	pr.Spec.Lifecycle = porchapiv1alpha1.PackageRevisionLifecyclePublished
 	t.UpdateApprovalF(pr)
 }
 
-func (t *PorchSuite) addPipelineToPR(pr *porchapi.PackageRevision) {
-	var prResources porchapi.PackageRevisionResources
+func (t *PorchSuite) addPipelineToPR(pr *porchapiv1alpha1.PackageRevision) {
+	var prResources porchapiv1alpha1.PackageRevisionResources
 
 	t.GetF(client.ObjectKeyFromObject(pr), &prResources)
 	kptfile := t.ParseKptfileF(&prResources)
