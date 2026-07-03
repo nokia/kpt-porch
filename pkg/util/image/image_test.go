@@ -220,6 +220,7 @@ func TestImageParse(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			got := Parse(tc.input)
 			assert.Equal(t, tc.want, got)
+			assert.Equal(t, got.Original, got.Full())
 		})
 	}
 }

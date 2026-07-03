@@ -94,16 +94,6 @@ func (s *FunctionConfigStore) generateRegexPattern(prefixes []string, imageName 
 
 }
 
-func splitImage(image string) (name string, tag string) {
-	lastSlash := strings.LastIndex(image, "/")
-	lastColon := strings.LastIndex(image, ":")
-
-	if lastColon > lastSlash {
-		return image[:lastColon], image[lastColon+1:]
-	}
-	return image, ""
-}
-
 func (s *FunctionConfigStore) UpdateBinaryCache(_ string, obj *configapi.FunctionConfig) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -214,10 +204,11 @@ func (s *FunctionConfigStore) GetBinaryFromCacheByConstraint(image, tag string) 
 	}
 	selectedBinary := cacheEntry.Tags[selectedKey]
 
-	prefixToCheck, tag := splitImage(image)
+	// TODO: something is not right here
+
 	regex := regexp.MustCompile(cacheEntry.PrefixRegex)
-	if regex.MatchString(prefixToCheck) {
-		binaryPath, tagExists := cacheEntry.Tags[tag]
+	if regex.MatchString(parsedImage.Prefix()) {
+		binaryPath, tagExists := cacheEntry.Tags[parsedImage.Tag]
 		if tagExists {
 			return binaryPath, true
 		}

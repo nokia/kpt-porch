@@ -73,6 +73,9 @@ func Join(parts ...string) string {
 
 	for _, part := range parts[1:] {
 		part = strings.Trim(part, "/")
+		if part == "" {
+			continue
+		}
 		sb.WriteString("/")
 		sb.WriteString(part)
 	}

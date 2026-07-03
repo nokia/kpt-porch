@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"net"
 	"slices"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -374,9 +373,9 @@ func (pcm *podCacheManager) warmupCache(defaultImagePrefix string) error {
 				image = fmt.Sprintf("%s:%s", entry.Spec.Image, entry.Spec.PodExecutor.Tags[0])
 			}
 			if len(entry.Spec.Prefixes) > 0 && entry.Spec.Prefixes[0] != "" {
-				image = ImageJoin(entry.Spec.Prefixes[0], image)
+				image = imageutil.Join(entry.Spec.Prefixes[0], image)
 			} else {
-				image = ImageJoin(defaultImagePrefix, image)
+				image = imageutil.Join(defaultImagePrefix, image)
 			}
 			image = pcm.podManager.imageResolver(image)
 			fn := pcm.FunctionInfo(image)
@@ -395,10 +394,6 @@ func (pcm *podCacheManager) warmupCache(defaultImagePrefix string) error {
 		}
 	}
 	return nil
-}
-
-func ImageJoin(prefix, image string) string {
-	return strings.TrimRight(prefix, "/") + "/" + strings.TrimLeft(image, "/")
 }
 
 // findBestPod returns with the index of the best pod for the given function.
