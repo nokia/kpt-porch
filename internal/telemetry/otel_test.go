@@ -29,6 +29,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
+	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 
 	otlpmetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	otlptraces "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -60,6 +62,16 @@ func TestPrometheusHTTPServer(t *testing.T) {
 	t.Setenv(ENV_OTEL_EXPORTER_PROMETHEUS_HOST, "0.0.0.0")
 	t.Setenv(ENV_OTEL_EXPORTER_PROMETHEUS_PORT, fmt.Sprintf("%d", port))
 
+	// Register a trivial metric into the k8s legacy registry to verify it
+	// appears in the unified /metrics response.
+	legacyCounter := compbasemetrics.NewCounter(&compbasemetrics.CounterOpts{
+		Name: "test_legacy_registry_total",
+		Help: "A test counter registered in the k8s legacy registry",
+	})
+	legacyregistry.MustRegister(legacyCounter)
+	legacyCounter.Inc()
+	defer legacyregistry.Reset()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -74,7 +86,16 @@ func TestPrometheusHTTPServer(t *testing.T) {
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	assert.Contains(t, string(body), "target_info")
+	bodyStr := string(body)
+
+	// Verify OTel metrics are present
+	assert.Contains(t, bodyStr, "target_info")
+
+	// Verify the legacy registry metric appears (apiserver library metrics path)
+	assert.Contains(t, bodyStr, "test_legacy_registry_total")
+
+	// Verify no gather errors are reported in the response
+	assert.NotContains(t, bodyStr, "error gathering metrics")
 }
 
 func TestPrometheusHTTPServerInvalidPort(t *testing.T) {

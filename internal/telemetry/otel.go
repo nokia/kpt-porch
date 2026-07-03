@@ -33,6 +33,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 	controllerruntimemetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
@@ -208,6 +209,7 @@ func startMetricsServerIfConfigured(res *OTelResources) error {
 	gatherers := prometheus.Gatherers{
 		prometheus.DefaultGatherer,
 		controllerruntimemetrics.Registry,
+		legacyregistry.DefaultGatherer,
 	}
 	handler := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
 		ErrorHandling: promhttp.ContinueOnError,
