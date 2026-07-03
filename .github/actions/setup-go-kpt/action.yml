@@ -23,7 +23,10 @@ inputs:
   kpt-fallback-version:
     description: "Fallback kpt version if extraction from go.mod fails"
     required: false
-    default: "v1.0.0-beta.64"
+    default: "v1.0.0-beta.65"
+  go-version:
+    description: "Exact version for Go version setup, go-version-file is ignored if set"
+    required: false
   go-version-file:
     description: "Path to go.mod file for Go version setup"
     required: false
@@ -48,6 +51,7 @@ runs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
+        go-version: ${{ inputs.go-version }}
         go-version-file: ${{ inputs.go-version-file }}
         cache: ${{ inputs.go-cache == 'true' }}
         cache-dependency-path: ${{ inputs.cache-dependency-path }}
