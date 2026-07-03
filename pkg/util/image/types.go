@@ -14,7 +14,9 @@
 
 package image
 
-import "strings"
+import (
+	"strings"
+)
 
 // ParsedImage is a structured representation of a container image reference,
 // broken into registry, sub-path, base name, tag, and digest components.
@@ -80,4 +82,8 @@ func (p *ParsedImage) Prefix() string {
 	}
 
 	return sb.String()
+}
+
+func (p *ParsedImage) String() string {
+	return p.Full()
 }
