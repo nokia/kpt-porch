@@ -28,7 +28,7 @@ import (
 	"github.com/kptdev/krm-functions-catalog/functions/go/starlark/starlark"
 	fnsdk "github.com/kptdev/krm-functions-sdk/go/fn"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
-	"github.com/kptdev/porch/pkg/util"
+	imageutil "github.com/kptdev/porch/pkg/util/image"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -181,13 +181,13 @@ func (s *FunctionConfigStore) GetBinaryFromCache(image string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	image, tag := splitImage(image)
-	prefixToCheck := util.GetImageRepository(image)
-	binaryStore, exists := s.binaryExecutorCache[util.GetImageName(image)]
+	parsedImage := imageutil.Parse(image)
+	prefixToCheck := parsedImage.Prefix()
+	binaryStore, exists := s.binaryExecutorCache[parsedImage.BaseName]
 	if exists {
 		regex := regexp.MustCompile(binaryStore.PrefixRegex)
 		if regex.MatchString(prefixToCheck) {
-			binaryPath, tagExists := binaryStore.Tags[tag]
+			binaryPath, tagExists := binaryStore.Tags[parsedImage.Tag]
 			if tagExists {
 				return binaryPath, true
 			}
@@ -200,15 +200,15 @@ func (s *FunctionConfigStore) GetBinaryFromCacheByConstraint(image, tag string) 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	baseName := util.GetImageName(image)
-	cacheEntry := s.binaryExecutorCache[baseName]
+	parsedImage := imageutil.Parse(image)
+	cacheEntry := s.binaryExecutorCache[parsedImage.BaseName]
 
 	cacheKeys := make([]string, 0, len(s.binaryExecutorCache))
 	for k := range cacheEntry.Tags {
 		cacheKeys = append(cacheKeys, k)
 	}
 
-	selectedKey, err := util.FindBestSemverMatch(tag, image, cacheKeys)
+	selectedKey, err := imageutil.FindBestSemverMatch(tag, cacheKeys)
 	if err != nil {
 		return "", false
 	}
@@ -236,14 +236,13 @@ func (s *FunctionConfigStore) GetExecCache() map[string]BuiltInCacheEntry {
 func (s *FunctionConfigStore) GetProcessorFromCache(image string) (fnsdk.ResourceListProcessor, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	baseName := util.GetImageName(image)
-	tag := util.GetImageTag(image)
-	entry, found := s.builtInExecutorCache[baseName]
-	prefixToCheck := util.GetImageRepository(image)
+	parsedImage := imageutil.Parse(image)
+	entry, found := s.builtInExecutorCache[parsedImage.BaseName]
+	prefixToCheck := parsedImage.Prefix()
 	if prefixToCheck == "" {
 		prefixToCheck = s.defaultImagePrefix
 	}
-	if slices.Contains(entry.Tags, tag) {
+	if slices.Contains(entry.Tags, parsedImage.Tag) {
 		regex := regexp.MustCompile(entry.PrefixRegex)
 		if regex.MatchString(prefixToCheck) {
 			return entry.Process, found

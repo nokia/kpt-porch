@@ -25,7 +25,7 @@ import (
 
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	fnconf "github.com/kptdev/porch/controllers/functionconfigs/reconciler"
-	"github.com/kptdev/porch/pkg/util"
+	imageutil "github.com/kptdev/porch/pkg/util/image"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -141,7 +141,7 @@ func (pcm *podCacheManager) podCacheManager(ctx context.Context) {
 
 				fn.pods = append(fn.pods, NewPodInfo(req.responseCh))
 
-				functionConfig, exists := pcm.functionConfigMap.GetFunctionConfig(util.GetImageName(req.image))
+				functionConfig, exists := pcm.functionConfigMap.GetFunctionConfig(imageutil.Parse(req.image).BaseName)
 				if !exists {
 					functionConfig = &configapi.FunctionConfig{}
 				}
@@ -259,7 +259,7 @@ func (pcm *podCacheManager) podCacheManager(ctx context.Context) {
 // If the image is present in the configMap, it returns the specific parameters for that image.
 // Otherwise, it falls back to the global defaults (pcm.podTTL, pcm.maxWaitlistLength, pcm.maxParallelPodsPerFunction).
 func (pcm *podCacheManager) getParamsForImage(image string) (ttl time.Duration, maxWaitlist, maxPods int) {
-	if entry, ok := pcm.functionConfigMap.GetFunctionConfig(util.GetImageName(image)); ok && entry.Spec.PodExecutor != nil {
+	if entry, ok := pcm.functionConfigMap.GetFunctionConfig(imageutil.Parse(image).BaseName); ok && entry.Spec.PodExecutor != nil {
 		podExecutorConfig := entry.Spec.PodExecutor
 		parsedTTL := podExecutorConfig.TimeToLive.Duration
 		if parsedTTL <= 0 {

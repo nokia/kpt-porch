@@ -25,7 +25,7 @@ import (
 	fnsdk "github.com/kptdev/krm-functions-sdk/go/fn"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/controllers/functionconfigs/reconciler"
-	"github.com/kptdev/porch/pkg/util"
+	imageutil "github.com/kptdev/porch/pkg/util/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -210,7 +210,7 @@ func TestBuiltinRuntime(t *testing.T) {
 		functionConfigStore.UpdateExecCache(setNamespaceFunction, &functionConfig)
 		br := newBuiltinRuntime(functionConfigStore)
 		funct := &kptfilev1.Function{
-			Image: util.ImageJoin(defaultKRMImagePrefix, setNamespaceFunction) + ":v0.4.2",
+			Image: imageutil.Join(defaultKRMImagePrefix, setNamespaceFunction) + ":v0.4.2",
 			// Image is explicitly tagged with v0.4.2, however,
 			// there is no function with this explicit tag in the cache
 		}
