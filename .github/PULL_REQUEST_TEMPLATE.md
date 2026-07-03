@@ -1,22 +1,21 @@
 <!--  Thanks for sending a pull request! -->
 
-## Title
 <!-- Short, descriptive title for the PR -->
-[Add title here]
+# [Add title here]
 
 ---
 
 ## Description
 <!-- Describe what this PR does and why -->
-- What changed:  
-- Why it’s needed:  
-- How it works:  
+- What changed: 
+- Why it’s needed: 
+- How it works: 
 
 ---
 
 ## Related Issue(s)
 <!-- Link issues using #ISSUE_NUMBER -->
-- Closes/Fixes #  
+- Closes/Fixes #
 
 ---
 
@@ -33,25 +32,25 @@
 ---
 
 ## Checklist
-- [ ] Code follows project style guidelines  
-- [ ] Self-reviewed changes  
-- [ ] Tests added/updated  
-- [ ] Documentation added/updated  
-- [ ] All tests and gating checks pass  
+- [ ] Code follows project style guidelines
+- [ ] Self-reviewed changes
+- [ ] Tests added/updated
+- [ ] Documentation added/updated
+- [ ] All tests and gating checks pass
 
 ---
 
 ## Testing Instructions (Optional)
-1.  
-2.  
-3.  
+1. 
+2. 
+3. 
 
 ---
 
 ## Additional Notes (Optional)
-- Known issues:  
-- Further improvements:  
-- Review notes:  
+- Known issues: 
+- Further improvements: 
+- Review notes: 
 
 ---
 
