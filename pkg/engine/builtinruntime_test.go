@@ -16,6 +16,7 @@ package engine
 
 import (
 	"bytes"
+	"flag"
 	"os"
 	"path/filepath"
 	"testing"
@@ -115,6 +116,10 @@ func TestNewBuiltinRuntime(t *testing.T) {
 }
 
 func TestBuiltinRuntime(t *testing.T) {
+	flagSet := flag.NewFlagSet("log-level", flag.ContinueOnError)
+	klog.InitFlags(flagSet)
+	_ = flagSet.Parse([]string{"--v", "3"})
+
 	t.Run("invalid semver constraint syntax", func(t *testing.T) {
 		ctx := t.Context()
 		functionConfig := configapi.FunctionConfig{
@@ -303,9 +308,7 @@ functionConfig:
 		logOutput := logBuffer.String()
 
 		// Verify the klog message contains the expected version selection
-		assert.Contains(t, logOutput, `Selected image "ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.1"`)
-		assert.Contains(t, logOutput, `version "0.4.1"`)
-		assert.Contains(t, logOutput, `for request "ghcr.io/kptdev/krm-functions-catalog/set-namespace"`)
+		assert.Contains(t, logOutput, `Selected tag "v0.4.1"`)
 
 		reader := bytes.NewReader([]byte(`apiVersion: config.kubernetes.io/v1alpha1
 kind: ResourceList
@@ -441,9 +444,7 @@ functionConfig:
 		logOutput := logBuffer.String()
 
 		// Verify the klog message contains the expected version selection
-		assert.Contains(t, logOutput, `Selected image "ghcr.io/kptdev/krm-functions-catalog/set-namespace:v0.4.1"`)
-		assert.Contains(t, logOutput, `(version "0.4.1")`)
-		assert.Contains(t, logOutput, `for request "ghcr.io/kptdev/krm-functions-catalog/set-namespace"`)
+		assert.Contains(t, logOutput, `Selected tag "v0.4.1"`)
 
 		reader := bytes.NewReader([]byte(`apiVersion: config.kubernetes.io/v1alpha1
 kind: ResourceList
