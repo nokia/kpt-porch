@@ -349,8 +349,11 @@ func (pr *dbPackageRevision) ToMainPackageRevision(ctx context.Context) reposito
 			Revision:      -1,
 			WorkspaceName: pr.Key().RKey().PlaceholderWSname,
 		},
-		meta:               metav1.ObjectMeta{},
-		spec:               &porchapi.PackageRevisionSpec{},
+		meta: metav1.ObjectMeta{},
+		spec: &porchapi.PackageRevisionSpec{
+			ReadinessGates:  append([]porchapi.ReadinessGate(nil), pr.specReadinessGates()...),
+			PackageMetadata: pr.specPackageMetadata().DeepCopy(),
+		},
 		updated:            time.Now(),
 		updatedBy:          getCurrentUser(),
 		lifecycle:          pr.lifecycle,
