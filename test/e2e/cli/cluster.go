@@ -1,4 +1,4 @@
-// Copyright 2022-2025 The kpt Authors
+// Copyright 2022-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,26 +55,6 @@ func IsRepoControllerRunningInCluster(t *testing.T) bool {
 		t.Fatalf("Error when getting porch-controllers Deployment: %v: %s", err, stderr.String())
 	}
 	return stdout.String() != "" && stdout.String() != "0"
-}
-
-func KubectlApply(t *testing.T, config string) {
-	cmd := exec.Command("kubectl", "apply", "-f", "-")
-	cmd.Stdin = strings.NewReader(config)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("kubectl apply failed: %v\ninput: %s\n\noutput:%s", err, config, string(out))
-	}
-	t.Logf("kubectl apply\n%s\noutput:\n%s", config, string(out))
-}
-
-func KubectlDelete(t *testing.T, config string) {
-	cmd := exec.Command("kubectl", "delete", "-f", "-")
-	cmd.Stdin = strings.NewReader(config)
-	out, err := cmd.CombinedOutput()
-	if err != nil && !strings.Contains(string(out), "NotFound") {
-		t.Fatalf("kubectl delete failed: %v\ninput: %s\n\noutput:%s", err, config, string(out))
-	}
-	t.Logf("kubectl delete\n%s\noutput:\n%s", config, string(out))
 }
 
 func KubectlWaitForLoadBalancerIp(t *testing.T, namespace, name string) string {

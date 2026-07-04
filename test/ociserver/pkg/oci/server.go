@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -184,13 +184,6 @@ func (s *Server) openRegistry(r *http.Request, name string) (*Registry, Response
 		// TODO: Should we send something consistent with auth failure?
 		klog.Warningf("404 for %s %s (repo not found)", r.Method, r.URL)
 		return nil, ErrorResponse(http.StatusNotFound), nil
-	}
-
-	if repo.username != "" || repo.password != "" {
-		username, password, ok := r.BasicAuth()
-		if !ok || username != repo.username || password != repo.password {
-			return nil, ErrorResponse(http.StatusForbidden), nil
-		}
 	}
 
 	return repo, nil, nil

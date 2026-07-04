@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
 package porch
 
 import (
-	"context"
-
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	coreapi "k8s.io/api/core/v1"
@@ -24,7 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,51 +51,6 @@ func CreateClientWithFlags(flags *genericclioptions.ConfigFlags) (client.Client,
 	}
 
 	return CreateClient(config)
-}
-
-func CreateDynamicClient(flags *genericclioptions.ConfigFlags) (client.WithWatch, error) {
-	config, err := flags.ToRESTConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	scheme, err := createScheme()
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := client.NewWithWatch(config, client.Options{
-		Scheme: scheme,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
-// controller-runtime does not support subresources so we use REST client directly.
-// TODO: Separate Porch clientset into its own module (similar to k8s clientsets) to use it
-// without causing circular reference.
-func CreateRESTClient(flags *genericclioptions.ConfigFlags) (rest.Interface, error) {
-	config, err := flags.ToRESTConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	scheme, err := createScheme()
-	if err != nil {
-		return nil, err
-	}
-
-	codecs := serializer.NewCodecFactory(scheme)
-
-	gv := porchapi.SchemeGroupVersion
-	config.GroupVersion = &gv
-	config.APIPath = "/apis"
-	config.NegotiatedSerializer = codecs.WithoutConversion()
-
-	return rest.RESTClientFor(config)
 }
 
 func createScheme() (*runtime.Scheme, error) {
@@ -145,8 +97,4 @@ func createRESTMapper() meta.RESTMapper {
 	}
 
 	return rm
-}
-
-func Apply(ctx context.Context, api client.Client, obj client.Object) error {
-	return api.Patch(ctx, obj, client.Apply, client.FieldOwner("kubectl"))
 }

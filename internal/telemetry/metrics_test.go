@@ -26,15 +26,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
-type fakePackageRevision struct {
-	repository.PackageRevision
-	key       repository.PackageRevisionKey
-	namespace string
-}
-
-func (f *fakePackageRevision) KubeObjectNamespace() string        { return f.namespace }
-func (f *fakePackageRevision) Key() repository.PackageRevisionKey { return f.key }
-
 // Remaining interface methods are not called by RecordPackageRevisionResourcesSize,
 // so they can panic if invoked unexpectedly.
 

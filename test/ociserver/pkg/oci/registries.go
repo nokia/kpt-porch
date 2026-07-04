@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,47 +25,10 @@ type Registries interface {
 	FindRegistry(ctx context.Context, key string) (*Registry, error)
 }
 
-// StaticRegistries holds fixed registries
-type StaticRegistries struct {
-	mutex sync.Mutex
-	repos map[string]*Registry
-}
-
-// NewStaticRegistries constructs an instance of StaticRegistries
-func NewStaticRegistries() *StaticRegistries {
-	return &StaticRegistries{
-		repos: make(map[string]*Registry),
-	}
-}
-
-// FindRegistry returns a registry registered under the specified id, or nil if none is registered.
-func (r *StaticRegistries) FindRegistry(ctx context.Context, id string) (*Registry, error) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	return r.repos[id], nil
-}
-
-// Add registers a git repository under the specified id
-func (r *StaticRegistries) Add(id string, repo *Registry) error {
-	if !isRegistryIDAllowed(id) {
-		return fmt.Errorf("invalid name %q", id)
-	}
-
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	if _, found := r.repos[id]; found {
-		return fmt.Errorf("repo %q already exists", id)
-	}
-	r.repos[id] = repo
-	return nil
-}
-
-func NewDynamicRegistries(baseDir string, options []RegistryOption) *DynamicRegistries {
+func NewDynamicRegistries(baseDir string) *DynamicRegistries {
 	return &DynamicRegistries{
 		baseDir: baseDir,
 		repos:   make(map[string]*dynamicRegistry),
-		options: options,
 	}
 }
 
@@ -73,7 +36,6 @@ type DynamicRegistries struct {
 	mutex   sync.Mutex
 	repos   map[string]*dynamicRegistry
 	baseDir string
-	options []RegistryOption
 }
 
 type dynamicRegistry struct {
@@ -81,7 +43,6 @@ type dynamicRegistry struct {
 	registry *Registry
 	name     string
 	dir      string
-	options  []RegistryOption
 }
 
 func isRegistryIDAllowed(s string) bool {
@@ -117,9 +78,8 @@ func (r *DynamicRegistries) FindRegistry(ctx context.Context, id string) (*Regis
 	repo := r.repos[id]
 	if repo == nil {
 		repo = &dynamicRegistry{
-			name:    id,
-			dir:     dir,
-			options: r.options,
+			name: id,
+			dir:  dir,
 		}
 		r.repos[id] = repo
 	}
@@ -135,7 +95,7 @@ func (r *dynamicRegistry) open() (*Registry, error) {
 	if r.registry == nil {
 		baseDir := r.dir
 
-		registry, err := NewRegistry(r.name, baseDir, r.options...)
+		registry, err := NewRegistry(r.name, baseDir)
 		if err != nil {
 			return nil, err
 		}

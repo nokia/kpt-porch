@@ -1,4 +1,4 @@
-// Copyright 2025 The kpt Authors
+// Copyright 2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -240,6 +240,10 @@ func (t *DbTestSuite) TestPackageRevisionLatest() {
 }
 
 func (t *DbTestSuite) TestPackageRevisionResources() {
+	mockCache := mockcachetypes.NewMockCache(t.T())
+	cachetypes.CacheInstance = mockCache
+	mockCache.EXPECT().GetRepository(mock.Anything).Return(&dbRepository{})
+
 	dbRepo := t.createTestRepo("my-ns", "my-repo")
 	dbPkg := t.createTestPkg(dbRepo.Key(), "my-package")
 	dbPkg.repo = dbRepo
@@ -263,16 +267,17 @@ func (t *DbTestSuite) TestPackageRevisionResources() {
 	t.Equal("Goodbye.txt", resKey)
 	t.Equal("Goodbye", resVal)
 
-	err = pkgRevResourceDeleteFromDB(t.Context(), dbPR.Key(), "Goodbye.txt")
-	t.Require().NoError(err)
-
-	err = pkgRevResourceDeleteFromDB(t.Context(), dbPR.Key(), "Goodbye.txt")
+	// Remove "Goodbye.txt" by rewriting resources without it
+	dbPR.resources = map[string]string{"Hello.txt": "Hello"}
+	err = pkgRevResourcesWriteToDB(t.Context(), &dbPR)
 	t.Require().NoError(err)
 
 	_, _, err = pkgRevResourceReadFromDB(t.Context(), dbPR.Key(), "Goodbye.txt")
 	t.Require().ErrorContains(err, "no rows in result set")
 
-	err = pkgRevResourceWriteToDB(t.Context(), dbPR.Key(), "Goodbye.txt", "So long")
+	// Write "Goodbye.txt" back with a new value
+	dbPR.resources = map[string]string{"Hello.txt": "Hello", "Goodbye.txt": "So long"}
+	err = pkgRevResourcesWriteToDB(t.Context(), &dbPR)
 	t.Require().NoError(err)
 
 	resKey, resVal, err = pkgRevResourceReadFromDB(t.Context(), dbPR.Key(), "Goodbye.txt")
@@ -280,7 +285,9 @@ func (t *DbTestSuite) TestPackageRevisionResources() {
 	t.Equal("Goodbye.txt", resKey)
 	t.Equal("So long", resVal)
 
-	err = pkgRevResourceWriteToDB(t.Context(), dbPR.Key(), "Goodbye.txt", "See ya later")
+	// Update "Goodbye.txt" value again
+	dbPR.resources = map[string]string{"Hello.txt": "Hello", "Goodbye.txt": "See ya later"}
+	err = pkgRevResourcesWriteToDB(t.Context(), &dbPR)
 	t.Require().NoError(err)
 
 	resKey, resVal, err = pkgRevResourceReadFromDB(t.Context(), dbPR.Key(), "Goodbye.txt")
@@ -288,7 +295,9 @@ func (t *DbTestSuite) TestPackageRevisionResources() {
 	t.Equal("Goodbye.txt", resKey)
 	t.Equal("See ya later", resVal)
 
-	err = pkgRevResourceWriteToDB(t.Context(), dbPR.Key(), "Grand.txt", "Grand")
+	// Add a new resource "Grand.txt"
+	dbPR.resources = map[string]string{"Hello.txt": "Hello", "Goodbye.txt": "See ya later", "Grand.txt": "Grand"}
+	err = pkgRevResourcesWriteToDB(t.Context(), &dbPR)
 	t.Require().NoError(err)
 
 	resKey, resVal, err = pkgRevResourceReadFromDB(t.Context(), dbPR.Key(), "Grand.txt")
@@ -296,8 +305,13 @@ func (t *DbTestSuite) TestPackageRevisionResources() {
 	t.Equal("Grand.txt", resKey)
 	t.Equal("Grand", resVal)
 
-	dbPR.pkgRevKey.WorkspaceName = "bad"
-	err = pkgRevResourceWriteToDB(t.Context(), dbPR.Key(), "Grand.txt", "Grand")
+	// Verify that writing resources for a non-existent package revision fails with FK constraint violation
+	badPR := dbPackageRevision{
+		pkgRevKey: dbPR.pkgRevKey,
+		resources: map[string]string{"Bad.txt": "Bad"},
+	}
+	badPR.pkgRevKey.WorkspaceName = "non-existent"
+	err = pkgRevResourcesWriteToDB(t.Context(), &badPR)
 	t.Require().ErrorContains(err, "violates foreign key constraint")
 
 	err = repoDeleteFromDB(t.Context(), dbRepo.Key())

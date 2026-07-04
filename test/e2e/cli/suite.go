@@ -285,15 +285,6 @@ func (s *CliTestSuite) ScanTestCases(t *testing.T) []TestCaseConfig {
 	return testCases
 }
 
-// Porchctl runs the porchctl command under test with the given arguments.
-func (s *CliTestSuite) Porchctl(t *testing.T, args ...string) error {
-	cmd := exec.Command(s.PorchctlCommand, args...)
-	t.Logf("running command: porchctl %v", strings.Join(args, " "))
-	outBytes, err := cmd.CombinedOutput()
-	t.Logf("porchctl output: %v", string(outBytes))
-	return err
-}
-
 func runUtilityCommand(t *testing.T, command string, args ...string) error {
 	cmd := exec.Command(command, args...)
 	t.Logf("running utility command %s %s", command, strings.Join(args, " "))

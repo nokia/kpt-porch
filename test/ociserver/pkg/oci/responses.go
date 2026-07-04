@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -85,23 +85,6 @@ func (v *FileResponse) WriteTo(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	io.Copy(w, f)
-}
-
-type StreamingResponse struct {
-	ContentType string
-	Body        io.ReadCloser
-}
-
-func (v *StreamingResponse) WriteTo(w http.ResponseWriter, r *http.Request) {
-	defer v.Body.Close()
-
-	if v.ContentType != "" {
-		w.Header().Add("Content-Type", v.ContentType)
-	}
-	// w.Header().Add("Content-Length", strconv.FormatInt(v.Stat.Size(), 10))
-	w.WriteHeader(http.StatusOK)
-
-	io.Copy(w, v.Body)
 }
 
 type HTTPResponse struct {

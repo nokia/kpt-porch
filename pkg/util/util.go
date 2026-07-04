@@ -1,4 +1,4 @@
-// Copyright 2023-2025 The kpt Authors
+// Copyright 2023-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,7 +37,6 @@ import (
 	pkgerrors "github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
@@ -91,14 +90,6 @@ func GetPorchApiServiceKey(ctx context.Context) (client.ObjectKey, error) {
 		Namespace: apiSvc.Spec.Service.Namespace,
 		Name:      apiSvc.Spec.Service.Name,
 	}, nil
-}
-
-func SchemaToMetaGVR(gvr schema.GroupVersionResource) metav1.GroupVersionResource {
-	return metav1.GroupVersionResource{
-		Group:    gvr.Group,
-		Version:  gvr.Version,
-		Resource: gvr.Resource,
-	}
 }
 
 func ValidateK8SName(k8sName string) error {
@@ -338,18 +329,6 @@ func RetryOnErrorConditional(retries int, shouldRetryFunc func(error) bool, f fu
 			return err
 		}
 	}
-	return err
-}
-
-func RetryOnError(retries int, f func(retryNumber int) error) error {
-	var err error
-	for i := 1; i <= retries; i++ {
-		err = f(i)
-		if err == nil {
-			return nil
-		}
-	}
-	klog.Errorf("Failed to fetch remote repository after %d retries: %v", retries, err)
 	return err
 }
 

@@ -87,14 +87,6 @@ func (r *OTelResources) ShutdownWithTimeout(timeout time.Duration) error {
 	return r.Shutdown(ctx)
 }
 
-// Flush forces a flush of the meter provider, useful in tests.
-func (r *OTelResources) Flush() error {
-	if r.meterProvider != nil {
-		return r.meterProvider.ForceFlush(context.Background())
-	}
-	return nil
-}
-
 // SetupOpenTelemetry is the single entry point for all OpenTelemetry setup.
 // It configures tracing, metrics (including the Prometheus HTTP server if
 // OTEL_EXPORTER_PROMETHEUS_HOST and OTEL_EXPORTER_PROMETHEUS_PORT are set),

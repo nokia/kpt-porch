@@ -1,4 +1,4 @@
-// Copyright 2022, 2025 The kpt Authors
+// Copyright 2022, 2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -70,10 +70,6 @@ var (
 // (those references are in the form 'refs/remotes/origin/...') or in the remote
 // repository (those references are in the form 'refs/heads/...').
 type branchName string
-
-func (b branchName) refInRemote() plumbing.ReferenceName {
-	return plumbing.ReferenceName(branchPrefixInRemoteRepo + string(b))
-}
 
 func (b branchName) refInLocal() plumbing.ReferenceName {
 	return plumbing.ReferenceName(branchPrefixInLocalRepo + string(b))
@@ -147,10 +143,6 @@ func createFinalTagNameInLocal(key repository.PackageRevisionKey) plumbing.Refer
 	} else {
 		return plumbing.ReferenceName(tagsPrefixInLocalRepo + filepath.Join(key.PkgKey.ToFullPathname(), "/"+key.WorkspaceName))
 	}
-}
-
-func refInLocalFromRefInRemote(n plumbing.ReferenceName) (plumbing.ReferenceName, error) {
-	return translateReference(n, defaultFetchSpec)
 }
 
 func refInRemoteFromRefInLocal(n plumbing.ReferenceName) (plumbing.ReferenceName, error) {

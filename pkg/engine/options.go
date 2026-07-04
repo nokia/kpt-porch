@@ -1,4 +1,4 @@
-// Copyright 2022, 2024-2025 The kpt Authors
+// Copyright 2022, 2024-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -73,17 +73,6 @@ func WithGRPCFunctionRuntime(options GRPCRuntimeOptions) EngineOption {
 		}
 		return nil
 	})
-}
-
-func WithFunctionRuntime(runtime fn.FunctionRuntime) EngineOption {
-	return EngineOptionFunc(func(engine *cadEngine) error {
-		engine.taskHandler.SetRuntime(runtime)
-		return nil
-	})
-}
-
-func WithRunnerOptions(options runneroptions.RunnerOptions) EngineOption {
-	return WithRunnerOptionsResolver(func(namespace string) runneroptions.RunnerOptions { return options })
 }
 
 func WithRunnerOptionsResolver(fn func(namespace string) runneroptions.RunnerOptions) EngineOption {

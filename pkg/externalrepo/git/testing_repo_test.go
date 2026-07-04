@@ -1,4 +1,4 @@
-// Copyright 2022-2025 The kpt Authors
+// Copyright 2022-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -262,4 +262,12 @@ func fetch(t *testing.T, repo *gogit.Repository) {
 	default:
 		t.Fatalf("Fetch failed: %s", err)
 	}
+}
+
+func refInRemote(b branchName) plumbing.ReferenceName {
+	return plumbing.ReferenceName(branchPrefixInRemoteRepo + string(b))
+}
+
+func refInLocalFromRefInRemote(n plumbing.ReferenceName) (plumbing.ReferenceName, error) {
+	return translateReference(n, defaultFetchSpec)
 }

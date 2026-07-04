@@ -1,4 +1,4 @@
-// Copyright 2022, 2025 The kpt Authors
+// Copyright 2022, 2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -120,28 +120,6 @@ func (r *ociRepository) loadTasks(ctx context.Context, imageRef oci.ImageDigestN
 	}
 
 	return tasks, nil
-}
-
-func LookupImageTag(ctx context.Context, s *oci.Storage, imageName oci.ImageTagName) (*oci.ImageDigestName, error) {
-	ctx, span := tracer.Start(ctx, "Storage::LookupImageTag", trace.WithAttributes(
-		attribute.Stringer("image", imageName),
-	))
-	defer span.End()
-
-	ociImage, err := s.ToRemoteImage(ctx, imageName)
-	if err != nil {
-		return nil, err
-	}
-
-	digest, err := ociImage.Digest()
-	if err != nil {
-		return nil, err
-	}
-
-	return &oci.ImageDigestName{
-		Image:  imageName.Image,
-		Digest: digest.String(),
-	}, nil
 }
 
 func LoadResources(ctx context.Context, s *oci.Storage, imageName *oci.ImageDigestName) (*repository.PackageResources, error) {

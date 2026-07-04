@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,10 +39,6 @@ type Registry struct {
 	uploadsDir   string
 	manifestsDir string
 	blobsDir     string
-
-	// Basic auth
-	username string
-	password string
 }
 
 // metaDir is how we differentiate the image data from a child image directory
@@ -50,15 +46,10 @@ type Registry struct {
 const metaDir = "_image_"
 
 // NewRegistry constructs an instance of Registry
-func NewRegistry(name string, rootDir string, options ...RegistryOption) (*Registry, error) {
+func NewRegistry(name string, rootDir string) (*Registry, error) {
 	r := &Registry{
 		name:    name,
 		rootDir: rootDir,
-	}
-	for _, option := range options {
-		if err := option.apply(r); err != nil {
-			return nil, err
-		}
 	}
 
 	r.manifestsDir = filepath.Join(rootDir, metaDir, "manifests")
@@ -319,25 +310,4 @@ func (r *Registry) ListTags(ctx context.Context) (*Tags, error) {
 	}
 
 	return tags, nil
-}
-
-// RegistryOption is implemented by configuration settings for git repository.
-type RegistryOption interface {
-	apply(*Registry) error
-}
-
-type optionBasicAuth struct {
-	username, password string
-}
-
-func (o *optionBasicAuth) apply(s *Registry) error {
-	s.username, s.password = o.username, o.password
-	return nil
-}
-
-func WithBasicAuth(username, password string) RegistryOption {
-	return &optionBasicAuth{
-		username: username,
-		password: password,
-	}
 }

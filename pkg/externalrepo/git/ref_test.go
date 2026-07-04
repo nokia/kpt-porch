@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,11 +27,11 @@ import (
 func TestBranchNames(t *testing.T) {
 	const main branchName = "main"
 
-	if got, want := main.refInRemote(), "refs/heads/main"; string(got) != want {
-		t.Errorf("%s in remote repository: got %s, wnat %s", main, got, want)
+	if got, want := refInRemote(main), "refs/heads/main"; string(got) != want {
+		t.Errorf("%s in remote repository: got %s, want %s", main, got, want)
 	}
 	if got, want := main.refInLocal(), "refs/remotes/origin/main"; string(got) != want {
-		t.Errorf("%s in local repository: got %s, wnat %s", main, got, want)
+		t.Errorf("%s in local repository: got %s, want %s", main, got, want)
 	}
 }
 

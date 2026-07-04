@@ -35,7 +35,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -813,35 +812,6 @@ func TestMultipleEndpointsWithStuckPod(t *testing.T) {
 		assert.Len(t, finalEndpoint.Subsets[0].Addresses, 1, "Expected endpoint to have exactly 1 address")
 		assert.Equal(t, newPodIP, finalEndpoint.Subsets[0].Addresses[0].IP, "Expected endpoint IP to match new pod IP")
 	}
-}
-
-// Fake client handles pod patches incorrectly in case the pod doesn't exist
-//
-//nolint:unused
-func fakeClientPatchFixInterceptor(ctx context.Context, kubeClient client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	if obj.GetObjectKind().GroupVersionKind().Kind == "Pod" {
-		var canary corev1.Pod
-		err := kubeClient.Get(ctx, client.ObjectKeyFromObject(obj), &canary)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				err = kubeClient.Create(ctx, obj)
-				if err != nil {
-					return err
-				}
-				return nil
-			}
-			return err
-		}
-	}
-	return nil
-}
-
-func marshalToYamlOrPanic(obj interface{}) []byte {
-	data, err := yaml.Marshal(obj)
-	if err != nil {
-		panic(err)
-	}
-	return data
 }
 
 func deepCopyObject(in, out interface{}) {

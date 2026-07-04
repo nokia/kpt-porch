@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,20 +15,7 @@
 package membership
 
 import (
-	"context"
-	"encoding/json"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-)
-
-var (
-	gvr = schema.GroupVersionResource{
-		Group:    "hub.gke.io",
-		Version:  "v1",
-		Resource: "memberships",
-	}
 )
 
 // Membership is the object created by hub when a cluster is registered to hub.
@@ -46,22 +33,4 @@ type MembershipSpec struct {
 
 type MembershipOwner struct {
 	ID string `json:"id,omitempty"`
-}
-
-// Get gets and returns the Membership named "membership" from the cluster.
-func Get(ctx context.Context, client dynamic.Interface) (*Membership, error) {
-	cr, err := client.Resource(gvr).Get(ctx, "membership", metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	// round-trip through JSON is a convenient way to get at structured content
-	b, err := cr.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	membership := &Membership{}
-	if err := json.Unmarshal(b, membership); err != nil {
-		return nil, err
-	}
-	return membership, nil
 }
