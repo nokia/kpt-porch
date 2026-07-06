@@ -43,12 +43,12 @@ const FunctionRunnerFinalizer = BaseFinalizer + "-function-runner"
 const ControllerFinalizer = BaseFinalizer + "-controller"
 
 type BinaryCacheEntry struct {
-	PrefixRegex string
+	PrefixRegex *regexp.Regexp
 	Tags        map[string]string
 }
 
 type BuiltInCacheEntry struct {
-	PrefixRegex string
+	PrefixRegex *regexp.Regexp
 	Process     fnsdk.ResourceListProcessor
 	Tags        []string
 }
@@ -80,7 +80,7 @@ func (s *FunctionConfigStore) UpsertFunctionConfig(name string, obj *configapi.F
 	s.functionConfigurations[name] = obj
 }
 
-func (s *FunctionConfigStore) generateRegexPattern(prefixes []string, imageName string) string {
+func (s *FunctionConfigStore) generateRegexPattern(prefixes []string) *regexp.Regexp {
 	var preparedPrefixes []string
 	for _, prefix := range prefixes {
 		if prefix == "" {
@@ -90,7 +90,7 @@ func (s *FunctionConfigStore) generateRegexPattern(prefixes []string, imageName 
 		}
 	}
 
-	return "^(?:" + strings.Join(preparedPrefixes, "|") + ")$"
+	return regexp.MustCompile("^(?:" + strings.Join(preparedPrefixes, "|") + ")$")
 
 }
 
@@ -101,7 +101,7 @@ func (s *FunctionConfigStore) UpdateBinaryCache(_ string, obj *configapi.Functio
 	var binaryCacheEntry BinaryCacheEntry
 	binaryCacheEntry.Tags = make(map[string]string)
 	// Create a prefix Regex
-	binaryCacheEntry.PrefixRegex = s.generateRegexPattern(obj.Spec.Prefixes, obj.Spec.Image)
+	binaryCacheEntry.PrefixRegex = s.generateRegexPattern(obj.Spec.Prefixes)
 
 	abs := obj.Spec.BinaryExecutor.Path
 	if abs[0] != '/' {
@@ -139,7 +139,7 @@ func (s *FunctionConfigStore) UpdateExecCache(name string, functionConfig *confi
 		s.builtInExecutorCache[id] = BuiltInCacheEntry{
 			Process:     fn,
 			Tags:        functionConfig.Spec.GoExecutor.Tags,
-			PrefixRegex: s.generateRegexPattern(functionConfig.Spec.Prefixes, functionConfig.Spec.Image),
+			PrefixRegex: s.generateRegexPattern(functionConfig.Spec.Prefixes),
 		}
 	}
 
@@ -175,8 +175,7 @@ func (s *FunctionConfigStore) GetBinaryFromCache(image string) (string, bool) {
 	prefixToCheck := parsedImage.Prefix()
 	binaryStore, exists := s.binaryExecutorCache[parsedImage.BaseName]
 	if exists {
-		regex := regexp.MustCompile(binaryStore.PrefixRegex)
-		if regex.MatchString(prefixToCheck) {
+		if binaryStore.PrefixRegex.MatchString(prefixToCheck) {
 			binaryPath, tagExists := binaryStore.Tags[parsedImage.Tag]
 			if tagExists {
 				return binaryPath, true
@@ -193,28 +192,19 @@ func (s *FunctionConfigStore) GetBinaryFromCacheByConstraint(image, tag string) 
 	parsedImage := imageutil.Parse(image)
 	cacheEntry := s.binaryExecutorCache[parsedImage.BaseName]
 
-	cacheKeys := make([]string, 0, len(s.binaryExecutorCache))
-	for k := range cacheEntry.Tags {
-		cacheKeys = append(cacheKeys, k)
+	if !cacheEntry.PrefixRegex.MatchString(parsedImage.Prefix()) {
+		return "", false
 	}
+
+	cacheKeys := slices.Collect(maps.Keys(cacheEntry.Tags))
 
 	selectedKey, err := imageutil.FindBestSemverMatch(tag, cacheKeys)
 	if err != nil {
 		return "", false
 	}
-	selectedBinary := cacheEntry.Tags[selectedKey]
+	selectedBinary, ok := cacheEntry.Tags[selectedKey]
 
-	// TODO: something is not right here
-
-	regex := regexp.MustCompile(cacheEntry.PrefixRegex)
-	if regex.MatchString(parsedImage.Prefix()) {
-		binaryPath, tagExists := cacheEntry.Tags[parsedImage.Tag]
-		if tagExists {
-			return binaryPath, true
-		}
-	}
-
-	return selectedBinary, true
+	return selectedBinary, ok
 }
 
 func (s *FunctionConfigStore) GetExecCache() map[string]BuiltInCacheEntry {
@@ -234,8 +224,7 @@ func (s *FunctionConfigStore) GetProcessorFromCache(image string) (fnsdk.Resourc
 		prefixToCheck = s.defaultImagePrefix
 	}
 	if slices.Contains(entry.Tags, parsedImage.Tag) {
-		regex := regexp.MustCompile(entry.PrefixRegex)
-		if regex.MatchString(prefixToCheck) {
+		if entry.PrefixRegex.MatchString(prefixToCheck) {
 			return entry.Process, found
 		}
 	}
