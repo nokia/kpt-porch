@@ -15,6 +15,7 @@
 package image
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -75,7 +76,9 @@ func (p *ParsedImage) Prefix() string {
 
 	if p.Registry != "" {
 		sb.WriteString(p.Registry)
-		sb.WriteString("/")
+		if p.SubPath != "" {
+			sb.WriteString("/")
+		}
 	}
 	if p.SubPath != "" {
 		sb.WriteString(p.SubPath)
@@ -83,6 +86,8 @@ func (p *ParsedImage) Prefix() string {
 
 	return sb.String()
 }
+
+var _ fmt.Stringer = &ParsedImage{}
 
 func (p *ParsedImage) String() string {
 	return p.Full()

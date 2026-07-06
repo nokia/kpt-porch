@@ -22,6 +22,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	registry         = "ghcr.io"
+	registryWithPort = "my-registry.com:5000"
+	subpath          = "kptdev/krm-functions-catalog"
+	image            = "apply-setters"
+	tag              = "v0.2.3"
+	digest           = "sha256:7d89a74f106241391f687fc2985c8e6de597bb21f0d0014def5edc730618d9cc"
+)
+
 func TestFindBestSemverMatch(t *testing.T) {
 	testCases := map[string]struct {
 		constraint  string
@@ -118,15 +127,6 @@ func TestFindBestSemverMatch(t *testing.T) {
 }
 
 func TestImageParse(t *testing.T) {
-	const (
-		registry         = "ghcr.io"
-		registryWithPort = "my-registry.com:5000"
-		subpath          = "kptdev/krm-functions-catalog"
-		image            = "apply-setters"
-		tag              = "v0.2.3"
-		digest           = "sha256:7d89a74f106241391f687fc2985c8e6de597bb21f0d0014def5edc730618d9cc"
-	)
-
 	testCases := map[string]struct {
 		input string
 		want  ParsedImage
@@ -221,6 +221,94 @@ func TestImageParse(t *testing.T) {
 			got := Parse(tc.input)
 			assert.Equal(t, tc.want, got)
 			assert.Equal(t, got.Original, got.Full())
+		})
+	}
+}
+
+func TestPrefix(t *testing.T) {
+	testCases := map[string]struct {
+		input string
+		want  string
+	}{
+		"empty": {
+			input: fmt.Sprintf("%s:%s", image, tag),
+			want:  "",
+		},
+		"registry only": {
+			input: fmt.Sprintf("%s/%s:%s", registry, image, tag),
+			want:  registry,
+		},
+		"registry with path": {
+			input: fmt.Sprintf("%s/%s/%s:%s", registry, subpath, image, tag),
+			want:  fmt.Sprintf("%s/%s", registry, subpath),
+		},
+		"localhost registry only": {
+			input: fmt.Sprintf("%s/%s:%s", "localhost:8080", image, tag),
+			want:  "localhost:8080",
+		},
+		"localhost registry with path": {
+			input: fmt.Sprintf("%s/%s/%s:%s", "localhost:8080", subpath, image, tag),
+			want:  fmt.Sprintf("%s/%s", "localhost:8080", subpath),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got := Parse(tc.input)
+			assert.Equal(t, tc.want, got.Prefix())
+		})
+	}
+}
+
+func TestStringer(t *testing.T) {
+	orig := fmt.Sprintf("%s/%s/%s:%s@%s", registry, subpath, image, tag, digest)
+	parsed := Parse(orig)
+	assert.Equal(t, orig, parsed.String())
+}
+
+func TestJoin(t *testing.T) {
+	testCases := map[string]struct {
+		input []string
+		want  string
+	}{
+		"empty": {
+			input: []string{},
+			want:  "",
+		},
+		"no prefix": {
+			input: []string{image},
+			want:  image,
+		},
+		"empty prefix": {
+			input: []string{"", image},
+			want:  image,
+		},
+		"registry only": {
+			input: []string{registry, image},
+			want:  fmt.Sprintf("%s/%s", registry, image),
+		},
+		"registry with path": {
+			input: []string{registry, subpath, image},
+			want:  fmt.Sprintf("%s/%s/%s", registry, subpath, image),
+		},
+		"empty registry with path": {
+			input: []string{"", subpath, image},
+			want:  fmt.Sprintf("%s/%s", subpath, image),
+		},
+		"extra slashes": {
+			input: []string{"/" + registry, subpath + "/", image},
+			want:  fmt.Sprintf("%s/%s/%s", registry, subpath, image),
+		},
+		"dangling slash": {
+			input: []string{"/", subpath, image},
+			want:  fmt.Sprintf("%s/%s", subpath, image),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got := Join(tc.input...)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

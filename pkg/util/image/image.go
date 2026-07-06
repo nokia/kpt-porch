@@ -64,22 +64,15 @@ func FindBestSemverMatch(constraint string, cachedTags []string) (string, error)
 }
 
 func Join(parts ...string) string {
-	if len(parts) == 0 {
-		return ""
-	}
-
-	sb := strings.Builder{}
-	sb.WriteString(strings.Trim(parts[0], "/"))
-
-	for _, part := range parts[1:] {
-		part = strings.Trim(part, "/")
-		if part == "" {
-			continue
+	var outparts []string
+	for _, part := range parts {
+		trimmed := strings.Trim(part, "/ \t\n\v\f\r\x85\xA0") // whitespaces taken from unicode.IsSpace
+		if trimmed != "" {
+			outparts = append(outparts, trimmed)
 		}
-		sb.WriteString("/")
-		sb.WriteString(part)
 	}
-	return sb.String()
+
+	return strings.Join(outparts, "/")
 }
 
 // Parse creates a ParsedImage object from the full image name.
