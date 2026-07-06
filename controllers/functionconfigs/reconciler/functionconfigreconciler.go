@@ -190,7 +190,10 @@ func (s *FunctionConfigStore) GetBinaryFromCacheByConstraint(image, tag string) 
 	defer s.mu.RUnlock()
 
 	parsedImage := imageutil.Parse(image)
-	cacheEntry := s.binaryExecutorCache[parsedImage.BaseName]
+	cacheEntry, ok := s.binaryExecutorCache[parsedImage.BaseName]
+	if !ok {
+		return "", false
+	}
 
 	if !cacheEntry.PrefixRegex.MatchString(parsedImage.Prefix()) {
 		return "", false
