@@ -66,7 +66,7 @@ func FindBestSemverMatch(constraint string, cachedTags []string) (string, error)
 func Join(parts ...string) string {
 	var outparts []string
 	for _, part := range parts {
-		trimmed := strings.Trim(part, "/ \t\n\v\f\r\x85\xA0") // whitespaces taken from unicode.IsSpace
+		trimmed := strings.Trim(part, "/ \t\n\r")
 		if trimmed != "" {
 			outparts = append(outparts, trimmed)
 		}
