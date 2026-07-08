@@ -24,7 +24,6 @@ import (
 
 	prombridge "go.opentelemetry.io/contrib/bridges/prometheus"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/contrib/propagators/autoprop"
 	"go.opentelemetry.io/otel"
 	otelprometheus "go.opentelemetry.io/otel/exporters/prometheus"
@@ -116,8 +115,6 @@ func SetupOpenTelemetry(ctx context.Context) (*OTelResources, error) {
 		return nil, err
 	}
 
-	http.DefaultTransport = otelhttp.NewTransport(http.DefaultTransport)
-	http.DefaultClient.Transport = http.DefaultTransport
 	klog.Infof("OpenTelemetry initialized in %s", time.Since(setupTiming))
 	return res, nil
 }

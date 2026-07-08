@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,6 +35,7 @@ import (
 	"github.com/kptdev/kpt/pkg/fn/runtime"
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
+	"github.com/kptdev/porch/pkg/httpclient"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -488,24 +488,15 @@ func (pm *podManager) getImage(ctx context.Context, ref name.Reference, auth aut
 	if !pm.enablePrivateRegistries || strings.HasPrefix(image, defaultRegistry) || !pm.enablePrivateRegistriesTls {
 		return remote.Image(ref, remote.WithAuth(auth), remote.WithContext(ctx))
 	}
-	tlsFile := "ca.crt"
-	// Check if mounted secret location contains CA file.
-	if _, err := os.Stat(pm.tlsSecretPath); os.IsNotExist(err) {
-		return nil, err
-	}
-	if _, errCRT := os.Stat(filepath.Join(pm.tlsSecretPath, "ca.crt")); os.IsNotExist(errCRT) {
-		if _, errPEM := os.Stat(filepath.Join(pm.tlsSecretPath, "ca.pem")); os.IsNotExist(errPEM) {
-			return nil, fmt.Errorf("ca.crt not found: %v, and ca.pem also not found: %w", errCRT, errPEM)
-		}
-		tlsFile = "ca.pem"
-	}
-	// Load the custom TLS configuration
-	tlsConfig, err := loadTLSConfig(filepath.Join(pm.tlsSecretPath, tlsFile))
+	caCertPath, err := tlsCACertPath(pm.tlsSecretPath)
 	if err != nil {
 		return nil, err
 	}
-	// Create a custom HTTPS transport
-	transport := createTransport(tlsConfig)
+	tlsConfig, err := loadTLSConfig(caCertPath)
+	if err != nil {
+		return nil, err
+	}
+	transport := httpclient.RegistryTransport(tlsConfig)
 
 	// Attempt image pull with given custom TLS cert
 	img, tlsErr := remote.Image(ref, remote.WithAuth(auth), remote.WithContext(ctx), remote.WithTransport(transport))
@@ -519,6 +510,20 @@ func (pm *podManager) getImage(ctx context.Context, ref name.Reference, auth aut
 		}
 	}
 	return img, nil
+}
+
+func tlsCACertPath(tlsSecretPath string) (string, error) {
+	if _, err := os.Stat(tlsSecretPath); os.IsNotExist(err) {
+		return "", err
+	}
+	tlsFile := "ca.crt"
+	if _, errCRT := os.Stat(filepath.Join(tlsSecretPath, "ca.crt")); os.IsNotExist(errCRT) {
+		if _, errPEM := os.Stat(filepath.Join(tlsSecretPath, "ca.pem")); os.IsNotExist(errPEM) {
+			return "", fmt.Errorf("ca.crt not found: %v, and ca.pem also not found: %w", errCRT, errPEM)
+		}
+		tlsFile = "ca.pem"
+	}
+	return filepath.Join(tlsSecretPath, tlsFile), nil
 }
 
 func loadTLSConfig(caCertPath string) (*tls.Config, error) {
@@ -538,12 +543,6 @@ func loadTLSConfig(caCertPath string) (*tls.Config, error) {
 		MinVersion: tls.VersionTLS12,
 	}
 	return tlsConfig, nil
-}
-
-func createTransport(tlsConfig *tls.Config) *http.Transport {
-	return &http.Transport{
-		TLSClientConfig: tlsConfig,
-	}
 }
 
 // CreatePod creates a pod for an image.

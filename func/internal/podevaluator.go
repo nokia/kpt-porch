@@ -136,40 +136,45 @@ func NewPodEvaluator(ctx context.Context, o PodEvaluatorOptions, cl client.Clien
 	readyCh := make(chan *podReadyResponse, channelBufferSize)
 	evictCh := make(chan *podEvictionRequest, channelBufferSize)
 
-	pe := &podEvaluator{
-		requestCh:      reqCh,
-		evictionCh:     evictCh,
-		maxGrpcRetries: maxRetries,
-		podCacheManager: &podCacheManager{
-			gcScanInterval:             o.GcScanInterval,
-			podTTL:                     o.PodTTL,
-			connectionRequestCh:        reqCh,
-			podReadyCh:                 readyCh,
-			evictionCh:                 evictCh,
-			functions:                  map[string]*functionInfo{},
-			maxWaitlistLength:          maxWaitlist,
-			maxParallelPodsPerFunction: maxPods,
-			functionConfigMap:          functionConfigStore,
+	podMgr := &podManager{
+		kubeClient:         cl,
+		namespace:          o.PodNamespace,
+		wrapperServerImage: o.WrapperServerImage,
+		podReadyCh:         readyCh,
+		podReadyTimeout:    60 * time.Second,
+		managerNamespace:   managerNs,
+		maxGrpcMessageSize: o.MaxGrpcMessageSize,
 
-			podManager: &podManager{
-				kubeClient:         cl,
-				namespace:          o.PodNamespace,
-				wrapperServerImage: o.WrapperServerImage,
-				podReadyCh:         readyCh,
-				podReadyTimeout:    60 * time.Second,
-				managerNamespace:   managerNs,
-				maxGrpcMessageSize: o.MaxGrpcMessageSize,
-
-				enablePrivateRegistries:    o.EnablePrivateRegistries,
-				registryAuthSecretPath:     o.RegistryAuthSecretPath,
-				registryAuthSecretName:     o.RegistryAuthSecretName,
-				enablePrivateRegistriesTls: o.EnablePrivateRegistriesTls,
-				tlsSecretPath:              o.TlsSecretPath,
-				imageResolver:              runneroptions.ResolveToImageForCLIFunc(o.DefaultImagePrefix),
-				tagResolver:                runtime.TagResolver{},
-			},
-		},
+		enablePrivateRegistries:    o.EnablePrivateRegistries,
+		registryAuthSecretPath:     o.RegistryAuthSecretPath,
+		registryAuthSecretName:     o.RegistryAuthSecretName,
+		enablePrivateRegistriesTls: o.EnablePrivateRegistriesTls,
+		tlsSecretPath:              o.TlsSecretPath,
+		imageResolver:              runneroptions.ResolveToImageForCLIFunc(o.DefaultImagePrefix),
+		tagResolver:                runtime.TagResolver{},
 	}
+
+	pcm := &podCacheManager{
+		gcScanInterval:             o.GcScanInterval,
+		podTTL:                     o.PodTTL,
+		connectionRequestCh:        reqCh,
+		podReadyCh:                 readyCh,
+		evictionCh:                 evictCh,
+		functions:                  map[string]*functionInfo{},
+		maxWaitlistLength:          maxWaitlist,
+		maxParallelPodsPerFunction: maxPods,
+		functionConfigMap:          functionConfigStore,
+
+		podManager: podMgr,
+	}
+
+	pe := &podEvaluator{
+		requestCh:       reqCh,
+		evictionCh:      evictCh,
+		maxGrpcRetries:  maxRetries,
+		podCacheManager: pcm,
+	}
+
 	go pe.podCacheManager.podCacheManager(ctx)
 
 	err = pe.podCacheManager.retrieveFunctionPods(context.Background())

@@ -416,25 +416,6 @@ func TestLoadTLSConfig(t *testing.T) {
 	})
 }
 
-func TestCreateTransport(t *testing.T) {
-	certPEM := generateSelfSignedCertPEM(t)
-
-	tmpFile, err := os.CreateTemp("", "transport-cert-*.pem")
-	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
-
-	_, err = tmpFile.Write(certPEM)
-	require.NoError(t, err)
-	require.NoError(t, tmpFile.Close())
-
-	tlsConfig, err := loadTLSConfig(tmpFile.Name())
-	require.NoError(t, err)
-
-	transport := createTransport(tlsConfig)
-	assert.NotNil(t, transport)
-	assert.Equal(t, tlsConfig, transport.TLSClientConfig)
-}
-
 func TestFindPodsForService(t *testing.T) {
 	t.Run("returns matching pods", func(t *testing.T) {
 		svc := &corev1.Service{
