@@ -20,7 +20,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kptdev/kpt/pkg/fn/runtime"
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	fnconf "github.com/kptdev/porch/controllers/functionconfigs/reconciler"
 	"github.com/kptdev/porch/func/evaluator"
@@ -151,7 +150,6 @@ func NewPodEvaluator(ctx context.Context, o PodEvaluatorOptions, cl client.Clien
 		enablePrivateRegistriesTls: o.EnablePrivateRegistriesTls,
 		tlsSecretPath:              o.TlsSecretPath,
 		imageResolver:              runneroptions.ResolveToImageForCLIFunc(o.DefaultImagePrefix),
-		tagResolver:                runtime.TagResolver{},
 	}
 
 	pcm := &podCacheManager{
@@ -196,17 +194,9 @@ func NewPodEvaluator(ctx context.Context, o PodEvaluatorOptions, cl client.Clien
 
 func (pe *podEvaluator) EvaluateFunction(ctx context.Context, req *evaluator.EvaluateFunctionRequest) (*evaluator.EvaluateFunctionResponse, error) {
 	starttime := time.Now()
-	var image string
 	defer func() {
 		klog.Infof("evaluating %v in pod took %v", req.Image, time.Since(starttime))
 	}()
-	tagResolver := pe.podCacheManager.podManager.tagResolver
-	var err error
-	image, err = tagResolver.ResolveFunctionImage(ctx, req.Image, req.Tag)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve tag for image %q with constraint %q: %w", req.Image, req.Tag, err)
-	}
-	req.Image = image
 
 	maxRetries := pe.maxGrpcRetries
 	var lastErr error

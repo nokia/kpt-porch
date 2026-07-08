@@ -32,7 +32,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	containerregistry "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/kptdev/kpt/pkg/fn/runtime"
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/pkg/httpclient"
@@ -218,8 +217,6 @@ type podManager struct {
 	tlsSecretPath string
 	// Image resolver that prepends a prefix if necessary
 	imageResolver runneroptions.ImageResolveFunc
-	// tagResolver is used to resolve the tag of the given image
-	tagResolver runtime.TagResolver
 	// skipGrpcReadyCheck disables the gRPC readiness verification during pod creation (for testing)
 	skipGrpcReadyCheck bool
 }

@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kptdev/kpt/pkg/fn/runtime"
 	pb "github.com/kptdev/porch/func/evaluator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,13 +51,7 @@ func startFakeEvalServer(t *testing.T, evalFunc func(ctx context.Context, req *p
 
 func TestEvaluateFunction_ErrorInResponse(t *testing.T) {
 	reqCh := make(chan *connectionRequest, 1)
-	pe := &podEvaluator{requestCh: reqCh,
-		podCacheManager: &podCacheManager{
-			podManager: &podManager{
-				tagResolver: runtime.TagResolver{},
-			},
-		},
-	}
+	pe := &podEvaluator{requestCh: reqCh}
 
 	go func() {
 		req := <-reqCh
@@ -77,13 +70,7 @@ func TestEvaluateFunction_ErrorInResponse(t *testing.T) {
 
 func TestEvaluateFunction_NilGrpcConnection(t *testing.T) {
 	reqCh := make(chan *connectionRequest, 1)
-	pe := &podEvaluator{requestCh: reqCh,
-		podCacheManager: &podCacheManager{
-			podManager: &podManager{
-				tagResolver: runtime.TagResolver{},
-			},
-		},
-	}
+	pe := &podEvaluator{requestCh: reqCh}
 
 	go func() {
 		req := <-reqCh
@@ -113,13 +100,7 @@ func TestEvaluateFunction_GrpcCallFails(t *testing.T) {
 	counter.Store(1)
 
 	reqCh := make(chan *connectionRequest, 1)
-	pe := &podEvaluator{requestCh: reqCh,
-		podCacheManager: &podCacheManager{
-			podManager: &podManager{
-				tagResolver: runtime.TagResolver{},
-			},
-		},
-	}
+	pe := &podEvaluator{requestCh: reqCh}
 
 	go func() {
 		req := <-reqCh
@@ -153,13 +134,7 @@ func TestEvaluateFunction_SuccessWithStderr(t *testing.T) {
 	counter.Store(1)
 
 	reqCh := make(chan *connectionRequest, 1)
-	pe := &podEvaluator{requestCh: reqCh,
-		podCacheManager: &podCacheManager{
-			podManager: &podManager{
-				tagResolver: runtime.TagResolver{},
-			},
-		},
-	}
+	pe := &podEvaluator{requestCh: reqCh}
 
 	go func() {
 		req := <-reqCh
@@ -193,13 +168,7 @@ func TestEvaluateFunction_SuccessClean(t *testing.T) {
 	counter.Store(1)
 
 	reqCh := make(chan *connectionRequest, 1)
-	pe := &podEvaluator{requestCh: reqCh,
-		podCacheManager: &podCacheManager{
-			podManager: &podManager{
-				tagResolver: runtime.TagResolver{},
-			},
-		},
-	}
+	pe := &podEvaluator{requestCh: reqCh}
 
 	go func() {
 		req := <-reqCh
@@ -231,13 +200,7 @@ func TestEvaluateFunction_CounterDecrement(t *testing.T) {
 	counter.Store(1)
 
 	reqCh := make(chan *connectionRequest, 1)
-	pe := &podEvaluator{requestCh: reqCh,
-		podCacheManager: &podCacheManager{
-			podManager: &podManager{
-				tagResolver: runtime.TagResolver{},
-			},
-		},
-	}
+	pe := &podEvaluator{requestCh: reqCh}
 
 	go func() {
 		req := <-reqCh
@@ -282,14 +245,10 @@ func TestEvaluateFunction_Unavailable_EvictsAndRetries(t *testing.T) {
 	evictCh := make(chan *podEvictionRequest, 1)
 
 	pe := &podEvaluator{
-		requestCh:      reqCh,
-		evictionCh:     evictCh,
-		maxGrpcRetries: 2,
-		podCacheManager: &podCacheManager{
-			podManager: &podManager{
-				tagResolver: runtime.TagResolver{},
-			},
-		},
+		requestCh:       reqCh,
+		evictionCh:      evictCh,
+		maxGrpcRetries:  2,
+		podCacheManager: &podCacheManager{},
 	}
 
 	deadCounter := &atomic.Int32{}
@@ -358,14 +317,10 @@ func TestEvaluateFunction_ExhaustsRetries(t *testing.T) {
 	evictCh := make(chan *podEvictionRequest, 2)
 
 	pe := &podEvaluator{
-		requestCh:      reqCh,
-		evictionCh:     evictCh,
-		maxGrpcRetries: 1, // only 1 retry allowed
-		podCacheManager: &podCacheManager{
-			podManager: &podManager{
-				tagResolver: runtime.TagResolver{},
-			},
-		},
+		requestCh:       reqCh,
+		evictionCh:      evictCh,
+		maxGrpcRetries:  1, // only 1 retry allowed
+		podCacheManager: &podCacheManager{},
 	}
 
 	counter1 := &atomic.Int32{}
