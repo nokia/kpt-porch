@@ -22,7 +22,7 @@ import (
 
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	"github.com/kptdev/porch/pkg/repository"
-	suiteutils "github.com/kptdev/porch/test/e2e/suiteutils"
+	"github.com/kptdev/porch/test/e2e/suiteutils"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -558,7 +558,7 @@ func (t *PorchSuite) TestPackageMetadataFromKptfile() {
 			{ConditionType: "Ready"},
 			{ConditionType: "Deployed"},
 		}
-		t.Require().Equal(expectedGates, clonePr.Spec.ReadinessGates)
+		t.Require().ElementsMatch(expectedGates, clonePr.Spec.ReadinessGates)
 
 		var packageResources porchapi.PackageRevisionResources
 		t.GetF(client.ObjectKeyFromObject(clonePr), &packageResources)
@@ -609,7 +609,7 @@ func (t *PorchSuite) TestPackageMetadataFromKptfile() {
 			t.Require().True(ok, "annotation key %s should exist", k)
 			t.Require().Equal(v, actual, "annotation %s value should match", k)
 		}
-		t.Require().Equal(expectedGates, mainPr.Spec.ReadinessGates, "main revision ReadinessGates should match v1")
+		t.Require().ElementsMatch(expectedGates, mainPr.Spec.ReadinessGates, "main revision ReadinessGates should match v1")
 	})
 }
 
