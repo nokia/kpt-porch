@@ -425,7 +425,7 @@ func delegateAPIServerHealth(mgr electedManager, port int, path string, okWhenSt
 	client := &http.Client{
 		Timeout: 3 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // #nosec G402 -- localhost health proxy to apiserver with self-signed cert
 		},
 	}
 
@@ -486,7 +486,7 @@ func (o *PorchServerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.ListTimeoutPerRepository, "list-timeout-per-repo", 20*time.Second, "Maximum amount of time to wait for a repository list request.")
 	fs.IntVar(&o.MaxConcurrentLists, "max-parallel-repo-lists", 10, "Maximum number of repositories to list in parallel.")
 
-	fs.IntVar(&o.ProbePort, "probe-port", 0, "If > 0, start serving /healthz, /livez and /readyz on this port from the runtime manager (in addition to the API server's built-in ones at `--secure-port`)")
+	fs.IntVar(&o.ProbePort, "probe-port", 0, "If > 0, start serving controller-runtime /healthz and /readyz on this port (in addition to the API server's built-in probes at `--secure-port`); a liveness-style check is available as /healthz/livez")
 
 	fs.BoolVar(&o.HAOptions.LeaderElection, "leader-elect", false, "If true, the porch-server will attempt to acquire leader election lock")
 	fs.DurationVar(&o.HAOptions.LeaseDuration, "leader-lease-duration", 0, "The duration that non-leader candidates will wait to force acquire leadership")
