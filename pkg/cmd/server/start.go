@@ -16,9 +16,11 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -26,6 +28,8 @@ import (
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	clientset "github.com/kptdev/porch/api/generated/clientset/versioned"
 	informers "github.com/kptdev/porch/api/generated/informers/externalversions"
@@ -89,6 +93,10 @@ type PorchServerOptions struct {
 	UseUserDefinedCaBundle bool
 
 	PodNamespace string
+
+	ProbePort int
+
+	HAOptions apiserver.HAConfig
 }
 
 // NewPorchServerOptions returns a new PorchServerOptions
@@ -353,6 +361,8 @@ func (o *PorchServerOptions) Config() (*apiserver.Config, error) {
 				DbPushDraftsToGit: o.DbPushDrafsToGit,
 			},
 			PodNameSpace: o.PodNamespace,
+			ProbePort:    o.ProbePort,
+			HAOptions:    o.HAOptions,
 		},
 	}
 	return config, nil
@@ -365,7 +375,7 @@ func (o PorchServerOptions) RunPorchServer(ctx context.Context) error {
 		return err
 	}
 
-	server, err := config.Complete().New(ctx)
+	mgr, server, err := config.Complete().New(ctx)
 	if err != nil {
 		return err
 	}
@@ -378,7 +388,66 @@ func (o PorchServerOptions) RunPorchServer(ctx context.Context) error {
 		})
 	}
 
-	return server.Run(ctx)
+	if o.ProbePort > 0 {
+		if err := proxyHealthChecks(mgr, o.RecommendedOptions.SecureServing.BindPort); err != nil {
+			return err
+		}
+	}
+
+	return mgr.Start(ctx)
+}
+
+func proxyHealthChecks(mgr manager.Manager, securePort int) error {
+	healthzDelegate := delegateAPIServerHealth(mgr, securePort, "healthz", true)
+	if err := mgr.AddHealthzCheck("healthz", healthzDelegate); err != nil {
+		return err
+	}
+
+	// there is no livez on the controller-runtime manager, only healthz, so we proxy both to healthz
+	livezDelegate := delegateAPIServerHealth(mgr, securePort, "livez", true)
+	if err := mgr.AddHealthzCheck("livez", livezDelegate); err != nil {
+		return err
+	}
+
+	readyzDelegate := delegateAPIServerHealth(mgr, securePort, "readyz", false)
+	if err := mgr.AddReadyzCheck("readyz", readyzDelegate); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type electedManager interface {
+	Elected() <-chan struct{}
+}
+
+func delegateAPIServerHealth(mgr electedManager, port int, path string, okWhenStandby bool) healthz.Checker {
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	return func(*http.Request) error {
+		select {
+		case <-mgr.Elected():
+			resp, err := client.Get(fmt.Sprintf("https://localhost:%d/%s", port, path))
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("apiserver %s returned %d", path, resp.StatusCode)
+			}
+			return nil
+		default:
+			if okWhenStandby {
+				return nil
+			}
+			return fmt.Errorf("not leader")
+		}
+	}
 }
 
 func (o *PorchServerOptions) AddFlags(fs *pflag.FlagSet) {
@@ -416,4 +485,11 @@ func (o *PorchServerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&o.RetryableGitErrors, "retryable-git-errors", nil, "Additional retryable git error patterns. Can be specified multiple times or as comma-separated values.")
 	fs.DurationVar(&o.ListTimeoutPerRepository, "list-timeout-per-repo", 20*time.Second, "Maximum amount of time to wait for a repository list request.")
 	fs.IntVar(&o.MaxConcurrentLists, "max-parallel-repo-lists", 10, "Maximum number of repositories to list in parallel.")
+
+	fs.IntVar(&o.ProbePort, "probe-port", 0, "If > 0, start serving /healthz, /livez and /readyz on this port from the runtime manager (in addition to the API server's built-in ones at `--secure-port`)")
+
+	fs.BoolVar(&o.HAOptions.LeaderElection, "leader-elect", false, "If true, the porch-server will attempt to acquire leader election lock")
+	fs.DurationVar(&o.HAOptions.LeaseDuration, "leader-lease-duration", 0, "The duration that non-leader candidates will wait to force acquire leadership")
+	fs.DurationVar(&o.HAOptions.RenewDeadline, "leader-renew-deadline", 0, "The duration that the acting controlplane will retry refreshing leadership before giving up")
+	fs.DurationVar(&o.HAOptions.RetryPeriod, "leader-retry-period", 0, "The duration the LeaderElector clients should wait between tries of actions")
 }

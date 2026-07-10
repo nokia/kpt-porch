@@ -23,6 +23,7 @@ import (
 	"github.com/kptdev/porch/pkg/apiserver"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 )
@@ -64,17 +65,6 @@ func TestValidate(t *testing.T) {
 	opts.CacheType = ""
 	err = opts.Validate(nil)
 	assert.Error(t, err)
-}
-
-func TestComplete(t *testing.T) {
-	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
-
-	// Test with patterns that have leading/trailing spaces
-	opts.RetryableGitErrors = []string{" git error 1 ", "git error 2", " git error 3"}
-	assert.Len(t, opts.RetryableGitErrors, 3)
-
-	err := opts.Complete()
-	assert.NoError(t, err)
 }
 
 func TestSetupDBCacheConn(t *testing.T) {
@@ -224,4 +214,46 @@ func TestSetupDBCacheConn(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestComplete(t *testing.T) {
+	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
+
+	opts.RetryableGitErrors = []string{" git error 1 ", "git error 2", " git error 3"}
+	assert.Len(t, opts.RetryableGitErrors, 3)
+
+	err := opts.Complete()
+	assert.NoError(t, err)
+}
+
+func TestHAFlagParsing(t *testing.T) {
+	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	opts.AddFlags(fs)
+	require.NoError(t, fs.Parse([]string{
+		"--probe-port=4453",
+		"--leader-elect=true",
+		"--leader-lease-duration=15s",
+	}))
+	assert.Equal(t, 4453, opts.ProbePort)
+	assert.True(t, opts.HAOptions.LeaderElection)
+	assert.Equal(t, 15*time.Second, opts.HAOptions.LeaseDuration)
+}
+
+func TestDelegateAPIServerHealthStandby(t *testing.T) {
+	mgr := &standbyManager{elected: make(chan struct{})}
+
+	liveness := delegateAPIServerHealth(mgr, 4443, "livez", true)
+	assert.NoError(t, liveness(nil))
+
+	readiness := delegateAPIServerHealth(mgr, 4443, "readyz", false)
+	assert.ErrorContains(t, readiness(nil), "not leader")
+}
+
+type standbyManager struct {
+	elected chan struct{}
+}
+
+func (m *standbyManager) Elected() <-chan struct{} {
+	return m.elected
 }

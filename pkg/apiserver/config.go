@@ -1,4 +1,4 @@
-// Copyright 2022, 2024-2025 The kpt Authors
+// Copyright 2022, 2024-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ package apiserver
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -32,7 +30,6 @@ import (
 	cachetypes "github.com/kptdev/porch/pkg/cache/types"
 	"github.com/kptdev/porch/pkg/engine"
 	"github.com/kptdev/porch/pkg/registry/porch"
-	pkgerrors "github.com/pkg/errors"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sts/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -51,10 +48,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 const NameIndexKey = "metadata.name"
+
+const LeaderElectionID = "porch-server"
 
 var (
 	// Scheme defines methods for serializing and deserializing API objects.
@@ -85,6 +85,13 @@ func init() {
 	)
 }
 
+type HAConfig struct {
+	LeaderElection bool
+	LeaseDuration  time.Duration
+	RenewDeadline  time.Duration
+	RetryPeriod    time.Duration
+}
+
 // ExtraConfig holds custom apiserver config
 type ExtraConfig struct {
 	CoreAPIKubeconfigPath string
@@ -92,25 +99,18 @@ type ExtraConfig struct {
 	GRPCRuntimeOptions engine.GRPCRuntimeOptions
 	CacheOptions       cachetypes.CacheOptions
 
+	HAOptions HAConfig
+
 	PodNameSpace  string
 	FunctionStore *reconciler.FunctionConfigStore
+
+	ProbePort int
 }
 
 // Config defines the config for the apiserver
 type Config struct {
 	GenericConfig *genericapiserver.RecommendedConfig
 	ExtraConfig   ExtraConfig
-}
-
-// PorchServer contains state for a Kubernetes cluster master/api server.
-type PorchServer struct {
-	GenericAPIServer           *genericapiserver.GenericAPIServer
-	coreClient                 client.WithWatch
-	cache                      cachetypes.Cache
-	periodicRepoSyncFrequency  time.Duration
-	listTimeoutPerRepository   time.Duration
-	repoOperationRetryAttempts int
-	ExtraConfig                *ExtraConfig
 }
 
 type completedConfig struct {
@@ -183,124 +183,80 @@ func buildCompleteScheme() (*runtime.Scheme, error) {
 	return completeScheme, err
 }
 
-func (c completedConfig) getRestConfig() (*rest.Config, error) {
+func (c *completedConfig) getRestConfig() (*rest.Config, error) {
 	kubeconfig := c.ExtraConfig.CoreAPIKubeconfigPath
 	if kubeconfig == "" {
-		icc, err := rest.InClusterConfig()
+		config, err := rest.InClusterConfig()
 		if err != nil {
 			return nil, fmt.Errorf("failed to load in-cluster config (specify --kubeconfig if not running in-cluster): %w", err)
 		}
-		return icc, nil
-	} else {
-		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig}
-		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
-
-		cc, err := loader.ClientConfig()
-		if err != nil {
-			return nil, fmt.Errorf("failed to load config %q: %w", kubeconfig, err)
-		}
-		return cc, nil
+		return config, nil
 	}
+
+	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig}
+	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+
+	config, err := loader.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config %q: %w", kubeconfig, err)
+	}
+	return config, nil
 }
 
-func (c completedConfig) buildClient(ctx context.Context) (client.WithWatch, error) {
-	restConfig, err := c.getRestConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	// set high qps/burst limits since this will effectively limit API server responsiveness
-	restConfig.QPS = 200
-	restConfig.Burst = 400
-
-	scheme, err := buildCompleteScheme()
-	if err != nil {
-		return nil, err
-	}
-
-	informerCache, err := ctrlcache.New(restConfig, ctrlcache.Options{
+func (c *completedConfig) buildClient(restConfig *rest.Config, scheme *runtime.Scheme, reader client.Reader) (client.WithWatch, error) {
+	withWatch, err := client.NewWithWatch(restConfig, client.Options{
 		Scheme: scheme,
-		ByObject: map[client.Object]ctrlcache.ByObject{
-			//The informer should pre-cache all the repositories at startup
-			&configapi.Repository{}: {},
+		Cache: &client.CacheOptions{
+			Reader: reader,
+			DisableFor: []client.Object{
+				// The caching client should not cache resources served by porch-server
+				&porchapi.PackageRevision{},
+				&porchapi.PackageRevisionResources{},
+				// PackageRev uses write-then-read patterns (Create then Get in
+				// ClosePackageRevisionDraft/SetMeta). Since writes bypass the
+				// informer cache, a subsequent Get can miss the just-created object.
+				&configapi.PackageRev{},
+				// v1alpha2 PackageRevision is a CRD patched by patchRenderRequestAnnotation
+				// right after a write; bypass the cache to avoid stale reads and the
+				// cluster-scope watch that the informer would require.
+				&porchv1alpha2.PackageRevision{},
+			},
 		},
 	})
-
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cache: %w", err)
+		return nil, fmt.Errorf("error building watching client: %w", err)
 	}
-
-	go func() {
-		if err := informerCache.Start(ctx); err != nil {
-			klog.Errorf("informer cache stopped with error: %v", err)
-		}
-	}()
-
-	if !informerCache.WaitForCacheSync(ctx) {
-		return nil, fmt.Errorf("informer cache failed to sync")
-	}
-
-	// Register field index for metadata.name so that field selector queries on Repository work through the cache
-	if err := informerCache.IndexField(ctx, &configapi.Repository{}, "metadata.name", func(obj client.Object) []string {
-		return []string{obj.GetName()}
-	}); err != nil {
-		return nil, fmt.Errorf("failed to create index for metadata.name: %w", err)
-	}
-
-	return client.NewWithWatch(restConfig, client.Options{Scheme: scheme, Cache: &client.CacheOptions{
-		Reader: informerCache,
-		DisableFor: []client.Object{
-			//The caching client should not cache resources served by porch-server
-			&porchapi.PackageRevision{},
-			&porchapi.PackageRevisionResources{},
-			// PackageRev uses write-then-read patterns (Create then Get in
-			// ClosePackageRevisionDraft/SetMeta). Since writes bypass the
-			// informer cache, a subsequent Get can miss the just-created object.
-			// This is not ideal, but crcache doesn't support a level of resources where caching makes a difference
-			&configapi.PackageRev{},
-			// v1alpha2 PackageRevision is a CRD patched by patchRenderRequestAnnotation
-			// right after a write; bypass the cache to avoid stale reads and the
-			// cluster-scope watch that the informer would require.
-			&porchv1alpha2.PackageRevision{},
-		},
-	}})
+	return withWatch, nil
 }
 
-func (c completedConfig) getCoreV1Client() (*corev1client.CoreV1Client, error) {
-	restConfig, err := c.getRestConfig()
-	if err != nil {
-		return nil, err
+func (c *completedConfig) buildManager(restConfig *rest.Config, scheme *runtime.Scheme, withIndex bool) (manager.Manager, error) {
+	probePort := ""
+	if c.ExtraConfig.ProbePort > 0 {
+		probePort = fmt.Sprintf(":%d", c.ExtraConfig.ProbePort)
 	}
-
-	corev1Client, err := corev1client.NewForConfig(restConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error building corev1 client: %w", err)
-	}
-	return corev1Client, nil
-}
-
-func (c completedConfig) buildFunctionConfigReconciler(ctx context.Context, scheme *runtime.Scheme, withIndex bool) (*reconciler.FunctionConfigReconciler, error) {
-	restConfig, err := c.getRestConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := context.WithCancel(ctx)
-	_ = cancel
-
-	var cacheOpts ctrlcache.Options
-	cacheOpts.Scheme = scheme
-	//cacheOpts.DefaultNamespaces = map[string]cache.Config{o.exec.PodNamespace: {}}
 
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
-		Scheme: scheme,
-		Cache:  cacheOpts,
+		Scheme:           scheme,
+		LeaderElection:   c.ExtraConfig.HAOptions.LeaderElection,
+		LeaderElectionID: LeaderElectionID,
+		LeaseDuration:    zeroToNil(c.ExtraConfig.HAOptions.LeaseDuration),
+		RenewDeadline:    zeroToNil(c.ExtraConfig.HAOptions.RenewDeadline),
+		RetryPeriod:      zeroToNil(c.ExtraConfig.HAOptions.RetryPeriod),
+		Cache: ctrlcache.Options{
+			Scheme: scheme,
+			ByObject: map[client.Object]ctrlcache.ByObject{
+				// The informer should pre-cache all the repositories at startup
+				&configapi.Repository{}: {},
+			},
+		},
+		HealthProbeBindAddress: probePort,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error at creating manager: %w", err)
+		return nil, fmt.Errorf("error building manager: %w", err)
 	}
 
 	if withIndex {
+		ctx := context.Background()
 		if err := mgr.GetFieldIndexer().IndexField(ctx, &configapi.Repository{}, NameIndexKey, func(o client.Object) []string {
 			repository := o.(*configapi.Repository)
 
@@ -310,13 +266,24 @@ func (c completedConfig) buildFunctionConfigReconciler(ctx context.Context, sche
 			}
 			return []string{repository.Name}
 		}); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error indexing Repository by name: %w", err)
 		}
 	}
 
+	return mgr, nil
+}
+
+func zeroToNil(duration time.Duration) *time.Duration {
+	if duration == 0 {
+		return nil
+	}
+	return &duration
+}
+
+func (c *completedConfig) registerFunctionConfigController(mgr manager.Manager) error {
 	functionConfigStore := reconciler.NewFunctionConfigStore(c.ExtraConfig.GRPCRuntimeOptions.DefaultImagePrefix, "")
 
-	rec := &reconciler.FunctionConfigReconciler{
+	controller := &reconciler.FunctionConfigReconciler{
 		Client:              mgr.GetClient(),
 		FunctionConfigStore: functionConfigStore,
 		For:                 reconciler.ReconcilerForServer,
@@ -324,53 +291,70 @@ func (c completedConfig) buildFunctionConfigReconciler(ctx context.Context, sche
 
 	c.ExtraConfig.FunctionStore = functionConfigStore
 
-	err = ctrl.NewControllerManagedBy(mgr).
+	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&configapi.FunctionConfig{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		Complete(rec)
-	if err != nil {
-		return nil, fmt.Errorf("error at creating controller: %w", err)
+		Complete(controller); err != nil {
+		return fmt.Errorf("error building FunctionConfig controller: %w", err)
 	}
 
-	go func() {
-		if err := mgr.Start(ctx); err != nil {
-			klog.Infof("manager stopped: %v", err)
-		}
-	}()
-
-	return rec, nil
+	return nil
 }
 
-// New returns a new instance of PorchServer from the given config.
-func (c completedConfig) New(ctx context.Context) (*PorchServer, error) {
+func (c *completedConfig) getCoreV1Client(restConfig *rest.Config) (*corev1client.CoreV1Client, error) {
+	corev1Client, err := corev1client.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error building corev1 client: %w", err)
+	}
+	return corev1Client, nil
+}
+
+// New returns a new manager with PorchServer and FunctionConfigReconciler registered from the given config.
+func (c *completedConfig) New(ctx context.Context) (manager.Manager, *PorchServer, error) {
 	// TODO: REMOVE AFTER ASYNC IMPLEMENTATION IS READY.
 	// Set the default request timeout just above hardcoded ctx timeout
 	c.GenericConfig.RequestTimeout = 291 * time.Second
 	genericServer, err := c.GenericConfig.New("porch-apiserver", genericapiserver.NewEmptyDelegate())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	coreClient, err := c.buildClient(ctx)
+	restConfig, err := c.getRestConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to build client for core apiserver: %w", err)
+		return nil, nil, err
 	}
 
-	fnConfigReconciler, err := c.buildFunctionConfigReconciler(ctx, coreClient.Scheme(), true)
+	// set high qps/burst limits since this will effectively limit API server responsiveness
+	restConfig.QPS = 200
+	restConfig.Burst = 400
+
+	scheme, err := buildCompleteScheme()
 	if err != nil {
-		return nil, fmt.Errorf("failed to build function config reconciler: %w", err)
+		return nil, nil, fmt.Errorf("error building scheme: %w", err)
 	}
 
-	c.ExtraConfig.FunctionStore = fnConfigReconciler.FunctionConfigStore
-
-	coreV1Client, err := c.getCoreV1Client()
+	mgr, err := c.buildManager(restConfig, scheme, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to build controller-runtime manager: %w", err)
+	}
+
+	if err = c.registerFunctionConfigController(mgr); err != nil {
+		return nil, nil, fmt.Errorf("failed to register FunctionConfig controller: %w", err)
+	}
+
+	coreClient, err := c.buildClient(restConfig, scheme, mgr.GetCache())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to build client for core apiserver: %w", err)
+	}
+
+	coreV1Client, err := c.getCoreV1Client(restConfig)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	stsClient, err := sts.NewService(context.Background(), option.WithoutAuthentication())
 	if err != nil {
-		return nil, fmt.Errorf("failed to build sts client: %w", err)
+		return nil, nil, fmt.Errorf("failed to build sts client: %w", err)
 	}
 
 	resolverChain := []porch.Resolver{
@@ -407,7 +391,7 @@ func (c completedConfig) New(ctx context.Context) (*PorchServer, error) {
 		})
 
 	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to create repository cache")
+		return nil, nil, fmt.Errorf("failed to create repository cache: %w", err)
 	}
 
 	runnerOptionsResolver := func(namespace string) runneroptions.RunnerOptions {
@@ -418,9 +402,6 @@ func (c completedConfig) New(ctx context.Context) (*PorchServer, error) {
 
 	cad, err := engine.NewCaDEngine(
 		engine.WithCache(cacheImpl),
-		// The order of registering the function runtimes matters here. When
-		// evaluating a function, the runtimes will be tried in the same
-		// order as they are registered.
 		engine.WithBuiltinFunctionRuntime(c.ExtraConfig.FunctionStore),
 		engine.WithGRPCFunctionRuntime(c.ExtraConfig.GRPCRuntimeOptions),
 		engine.WithCredentialResolver(credentialResolver),
@@ -431,7 +412,7 @@ func (c completedConfig) New(ctx context.Context) (*PorchServer, error) {
 		engine.WithRepoOperationRetryAttempts(c.ExtraConfig.CacheOptions.RepoOperationRetryAttempts),
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	restStorageOptions := porch.RESTStorageOptions{
@@ -442,38 +423,23 @@ func (c completedConfig) New(ctx context.Context) (*PorchServer, error) {
 	}
 	porchGroup, err := restStorageOptions.NewRESTStorage()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	s := &PorchServer{
+	porchServer := &PorchServer{
 		GenericAPIServer: genericServer,
 		coreClient:       coreClient,
 		cache:            cacheImpl,
-		// Set background job periodic frequency the same as repo sync frequency.
-		periodicRepoSyncFrequency:  c.ExtraConfig.CacheOptions.RepoSyncFrequency,
-		listTimeoutPerRepository:   c.ExtraConfig.CacheOptions.CRCacheOptions.ListTimeoutPerRepository,
-		repoOperationRetryAttempts: c.ExtraConfig.CacheOptions.RepoOperationRetryAttempts,
+		leaderElect:      c.ExtraConfig.HAOptions.LeaderElection,
 	}
 
-	// Install the groups.
-	if err := s.GenericAPIServer.InstallAPIGroups(&porchGroup); err != nil {
-		return nil, err
+	if err = porchServer.GenericAPIServer.InstallAPIGroups(&porchGroup); err != nil {
+		return nil, nil, fmt.Errorf("failed to install Porch API group to PorchServer instance: %w", err)
 	}
 
-	return s, nil
-}
-
-func (s *PorchServer) Run(ctx context.Context) error {
-	// TODO: Reconsider if the existence of CERT_STORAGE_DIR was a good inidcator for webhook setup,
-	// but for now we keep backward compatiblity
-	certStorageDir, found := os.LookupEnv("CERT_STORAGE_DIR")
-	if found && strings.TrimSpace(certStorageDir) != "" {
-		if err := setupWebhooks(ctx, s.coreClient); err != nil {
-			klog.Errorf("%v\n", err)
-			return err
-		}
-	} else {
-		klog.Infoln("Cert storage dir not provided, skipping webhook setup")
+	if err = mgr.Add(porchServer); err != nil {
+		return nil, nil, fmt.Errorf("failed to register PorchServer instance to manager: %w", err)
 	}
-	return s.GenericAPIServer.PrepareRun().RunWithContext(ctx)
+
+	return mgr, porchServer, nil
 }
