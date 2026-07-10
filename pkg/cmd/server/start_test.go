@@ -15,7 +15,13 @@
 package server
 
 import (
+	"context"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +32,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -248,6 +256,100 @@ func TestDelegateAPIServerHealthStandby(t *testing.T) {
 
 	readiness := delegateAPIServerHealth(mgr, 4443, "readyz", false)
 	assert.ErrorContains(t, readiness(nil), "not leader")
+}
+
+func TestValidateMaxConcurrentLists(t *testing.T) {
+	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
+	opts.CacheType = "CR"
+	opts.MaxConcurrentLists = -1
+
+	err := opts.Validate(nil)
+	assert.ErrorContains(t, err, "invalid value for max-parallel-repo-lists")
+}
+
+func TestCompleteSetsDefaultCacheDirectory(t *testing.T) {
+	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
+	opts.CacheDirectory = ""
+
+	require.NoError(t, opts.Complete())
+	assert.NotEmpty(t, opts.CacheDirectory)
+	assert.True(t, strings.HasSuffix(opts.CacheDirectory, "/porch"))
+}
+
+func TestCompleteUppercasesCacheType(t *testing.T) {
+	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
+	opts.CacheType = "cr"
+
+	require.NoError(t, opts.Complete())
+	assert.Equal(t, "CR", opts.CacheType)
+}
+
+func TestNewPorchServerOptionsDefaults(t *testing.T) {
+	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
+
+	assert.Nil(t, opts.RecommendedOptions.Etcd)
+	assert.Equal(t, 0, opts.ProbePort)
+	assert.False(t, opts.HAOptions.LeaderElection)
+}
+
+func TestProxyHealthChecks(t *testing.T) {
+	mgr, err := ctrl.NewManager(&rest.Config{Host: "https://127.0.0.1:1"}, ctrl.Options{
+		Scheme: apiserver.Scheme,
+	})
+	require.NoError(t, err)
+
+	assert.NoError(t, proxyHealthChecks(mgr, 4443))
+}
+
+func TestDelegateAPIServerHealthLeader(t *testing.T) {
+	tests := map[string]struct {
+		statusCode  int
+		path        string
+		expectedErr string
+	}{
+		"healthy": {
+			statusCode: http.StatusOK,
+			path:       "healthz",
+		},
+		"not ready": {
+			statusCode:  http.StatusServiceUnavailable,
+			path:        "readyz",
+			expectedErr: "apiserver readyz returned 503",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tc.statusCode)
+			}))
+			t.Cleanup(srv.Close)
+
+			_, portStr, err := net.SplitHostPort(srv.Listener.Addr().String())
+			require.NoError(t, err)
+			port, err := strconv.Atoi(portStr)
+			require.NoError(t, err)
+
+			mgr := &standbyManager{elected: make(chan struct{})}
+			close(mgr.elected)
+
+			checker := delegateAPIServerHealth(mgr, port, tc.path, true)
+			err = checker(nil)
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func TestNewCommandStartPorchServer(t *testing.T) {
+	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
+	cmd := NewCommandStartPorchServer(context.Background(), opts)
+
+	assert.Equal(t, "Launch a porch API server", cmd.Short)
+	assert.NotNil(t, cmd.Flags().Lookup("cache-type"))
 }
 
 type standbyManager struct {
