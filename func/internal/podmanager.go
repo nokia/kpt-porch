@@ -36,6 +36,7 @@ import (
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/pkg/httpclient"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.uber.org/multierr"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -511,16 +512,23 @@ func (pm *podManager) getImage(ctx context.Context, ref name.Reference, auth aut
 
 func tlsCACertPath(tlsSecretPath string) (string, error) {
 	if _, err := os.Stat(tlsSecretPath); err != nil {
-		return "", err
+		return "", fmt.Errorf("tls secret folder %q could not be reached: %w", tlsSecretPath, err)
 	}
-	tlsFile := "ca.crt"
-	if _, errCRT := os.Stat(filepath.Join(tlsSecretPath, "ca.crt")); os.IsNotExist(errCRT) {
-		if _, errPEM := os.Stat(filepath.Join(tlsSecretPath, "ca.pem")); os.IsNotExist(errPEM) {
-			return "", fmt.Errorf("ca.crt not found: %v, and ca.pem also not found: %w", errCRT, errPEM)
+
+	var multiErr error
+
+	candidates := []string{"ca.crt", "ca.pem", "cacert.pem", "ca-bundle.crt", "root.crt"}
+	for _, file := range candidates {
+		path := filepath.Join(tlsSecretPath, file)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		} else {
+			multierr.AppendInto(&multiErr, err)
 		}
-		tlsFile = "ca.pem"
 	}
-	return filepath.Join(tlsSecretPath, tlsFile), nil
+
+	return "", fmt.Errorf("no CA certificate found in %q (candidates: [%s]): %w",
+		tlsSecretPath, strings.Join(candidates, ", "), multiErr)
 }
 
 func loadTLSConfig(caCertPath string) (*tls.Config, error) {
