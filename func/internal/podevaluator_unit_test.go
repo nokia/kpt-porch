@@ -308,9 +308,9 @@ func TestEvaluateFunction_Unavailable_EvictsAndRetries(t *testing.T) {
 	evictCh := make(chan *podEvictionRequest, 1)
 
 	pe := &podEvaluator{
-		requestCh:       reqCh,
-		evictionCh:      evictCh,
-		maxGrpcRetries:  2,
+		requestCh:      reqCh,
+		evictionCh:     evictCh,
+		maxGrpcRetries: 2,
 		podCacheManager: &podCacheManager{
 			podManager: &podManager{
 				tagResolver: runtime.TagResolver{},
@@ -384,9 +384,9 @@ func TestEvaluateFunction_ExhaustsRetries(t *testing.T) {
 	evictCh := make(chan *podEvictionRequest, 2)
 
 	pe := &podEvaluator{
-		requestCh:       reqCh,
-		evictionCh:      evictCh,
-		maxGrpcRetries:  1, // only 1 retry allowed
+		requestCh:      reqCh,
+		evictionCh:     evictCh,
+		maxGrpcRetries: 1, // only 1 retry allowed
 		podCacheManager: &podCacheManager{
 			podManager: &podManager{
 				tagResolver: runtime.TagResolver{},
