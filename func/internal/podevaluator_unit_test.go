@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kptdev/kpt/pkg/lib/runneroptions"
+	fnconf "github.com/kptdev/porch/controllers/functionconfigs/reconciler"
 	pb "github.com/kptdev/porch/func/evaluator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,6 +32,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 // startFakeEvalServer starts a gRPC function evaluator server on a dynamic port.
@@ -47,6 +50,29 @@ func startFakeEvalServer(t *testing.T, evalFunc func(ctx context.Context, req *p
 	return lis.Addr().String(), func() {
 		server.GracefulStop()
 	}
+}
+
+func TestNewPodEvaluator(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	kubeClient := fake.NewClientBuilder().Build()
+	store := fnconf.NewFunctionConfigStore(runneroptions.GHCRImagePrefix, "/functions")
+
+	eval, err := NewPodEvaluator(ctx, PodEvaluatorOptions{
+		PodNamespace:       "test-ns",
+		WrapperServerImage: "ghcr.io/kptdev/wrapper-server:latest",
+		GcScanInterval:     time.Minute,
+		PodTTL:             time.Minute,
+	}, kubeClient, store)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+
+	pe, ok := eval.(*podEvaluator)
+	require.True(t, ok)
+	assert.Equal(t, defaultMaxWaitlistLength, pe.podCacheManager.maxWaitlistLength)
+	assert.Equal(t, defaultMaxParallelPodsPerFunction, pe.podCacheManager.maxParallelPodsPerFunction)
+	assert.Equal(t, defaultMaxGrpcRetries, pe.maxGrpcRetries)
 }
 
 func TestEvaluateFunction_ErrorInResponse(t *testing.T) {

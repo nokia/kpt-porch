@@ -377,6 +377,41 @@ func TestAppendImagePullSecret(t *testing.T) {
 	})
 }
 
+func TestTlsCACertPath(t *testing.T) {
+	t.Run("prefers ca.crt over ca.pem", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "ca.crt"), []byte("crt"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "ca.pem"), []byte("pem"), 0o600))
+
+		path, err := tlsCACertPath(dir)
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(dir, "ca.crt"), path)
+	})
+
+	t.Run("falls back to ca.pem", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "ca.pem"), []byte("pem"), 0o600))
+
+		path, err := tlsCACertPath(dir)
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(dir, "ca.pem"), path)
+	})
+
+	t.Run("returns error when mount path is missing", func(t *testing.T) {
+		_, err := tlsCACertPath(filepath.Join(t.TempDir(), "missing"))
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "tls secret folder")
+	})
+
+	t.Run("returns error when no candidate files exist", func(t *testing.T) {
+		dir := t.TempDir()
+		_, err := tlsCACertPath(dir)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "no CA certificate found")
+		assert.ErrorContains(t, err, "ca.crt")
+	})
+}
+
 func TestLoadTLSConfig(t *testing.T) {
 	t.Run("valid PEM certificate", func(t *testing.T) {
 		// Generate a self-signed certificate for testing

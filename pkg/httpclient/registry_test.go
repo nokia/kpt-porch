@@ -24,6 +24,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type nonHTTPTransport struct{}
+
+func (nonHTTPTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, http.ErrSkipAltProtocol
+}
+
+func TestSnapshotBaseTransport_FallbackWhenDefaultTransportIsNotHTTPTransport(t *testing.T) {
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+
+	http.DefaultTransport = nonHTTPTransport{}
+
+	transport := snapshotBaseTransport()
+	require.NotNil(t, transport)
+	assert.NotNil(t, transport.DialContext)
+	assert.True(t, transport.ForceAttemptHTTP2)
+	assert.Equal(t, 100, transport.MaxIdleConns)
+}
+
 func TestRegistryClientUsesHTTPTransport(t *testing.T) {
 	client := RegistryClient(nil)
 	require.NotNil(t, client)
