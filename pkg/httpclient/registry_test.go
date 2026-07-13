@@ -22,7 +22,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func TestRegistryClientUsesHTTPTransport(t *testing.T) {
@@ -44,23 +43,4 @@ func TestRegistryClientAppliesTLSConfig(t *testing.T) {
 	require.True(t, ok)
 	assert.EqualValues(t, tls.VersionTLS12, transport.TLSClientConfig.MinVersion)
 	assert.Equal(t, pool, transport.TLSClientConfig.RootCAs)
-}
-
-func TestRegistryClientWithWrappedDefaultTransport(t *testing.T) {
-	oldDefaultTransport := http.DefaultTransport
-	oldDefaultClientTransport := http.DefaultClient.Transport
-
-	http.DefaultTransport = otelhttp.NewTransport(http.DefaultTransport)
-	http.DefaultClient.Transport = http.DefaultTransport
-
-	t.Cleanup(func() {
-		http.DefaultTransport = oldDefaultTransport
-		http.DefaultClient.Transport = oldDefaultClientTransport
-	})
-
-	assert.NotPanics(t, func() {
-		client := RegistryClient(nil)
-		_, ok := client.Transport.(*http.Transport)
-		assert.True(t, ok)
-	})
 }

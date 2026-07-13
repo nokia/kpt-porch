@@ -510,7 +510,7 @@ func (pm *podManager) getImage(ctx context.Context, ref name.Reference, auth aut
 }
 
 func tlsCACertPath(tlsSecretPath string) (string, error) {
-	if _, err := os.Stat(tlsSecretPath); os.IsNotExist(err) {
+	if _, err := os.Stat(tlsSecretPath); err != nil {
 		return "", err
 	}
 	tlsFile := "ca.crt"
