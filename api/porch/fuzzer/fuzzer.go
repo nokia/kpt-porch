@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,6 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
-var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
-	return []interface{}{}
+var Funcs = func(codecs runtimeserializer.CodecFactory) []any {
+	return []any{}
 }

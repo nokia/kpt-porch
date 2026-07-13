@@ -1,4 +1,4 @@
-// Copyright 2022,2024 The kpt Authors
+// Copyright 2022, 2024, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -267,7 +267,7 @@ func createValidatingWebhook(ctx context.Context, cfg *WebhookConfig, caCert []b
 	kubeConfig := ctrl.GetConfigOrDie()
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("failed to setup kubeClient: %v", err)
+		return fmt.Errorf("failed to setup kubeClient: %w", err)
 	}
 	// Set max timeout value for ValidatingWebhooks
 	cfg.timeout = 30
@@ -456,7 +456,7 @@ func constructResponse(response *admissionv1.AdmissionResponse,
 
 	resp, err := json.Marshal(admissionReviewResponse)
 	if err != nil {
-		return nil, fmt.Errorf("error marshalling response json: %v", err)
+		return nil, fmt.Errorf("error marshalling response json: %w", err)
 	}
 	return resp, nil
 }

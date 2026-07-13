@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"io"
 	"io/fs"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -348,8 +348,8 @@ func (h *commitHelper) storeTrees(treePath string) (plumbing.Hash, error) {
 	}
 
 	entries := tree.Entries
-	sort.Slice(entries, func(i, j int) bool {
-		return entrySortKey(&entries[i]) < entrySortKey(&entries[j])
+	slices.SortFunc(entries, func(a, b object.TreeEntry) int {
+		return strings.Compare(entrySortKey(&a), entrySortKey(&b))
 	})
 
 	// Store all child trees, pruning any that resolve to empty

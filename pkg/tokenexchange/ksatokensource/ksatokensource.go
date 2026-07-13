@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ func ExtractJWTString(jwtToken string, key string) (string, error) {
 		// Don't log the token as it may be sensitive
 		return "", fmt.Errorf("error getting identity provider from JWT (cannot decode base64)")
 	}
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	if err := json.Unmarshal(b, &m); err != nil {
 		// Don't log the token as it may be sensitive
 		return "", fmt.Errorf("error getting identity provider from JWT (cannot decode json)")

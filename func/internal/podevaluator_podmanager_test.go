@@ -814,7 +814,7 @@ func TestMultipleEndpointsWithStuckPod(t *testing.T) {
 	}
 }
 
-func deepCopyObject(in, out interface{}) {
+func deepCopyObject(in, out any) {
 	buf := bytes.Buffer{}
 	if err := gob.NewEncoder(&buf).Encode(in); err != nil {
 		panic(err)

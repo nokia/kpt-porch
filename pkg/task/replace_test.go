@@ -77,7 +77,7 @@ func removeComments(t *testing.T, r repository.PackageResources) repository.Pack
 }
 
 func removeCommentsFromFile(t *testing.T, name, contents string) string {
-	var data interface{}
+	var data any
 	if err := yaml.Unmarshal([]byte(contents), &data); err != nil {
 		t.Fatalf("Failed to unmarshal %q: %v", name, err)
 	}

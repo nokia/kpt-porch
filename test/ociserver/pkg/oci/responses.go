@@ -26,7 +26,7 @@ import (
 )
 
 type JSONResponse struct {
-	Object interface{}
+	Object any
 }
 
 func (v *JSONResponse) WriteTo(w http.ResponseWriter, r *http.Request) {

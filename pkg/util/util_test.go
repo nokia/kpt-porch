@@ -1,4 +1,4 @@
-// Copyright 2022,2025 The kpt Authors
+// Copyright 2022,2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -133,7 +133,7 @@ func TestParseRepositoryNameOK(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			parsedSlice := SplitIn3OnDelimiter(tc.pkgRevId, ".")
-			if !reflect.DeepEqual(tc.expected, parsedSlice) {
+			if !slices.Equal(tc.expected, parsedSlice) {
 				t.Errorf("expected %+v, got %+v", tc.expected, parsedSlice)
 			}
 		})
@@ -174,7 +174,7 @@ func TestParseRepositoryNameStrangeDelimiterOK(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			parsedSlice := SplitIn3OnDelimiter(tc.pkgRevId, "#.#")
-			if !reflect.DeepEqual(tc.expected, parsedSlice) {
+			if !slices.Equal(tc.expected, parsedSlice) {
 				t.Errorf("expected %+v, got %+v", tc.expected, parsedSlice)
 			}
 		})

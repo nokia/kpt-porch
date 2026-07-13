@@ -91,7 +91,7 @@ func discoverGiteaLBIP() string {
 
 func createGiteaRepo(repoName string) error {
 	giteaURL := getGiteaBaseURL() + "/api/v1/user/repos"
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"name":        repoName,
 		"description": "Test repository for Porch metrics",
 		"private":     false,
@@ -100,12 +100,12 @@ func createGiteaRepo(repoName string) error {
 
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal payload: %v", err)
+		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
 	req, err := http.NewRequest("POST", giteaURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %v", err)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -114,7 +114,7 @@ func createGiteaRepo(repoName string) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to create repo: %v", err)
+		return fmt.Errorf("failed to create repo: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -163,7 +163,7 @@ func deleteGiteaRepo(repoName string) error {
 
 	req, err := http.NewRequest("DELETE", giteaURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create delete request: %v", err)
+		return fmt.Errorf("failed to create delete request: %w", err)
 	}
 
 	req.SetBasicAuth("porch", "secret")
@@ -171,7 +171,7 @@ func deleteGiteaRepo(repoName string) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to delete repo: %v", err)
+		return fmt.Errorf("failed to delete repo: %w", err)
 	}
 	defer resp.Body.Close()
 

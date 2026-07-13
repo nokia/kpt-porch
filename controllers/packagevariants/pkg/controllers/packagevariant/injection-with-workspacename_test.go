@@ -1,4 +1,4 @@
-// Copyright 2023 The kpt Authors
+// Copyright 2023, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,8 @@ package packagevariant
 import (
 	"context"
 	"fmt"
-	"sort"
+	"slices"
+	"strings"
 	"testing"
 
 	kptfilev1 "github.com/kptdev/kpt/api/kptfile/v1"
@@ -234,9 +235,9 @@ spec:
 			require.Equal(t, len(tc.expected), len(actualInjectionPoints))
 
 			// ensure a stable ordering
-			sort.Slice(actualInjectionPoints,
-				func(i, j int) bool {
-					return actualInjectionPoints[i].conditionType < actualInjectionPoints[j].conditionType
+			slices.SortFunc(actualInjectionPoints,
+				func(a, b *injectionPoint) int {
+					return strings.Compare(a.conditionType, b.conditionType)
 				})
 			for i, ip := range actualInjectionPoints {
 				require.Equal(t, tc.expected[i].conditionType, ip.conditionType)

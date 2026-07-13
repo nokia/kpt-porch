@@ -164,7 +164,7 @@ func createGiteaAPIToken(name string) (string, error) {
 	if resp.StatusCode != 201 {
 		return "", fmt.Errorf("failed to create gitea token: %d", resp.StatusCode)
 	}
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}

@@ -19,10 +19,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -301,23 +301,63 @@ func CompareObjectMeta(left metav1.ObjectMeta, right metav1.ObjectMeta) bool {
 		return false
 	}
 
-	if result := reflect.DeepEqual(left.Labels, right.Labels); !result {
+	if !mapsEqual(left.Labels, right.Labels) {
 		return false
 	}
 
-	if result := reflect.DeepEqual(left.Annotations, right.Annotations); !result {
+	if !mapsEqual(left.Annotations, right.Annotations) {
 		return false
 	}
 
-	if result := reflect.DeepEqual(left.Finalizers, right.Finalizers); !result {
+	if !slicesEqual(left.Finalizers, right.Finalizers) {
 		return false
 	}
 
-	if result := reflect.DeepEqual(left.OwnerReferences, right.OwnerReferences); !result {
+	if !ownerRefsEqual(left.OwnerReferences, right.OwnerReferences) {
 		return false
 	}
 
 	return true
+}
+
+func ownerRefEqual(a, b metav1.OwnerReference) bool {
+	return a.APIVersion == b.APIVersion &&
+		a.Kind == b.Kind &&
+		a.Name == b.Name &&
+		a.UID == b.UID &&
+		boolPtrEqual(a.Controller, b.Controller) &&
+		boolPtrEqual(a.BlockOwnerDeletion, b.BlockOwnerDeletion)
+}
+
+func boolPtrEqual(a, b *bool) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func mapsEqual(a, b map[string]string) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	return maps.Equal(a, b)
+}
+
+func slicesEqual(a, b []string) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	return slices.Equal(a, b)
+}
+
+func ownerRefsEqual(a, b []metav1.OwnerReference) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	return slices.EqualFunc(a, b, ownerRefEqual)
 }
 
 // RetryOnErrorConditional retries f up to retries times if it returns an error that matches shouldRetryFunc

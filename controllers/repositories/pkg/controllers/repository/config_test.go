@@ -47,11 +47,11 @@ func TestBindFlags(t *testing.T) {
 }
 
 type mockLogger struct {
-	infoCalls [][]interface{}
+	infoCalls [][]any
 }
 
-func (m *mockLogger) Info(msg string, keysAndValues ...interface{}) {
-	m.infoCalls = append(m.infoCalls, append([]interface{}{msg}, keysAndValues...))
+func (m *mockLogger) Info(msg string, keysAndValues ...any) {
+	m.infoCalls = append(m.infoCalls, append([]any{msg}, keysAndValues...))
 }
 
 func TestLogConfig(t *testing.T) {

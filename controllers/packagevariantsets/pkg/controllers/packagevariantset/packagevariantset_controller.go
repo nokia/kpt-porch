@@ -276,7 +276,7 @@ func (r *PackageVariantSetReconciler) ensurePackageVariants(ctx context.Context,
 		client.MatchingLabels{
 			PackageVariantSetOwnerLabel: string(pvs.UID),
 		}); err != nil {
-		return fmt.Errorf("error listing package variants %v", err)
+		return fmt.Errorf("error listing package variants: %w", err)
 	}
 
 	// existingPackageVariantMap holds the PackageVariant objects that currently exist.

@@ -495,7 +495,7 @@ func (pm *podManager) getImage(ctx context.Context, ref name.Reference, auth aut
 	}
 	if _, errCRT := os.Stat(filepath.Join(pm.tlsSecretPath, "ca.crt")); os.IsNotExist(errCRT) {
 		if _, errPEM := os.Stat(filepath.Join(pm.tlsSecretPath, "ca.pem")); os.IsNotExist(errPEM) {
-			return nil, fmt.Errorf("ca.crt not found: %v, and ca.pem also not found: %v", errCRT, errPEM)
+			return nil, fmt.Errorf("ca.crt not found: %v, and ca.pem also not found: %w", errCRT, errPEM)
 		}
 		tlsFile = "ca.pem"
 	}

@@ -1,4 +1,4 @@
-// Copyright 2022, 2024-2025 The kpt Authors
+// Copyright 2022, 2024-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -125,21 +125,30 @@ func createRepoWithContents(t *testing.T, contentDir string) *gogit.Repository {
 		t.Fatalf("Failed to get git repository worktree: %v", err)
 	}
 
-	if err := filepath.Walk(contentDir, func(path string, info fs.FileInfo, err error) error {
+	if err := filepath.WalkDir(contentDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
-		} else if !info.Mode().IsRegular() {
-			return fmt.Errorf("irregular file object detected: %q (%s)", path, info.Mode())
+		}
+		// d.Type() may return 0 (unknown) on some filesystems;
+		// fall back to Stat via d.Info() to avoid skipping regular files.
+		if !d.Type().IsRegular() {
+			info, infoErr := d.Info()
+			if infoErr != nil {
+				return infoErr
+			}
+			if !info.Mode().IsRegular() {
+				return fmt.Errorf("irregular file object detected: %q (%s)", path, info.Mode())
+			}
 		}
 		rel, err := filepath.Rel(contentDir, path)
 		if err != nil {
 			return fmt.Errorf("failed to get relative path from %q to %q: %w", contentDir, path, err)
 		}
 		dir := filepath.Dir(rel)
-		if err := wt.Filesystem.MkdirAll(dir, 0777); err != nil {
+		if err := wt.Filesystem.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("failed to create directories for %q: %w", rel, err)
 		}
 		src, err := os.Open(path)
