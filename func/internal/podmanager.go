@@ -33,7 +33,6 @@ import (
 	containerregistry "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/kptdev/kpt/pkg/fn/runtime"
-	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/pkg/httpclient"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -217,8 +216,6 @@ type podManager struct {
 	enablePrivateRegistriesTls bool
 	// The path of the secret used in tls configuration
 	tlsSecretPath string
-	// Image resolver that prepends a prefix if necessary
-	imageResolver runneroptions.ImageResolveFunc
 	// tagResolver is used to resolve the tag of the given image
 	tagResolver runtime.TagResolver
 	// skipGrpcReadyCheck disables the gRPC readiness verification during pod creation (for testing)
@@ -557,9 +554,6 @@ func loadTLSConfig(caCertPath string) (*tls.Config, error) {
 func (pm *podManager) CreatePod(ctx context.Context, image string, postFix int, config *configapi.PodExecutorConfig, useGenerateName bool) (*corev1.Pod, error) {
 	var de *digestAndEntrypoint
 	var err error
-	if pm.imageResolver != nil {
-		image = pm.imageResolver(image)
-	}
 	de, err = pm.imageDigestAndEntrypoint(ctx, image)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get the entrypoint for %v: %w", image, err)
