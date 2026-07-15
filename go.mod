@@ -18,6 +18,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.21.6
 	github.com/google/uuid v1.6.0
+	github.com/grafana/pyroscope-go v1.4.1
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kptdev/kpt v1.0.0-beta.65
@@ -65,10 +66,14 @@ require (
 	k8s.io/kube-aggregator v0.36.1
 	k8s.io/kubectl v0.36.1
 	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
-	sigs.k8s.io/cli-utils v0.37.2
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/kustomize/kyaml v0.21.1
 	sigs.k8s.io/yaml v1.6.0
+)
+
+require (
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.11 // indirect
+	sigs.k8s.io/cli-utils v0.37.2 // indirect
 )
 
 require (
