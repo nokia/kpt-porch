@@ -1,4 +1,4 @@
-// Copyright 2023 The kpt Authors
+// Copyright 2023, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -287,13 +287,13 @@ func GetResourceVersion(prr *porchapi.PackageRevisionResources) (string, error) 
 func AddRevisionMetadata(prr *porchapi.PackageRevisionResources) error {
 	kptMetaDataKo := fnsdk.NewEmptyKubeObject()
 	if err := kptMetaDataKo.SetAPIVersion(prr.APIVersion); err != nil {
-		return fmt.Errorf("cannot set Api Version: %v", err)
+		return fmt.Errorf("cannot set Api Version: %w", err)
 	}
 	if err := kptMetaDataKo.SetKind(kptfilev1.RevisionMetaDataKind); err != nil {
-		return fmt.Errorf("cannot set Kind: %v", err)
+		return fmt.Errorf("cannot set Kind: %w", err)
 	}
 	if err := kptMetaDataKo.SetNestedField(prr.GetObjectMeta(), "metadata"); err != nil {
-		return fmt.Errorf("cannot set metadata: %v", err)
+		return fmt.Errorf("cannot set metadata: %w", err)
 	}
 	prr.Spec.Resources[kptfilev1.RevisionMetaDataFileName] = kptMetaDataKo.String()
 

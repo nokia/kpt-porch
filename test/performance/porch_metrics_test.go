@@ -231,7 +231,7 @@ scrape_configs:
     scrape_interval: 1s
 `
 	if err := os.WriteFile("prometheus.yml", []byte(promConfig), 0644); err != nil {
-		return fmt.Errorf("failed to create prometheus.yml: %v", err)
+		return fmt.Errorf("failed to create prometheus.yml: %w", err)
 	}
 
 	// Execute Docker commands
@@ -304,13 +304,13 @@ func setupGiteaSecret(t *testing.T) error {
 	// Read and apply the secret manifest
 	secretManifest, err := os.ReadFile(filepath.Join(dir, "gitea-secret.yaml"))
 	if err != nil {
-		return fmt.Errorf("failed to read gitea secret manifest: %v", err)
+		return fmt.Errorf("failed to read gitea secret manifest: %w", err)
 	}
 
 	cmd := exec.Command("kubectl", "apply", "-f", "-")
 	cmd.Stdin = bytes.NewReader(secretManifest)
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to apply gitea secret: %v\nOutput: %s", err, output)
+		return fmt.Errorf("failed to apply gitea secret: %w\nOutput: %s", err, output)
 	}
 
 	return nil

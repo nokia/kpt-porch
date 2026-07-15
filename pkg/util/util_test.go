@@ -18,11 +18,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
-	"github.com/kptdev/krm-functions-sdk/go/fn/kptfileapi"
+	kptfilev1 "github.com/kptdev/kpt/api/kptfile/v1"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -133,7 +133,7 @@ func TestParseRepositoryNameOK(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			parsedSlice := SplitIn3OnDelimiter(tc.pkgRevId, ".")
-			if !reflect.DeepEqual(tc.expected, parsedSlice) {
+			if !slices.Equal(tc.expected, parsedSlice) {
 				t.Errorf("expected %+v, got %+v", tc.expected, parsedSlice)
 			}
 		})
@@ -174,7 +174,7 @@ func TestParseRepositoryNameStrangeDelimiterOK(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			parsedSlice := SplitIn3OnDelimiter(tc.pkgRevId, "#.#")
-			if !reflect.DeepEqual(tc.expected, parsedSlice) {
+			if !slices.Equal(tc.expected, parsedSlice) {
 				t.Errorf("expected %+v, got %+v", tc.expected, parsedSlice)
 			}
 		})
@@ -480,7 +480,7 @@ func getPartErrMsg(errorSlice []string, start string) string {
 func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 	tests := []struct {
 		name           string
-		upstream       *kptfileapi.Upstream
+		upstream       *kptfilev1.Upstream
 		wantRepoSpec   *configapi.RepositorySpec
 		wantPkg        string
 		wantRef        string
@@ -494,13 +494,13 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 		},
 		{
 			name:     "nil git returns error",
-			upstream: &kptfileapi.Upstream{Git: nil},
+			upstream: &kptfilev1.Upstream{Git: nil},
 			wantErr:  "upstream does not contain a valid git repository",
 		},
 		{
 			name: "empty repo returns error",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "",
 					Ref:       "mypkg/v1",
 					Directory: "mypkg",
@@ -510,8 +510,8 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 		},
 		{
 			name: "empty directory returns error",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/example/repo.git",
 					Ref:       "mypkg/v1",
 					Directory: "",
@@ -521,8 +521,8 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 		},
 		{
 			name: "directory with leading slash returns error",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/example/repo.git",
 					Ref:       "mypkg/v1",
 					Directory: "/mypkg",
@@ -532,8 +532,8 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 		},
 		{
 			name: "directory with trailing slash returns error",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/example/repo.git",
 					Ref:       "mypkg/v1",
 					Directory: "mypkg/",
@@ -543,8 +543,8 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 		},
 		{
 			name: "empty ref returns error",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/example/repo.git",
 					Ref:       "",
 					Directory: "mypkg",
@@ -554,8 +554,8 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 		},
 		{
 			name: "unmanaged ref - ref does not contain directory pattern",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/example/repo.git",
 					Ref:       "main",
 					Directory: "mypkg",
@@ -574,8 +574,8 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 		},
 		{
 			name: "unmanaged ref - arbitrary tag",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/example/repo.git",
 					Ref:       "release-2.0",
 					Directory: "packages/foo",
@@ -594,8 +594,8 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 		},
 		{
 			name: "managed ref - simple package",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/example/repo.git",
 					Ref:       "mypkg/v1",
 					Directory: "mypkg",
@@ -614,8 +614,8 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 		},
 		{
 			name: "managed ref - nested package",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/example/repo.git",
 					Ref:       "packages/mypkg/v2",
 					Directory: "packages/mypkg",
@@ -634,8 +634,8 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 		},
 		{
 			name: "managed ref - with repo directory prefix",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/example/repo.git",
 					Ref:       "blueprints/mypkg/v3",
 					Directory: "mypkg",
@@ -675,7 +675,7 @@ func TestGetRepoPackageRefFromUpstream(t *testing.T) {
 func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 	tests := []struct {
 		name           string
-		upstream       *kptfileapi.Upstream
+		upstream       *kptfilev1.Upstream
 		wantRepoSpec   *configapi.RepositorySpec
 		wantPkg        string
 		wantRef        string
@@ -684,8 +684,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 	}{
 		{
 			name: "real test case 1",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "http://172.18.255.204:3000/porch/porch-test.git",
 					Directory: "upstream-function1",
 					Ref:       "upstream-function1/v1",
@@ -704,8 +704,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 2",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "http://172.18.255.204:3000/porch/porch-test.git",
 					Directory: "r2/r2/r2/r2",
 					Ref:       "r2/r2/r2/r2/r2/r2/v1",
@@ -724,8 +724,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 3",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "http://172.18.255.204:3000/porch/porch-test.git",
 					Directory: "upstream-function",
 					Ref:       "l1/upstream-function/v1",
@@ -744,8 +744,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 4",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "http://172.18.255.204:3000/porch/porch-test.git",
 					Directory: "upstream-function",
 					Ref:       "r1/upstream-function/v1",
@@ -764,8 +764,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 5",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "http://172.18.255.204:3000/porch/porch-test.git",
 					Directory: "upstream-function",
 					Ref:       "l3/l3/l3/upstream-function/v1",
@@ -784,8 +784,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 6",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "http://172.18.255.204:3000/porch/porch-test.git",
 					Directory: "upstream-dir/upstream-function",
 					Ref:       "l3/l3/l3/upstream-dir/upstream-function/v1",
@@ -804,8 +804,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 7",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "http://172.18.255.204:3000/porch/porch-test.git",
 					Directory: "upstream-function",
 					Ref:       "r3/r3/r3/upstream-function/v1",
@@ -824,8 +824,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 8",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/kptdev/kpt.git",
 					Directory: "package-examples/wordpress",
 					Ref:       "v1.0.0-beta.64",
@@ -844,8 +844,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 9",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/kptdev/kpt-samples.git",
 					Directory: "echo",
 					Ref:       "main",
@@ -864,8 +864,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 10",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/kptdev/kpt-samples.git",
 					Directory: "echo",
 					Ref:       "v0",
@@ -884,8 +884,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 11",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "http://172.18.255.204:3000/porch/porch-test.git",
 					Directory: "r2/r2/r2/r2/r2/r2",
 					Ref:       "r2/r2/r2/r2/r2/r2/v1",
@@ -904,8 +904,8 @@ func TestGetRepoPackageRefFromUpstreamRealData(t *testing.T) {
 		},
 		{
 			name: "real test case 12",
-			upstream: &kptfileapi.Upstream{
-				Git: &kptfileapi.Git{
+			upstream: &kptfilev1.Upstream{
+				Git: &kptfilev1.Git{
 					Repo:      "https://github.com/nephio-project/catalog.git",
 					Directory: "nephio/core/workload-crds",
 					Ref:       "nephio/core/workload-crds/v3.0.0",

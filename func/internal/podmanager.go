@@ -34,7 +34,6 @@ import (
 	containerregistry "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/kptdev/kpt/pkg/fn/runtime"
-	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -216,8 +215,6 @@ type podManager struct {
 	enablePrivateRegistriesTls bool
 	// The path of the secret used in tls configuration
 	tlsSecretPath string
-	// Image resolver that prepends a prefix if necessary
-	imageResolver runneroptions.ImageResolveFunc
 	// tagResolver is used to resolve the tag of the given image
 	tagResolver runtime.TagResolver
 	// skipGrpcReadyCheck disables the gRPC readiness verification during pod creation (for testing)
@@ -495,7 +492,7 @@ func (pm *podManager) getImage(ctx context.Context, ref name.Reference, auth aut
 	}
 	if _, errCRT := os.Stat(filepath.Join(pm.tlsSecretPath, "ca.crt")); os.IsNotExist(errCRT) {
 		if _, errPEM := os.Stat(filepath.Join(pm.tlsSecretPath, "ca.pem")); os.IsNotExist(errPEM) {
-			return nil, fmt.Errorf("ca.crt not found: %v, and ca.pem also not found: %v", errCRT, errPEM)
+			return nil, fmt.Errorf("ca.crt not found: %v, and ca.pem also not found: %w", errCRT, errPEM)
 		}
 		tlsFile = "ca.pem"
 	}
@@ -550,9 +547,6 @@ func createTransport(tlsConfig *tls.Config) *http.Transport {
 func (pm *podManager) CreatePod(ctx context.Context, image string, postFix int, config *configapi.PodExecutorConfig, useGenerateName bool) (*corev1.Pod, error) {
 	var de *digestAndEntrypoint
 	var err error
-	if pm.imageResolver != nil {
-		image = pm.imageResolver(image)
-	}
 	de, err = pm.imageDigestAndEntrypoint(ctx, image)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get the entrypoint for %v: %w", image, err)

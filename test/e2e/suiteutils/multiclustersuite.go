@@ -50,7 +50,7 @@ func (t *MultiClusterTestSuite) UseKubeconfigFile(kubeconfigPath string) error {
 	os.Setenv(clientcmd.RecommendedConfigPathEnvVar, t.PorchRoot+kubeconfigPath)
 	cfg, err := config.GetConfig()
 	if err != nil {
-		return fmt.Errorf("Unable to switch clusters - error loading Kubernetes client config from file %q: %v", kubeconfigPath, err)
+		return fmt.Errorf("Unable to switch clusters - error loading Kubernetes client config from file %q: %w", kubeconfigPath, err)
 	}
 
 	if cachedClient, found := t.clients[kubeconfigPath]; found {

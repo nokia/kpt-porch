@@ -340,7 +340,7 @@ func findColumn(cols []metav1.TableColumnDefinition, name string) int {
 	return -1
 }
 
-func getStringCell(cells []interface{}, col int) (string, bool) {
+func getStringCell(cells []any, col int) (string, bool) {
 	if col < 0 {
 		return "", false
 	}
@@ -348,7 +348,7 @@ func getStringCell(cells []interface{}, col int) (string, bool) {
 	return s, ok
 }
 
-func getInt64Cell(cells []interface{}, col int) (int64, bool) {
+func getInt64Cell(cells []any, col int) (int64, bool) {
 	if col < 0 {
 		return 0, false
 	}

@@ -1,4 +1,4 @@
-// Copyright 2022, 2024-2025 The kpt Authors
+// Copyright 2022, 2024-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1176,7 +1176,7 @@ func (r *gitRepository) verifyRepository(ctx context.Context, opts *GitRepositor
 		if err != nil {
 			switch opts.MainBranchStrategy {
 			case ErrorIfMissing:
-				return fmt.Errorf("branch %q doesn't exist: %v", r.branch, err)
+				return fmt.Errorf("branch %q doesn't exist: %w", r.branch, err)
 			case CreateIfMissing:
 				klog.Infof("Creating branch %s in repository %s", r.branch, r.Key().Name)
 				if err := r.createBranch(repo, r.branch); err != nil {
@@ -1204,7 +1204,7 @@ func (r *gitRepository) verifyRepository(ctx context.Context, opts *GitRepositor
 		refSpecs := newPushRefSpecBuilder()
 		refSpecs.addRefToPush(commitHash, r.branch.refInLocal())
 		if err := r.pushAndCleanup(ctx, refSpecs, nil); err != nil {
-			return fmt.Errorf("error pushing main branch %q: %v", r.branch, err)
+			return fmt.Errorf("error pushing main branch %q: %w", r.branch, err)
 		}
 	}
 	return nil
@@ -1300,7 +1300,7 @@ func (r *gitRepository) commitPackageToMainInRepo(ctx context.Context, repo *git
 		Revision:      repository.Revision2Str(d.Key().Revision),
 	})
 	if err != nil {
-		return plumbing.ZeroHash, plumbing.ZeroHash, fmt.Errorf("failed annotation commit message for package %s: %v", d.Key().PkgKey.ToFullPathname(), err)
+		return plumbing.ZeroHash, plumbing.ZeroHash, fmt.Errorf("failed annotation commit message for package %s: %w", d.Key().PkgKey.ToFullPathname(), err)
 	}
 	hash, treeHash, err := ch.commit(ctx, message, d.Key().PkgKey.ToFullPathname(), d.commit)
 	if err != nil {
@@ -1368,7 +1368,7 @@ func (r *gitRepository) executeCommitOperations(ctx context.Context, repo *git.R
 	for _, op := range commitOps.getOperations() {
 		switch op.opType {
 		case "approval":
-			data := op.data.(map[string]interface{})
+			data := op.data.(map[string]any)
 			d := data["draft"].(*gitPackageRevisionDraft)
 			tag := data["tag"].(plumbing.ReferenceName)
 
@@ -1384,7 +1384,7 @@ func (r *gitRepository) executeCommitOperations(ctx context.Context, repo *git.R
 			d.tree = newTreeHash
 
 		case "deletion":
-			data := op.data.(map[string]interface{})
+			data := op.data.(map[string]any)
 			branch := data["branch"].(plumbing.ReferenceName)
 			prKey := data["prKey"].(repository.PackageRevisionKey)
 

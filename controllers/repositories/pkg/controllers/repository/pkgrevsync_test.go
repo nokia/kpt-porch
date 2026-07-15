@@ -93,6 +93,7 @@ type fakePackageRevision struct {
 	commitAuthor string
 	isLatest     bool
 	resources    map[string]string
+	meta         metav1.ObjectMeta
 }
 
 func (f *fakePackageRevision) KubeObjectNamespace() string                          { return f.key.RKey().Namespace }
@@ -100,7 +101,7 @@ func (f *fakePackageRevision) KubeObjectName() string                           
 func (f *fakePackageRevision) Key() repository.PackageRevisionKey                   { return f.key }
 func (f *fakePackageRevision) UID() types.UID                                       { return "" }
 func (f *fakePackageRevision) ResourceVersion() string                              { return "" }
-func (f *fakePackageRevision) GetMeta() metav1.ObjectMeta                           { return metav1.ObjectMeta{} }
+func (f *fakePackageRevision) GetMeta() metav1.ObjectMeta                           { return f.meta }
 func (f *fakePackageRevision) SetMeta(_ context.Context, _ metav1.ObjectMeta) error { return nil }
 func (f *fakePackageRevision) Lifecycle(_ context.Context) porchv1alpha1.PackageRevisionLifecycle {
 	return f.lifecycle
@@ -758,4 +759,157 @@ func TestSeedFieldsNotCalledOnUpdate(t *testing.T) {
 	r := &RepositoryReconciler{Client: mockClient}
 	err := r.syncPackageRevisions(ctx, repo, []repository.PackageRevision{pkgRev})
 	assert.NoError(t, err)
+}
+
+// --- Tests: sourceMetadata ---
+
+func TestSourceMetadata(t *testing.T) {
+	t.Run("empty meta returns nil", func(t *testing.T) {
+		pkgRev := &fakePackageRevision{}
+		labels, annotations := sourceMetadata(pkgRev)
+		assert.Nil(t, labels)
+		assert.Nil(t, annotations)
+	})
+
+	t.Run("system labels are excluded", func(t *testing.T) {
+		pkgRev := &fakePackageRevision{
+			meta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					porchv1alpha2.RepositoryLabelKey:       "my-repo",
+					porchv1alpha2.LatestPackageRevisionKey: "true",
+					"kpt.dev/latest-revision":              "true", // v1alpha1 variant
+					"app.kubernetes.io/name":               "my-app",
+				},
+			},
+		}
+		labels, annotations := sourceMetadata(pkgRev)
+		assert.Equal(t, map[string]string{"app.kubernetes.io/name": "my-app"}, labels)
+		assert.Nil(t, annotations)
+	})
+
+	t.Run("only system labels returns nil", func(t *testing.T) {
+		pkgRev := &fakePackageRevision{
+			meta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					porchv1alpha2.RepositoryLabelKey:       "my-repo",
+					porchv1alpha2.LatestPackageRevisionKey: "true",
+					"kpt.dev/latest-revision":              "true",
+				},
+			},
+		}
+		labels, annotations := sourceMetadata(pkgRev)
+		assert.Nil(t, labels)
+		assert.Nil(t, annotations)
+	})
+
+	t.Run("annotations are passed through", func(t *testing.T) {
+		pkgRev := &fakePackageRevision{
+			meta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"team":    "platform",
+					"purpose": "infra",
+				},
+			},
+		}
+		labels, annotations := sourceMetadata(pkgRev)
+		assert.Nil(t, labels)
+		assert.Equal(t, map[string]string{"team": "platform", "purpose": "infra"}, annotations)
+	})
+
+	t.Run("mixed labels and annotations", func(t *testing.T) {
+		pkgRev := &fakePackageRevision{
+			meta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					porchv1alpha2.RepositoryLabelKey: "repo",
+					"env":                            "production",
+					"app":                            "frontend",
+				},
+				Annotations: map[string]string{
+					"description": "production frontend",
+				},
+			},
+		}
+		labels, annotations := sourceMetadata(pkgRev)
+		assert.Equal(t, map[string]string{"env": "production", "app": "frontend"}, labels)
+		assert.Equal(t, map[string]string{"description": "production frontend"}, annotations)
+	})
+}
+
+// --- Tests: applySeedFields with source metadata ---
+
+func TestApplySeedFieldsWithSourceMetadata(t *testing.T) {
+	ctx := context.Background()
+	repo := newTestRepo()
+
+	t.Run("source labels included in seed spec apply", func(t *testing.T) {
+		pkgRev := newFakePkgRev("labeled-pkg", "v1", porchv1alpha2.PackageRevisionLifecyclePublished)
+		pkgRev.key.Revision = 1
+		pkgRev.meta = metav1.ObjectMeta{
+			Labels: map[string]string{
+				porchv1alpha2.RepositoryLabelKey: "my-repo",    // system — should be excluded
+				"team":                           "networking", // source — should be included
+				"env":                            "staging",    // source — should be included
+			},
+			Annotations: map[string]string{
+				"contact": "team-net@example.com",
+			},
+		}
+
+		// Build the CRD first (as applyDesiredPackageRevisions would)
+		crd, err := buildPackageRevision(ctx, repo, pkgRev, true)
+		require.NoError(t, err)
+
+		mockClient := mockclient.NewMockClient(t)
+
+		// Expect seed spec Patch with source labels in ObjectMeta
+		var seedSpecObj *porchv1alpha2.PackageRevision
+		mockClient.EXPECT().Patch(mock.Anything, mock.AnythingOfType("*v1alpha2.PackageRevision"), mock.Anything, mock.Anything).
+			Run(func(_ context.Context, obj client.Object, _ client.Patch, _ ...client.PatchOption) {
+				seedSpecObj = obj.(*porchv1alpha2.PackageRevision)
+			}).Return(nil).Once()
+
+		// Expect seed status Patch
+		sw := mockclient.NewMockSubResourceWriter(t)
+		mockClient.EXPECT().Status().Return(sw)
+		sw.EXPECT().Patch(mock.Anything, mock.AnythingOfType("*v1alpha2.PackageRevision"), mock.Anything, mock.Anything).Return(nil).Once()
+
+		r := &RepositoryReconciler{Client: mockClient}
+		r.applySeedFields(ctx, repo, pkgRev, crd)
+
+		// Verify source labels (excluding system) are in the seed apply ObjectMeta
+		require.NotNil(t, seedSpecObj)
+		assert.Equal(t, "networking", seedSpecObj.Labels["team"])
+		assert.Equal(t, "staging", seedSpecObj.Labels["env"])
+		assert.NotContains(t, seedSpecObj.Labels, porchv1alpha2.RepositoryLabelKey)
+
+		// Verify annotations are included
+		assert.Equal(t, "team-net@example.com", seedSpecObj.Annotations["contact"])
+	})
+
+	t.Run("no source metadata means no labels on seed ObjectMeta", func(t *testing.T) {
+		pkgRev := newFakePkgRev("bare-pkg", "v1", porchv1alpha2.PackageRevisionLifecycleDraft)
+		// meta left empty — no source labels/annotations
+
+		crd, err := buildPackageRevision(ctx, repo, pkgRev, false)
+		require.NoError(t, err)
+
+		mockClient := mockclient.NewMockClient(t)
+
+		var seedSpecObj *porchv1alpha2.PackageRevision
+		mockClient.EXPECT().Patch(mock.Anything, mock.AnythingOfType("*v1alpha2.PackageRevision"), mock.Anything, mock.Anything).
+			Run(func(_ context.Context, obj client.Object, _ client.Patch, _ ...client.PatchOption) {
+				seedSpecObj = obj.(*porchv1alpha2.PackageRevision)
+			}).Return(nil).Once()
+
+		sw := mockclient.NewMockSubResourceWriter(t)
+		mockClient.EXPECT().Status().Return(sw)
+		sw.EXPECT().Patch(mock.Anything, mock.AnythingOfType("*v1alpha2.PackageRevision"), mock.Anything, mock.Anything).Return(nil).Once()
+
+		r := &RepositoryReconciler{Client: mockClient}
+		r.applySeedFields(ctx, repo, pkgRev, crd)
+
+		require.NotNil(t, seedSpecObj)
+		assert.Nil(t, seedSpecObj.Labels)
+		assert.Nil(t, seedSpecObj.Annotations)
+	})
 }

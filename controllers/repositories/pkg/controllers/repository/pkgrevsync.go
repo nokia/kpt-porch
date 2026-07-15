@@ -149,19 +149,30 @@ func (r *RepositoryReconciler) applyPackageRevision(ctx context.Context, pr *por
 }
 
 // applySeedFields applies non-repo-controller-owned fields (lifecycle, revision,
-// Kptfile-derived, publish metadata) on initial creation only. Uses a
-// separate field manager without ForceOwnership so these fields seed the value
-// for discovered packages but never overwrite values already set by the user
-// or the PR controller.
+// Kptfile-derived, publish metadata, source labels/annotations) on initial
+// creation only. Uses a separate field manager without ForceOwnership so these
+// fields seed the value for discovered packages but never overwrite values
+// already set by the user or the PR controller.
 func (r *RepositoryReconciler) applySeedFields(ctx context.Context, repo *configapi.Repository, pkgRev repository.PackageRevision, crd *porchv1alpha2.PackageRevision) {
 	log := log.FromContext(ctx)
 
 	lifecycle := porchv1alpha2.PackageRevisionLifecycle(pkgRev.Lifecycle(ctx))
 	kf, _ := pkgRev.GetKptfile(ctx)
 
+	// Carry over labels/annotations from the source PackageRevision's metadata.
+	// System-managed labels are excluded (owned by the main field manager).
+	seedObjMeta := metav1.ObjectMeta{Name: crd.Name, Namespace: crd.Namespace}
+	labels, annotations := sourceMetadata(pkgRev)
+	if len(labels) > 0 {
+		seedObjMeta.Labels = labels
+	}
+	if len(annotations) > 0 {
+		seedObjMeta.Annotations = annotations
+	}
+
 	seedSpec := &porchv1alpha2.PackageRevision{
 		TypeMeta:   crd.TypeMeta,
-		ObjectMeta: metav1.ObjectMeta{Name: crd.Name, Namespace: crd.Namespace},
+		ObjectMeta: seedObjMeta,
 		Spec: porchv1alpha2.PackageRevisionSpec{
 			Lifecycle:       lifecycle,
 			ReadinessGates:  porchv1alpha2.KptfileToReadinessGates(kf),
@@ -342,4 +353,39 @@ func packageRevisionLabels(repoName string, pkgRev repository.PackageRevision) m
 		labels[porchv1alpha2.LatestPackageRevisionKey] = "false"
 	}
 	return labels
+}
+
+// systemLabels are labels managed by controllers that should not be carried
+// over as source metadata. Includes both v1alpha1 and v1alpha2 variants.
+var systemLabels = map[string]bool{
+	porchv1alpha2.RepositoryLabelKey:       true,
+	porchv1alpha2.LatestPackageRevisionKey: true,
+	"kpt.dev/latest-revision":              true, // v1alpha1 variant
+}
+
+// sourceMetadata extracts labels and annotations from the source package
+// revision's Kubernetes ObjectMeta. System-managed labels are excluded.
+func sourceMetadata(pkgRev repository.PackageRevision) (map[string]string, map[string]string) {
+	meta := pkgRev.GetMeta()
+
+	var labels map[string]string
+	for k, v := range meta.Labels {
+		if systemLabels[k] {
+			continue
+		}
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+		labels[k] = v
+	}
+
+	var annotations map[string]string
+	for k, v := range meta.Annotations {
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[k] = v
+	}
+
+	return labels, annotations
 }

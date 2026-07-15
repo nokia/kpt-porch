@@ -292,7 +292,7 @@ func (t *TestSuite) Fatalf(format string, args ...any) {
 	t.T().Fatalf("FATAL: "+format, args...)
 }
 
-type ErrorHandler func(format string, args ...interface{})
+type ErrorHandler func(format string, args ...any)
 
 func (t *TestSuite) get(key client.ObjectKey, obj client.Object, eh ErrorHandler) {
 	t.T().Helper()
@@ -550,13 +550,13 @@ func (t *TestSuite) SaveKptfileF(resources *porchapi.PackageRevisionResources, k
 	resources.Spec.Resources[kptfilev1.KptFileName] = string(b)
 }
 
-func (t *TestSuite) FindAndDecodeF(resources *porchapi.PackageRevisionResources, name string, value interface{}) {
+func (t *TestSuite) FindAndDecodeF(resources *porchapi.PackageRevisionResources, name string, value any) {
 	t.T().Helper()
 	contents, ok := resources.Spec.Resources[name]
 	if !ok {
 		t.Fatalf("Cannot find %q in %s/%s package", name, resources.Namespace, resources.Name)
 	}
-	var temp interface{}
+	var temp any
 	d := yaml.NewDecoder(strings.NewReader(contents))
 	if err := d.Decode(&temp); err != nil {
 		t.Fatalf("Cannot decode yaml %q in %s/%s package: %v", name, resources.Namespace, resources.Name, err)

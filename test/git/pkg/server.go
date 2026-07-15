@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -235,14 +235,16 @@ func sortedRefs(refs map[string]*plumbing.Reference, head *plumbing.Reference) [
 	for _, v := range refs {
 		sorted = append(sorted, v)
 	}
-	sort.Slice(sorted, func(i, j int) bool {
+	slices.SortFunc(sorted, func(a, b *plumbing.Reference) int {
 		switch {
-		case sorted[i] == head:
-			return true
-		case sorted[j] == head:
-			return false
+		case a == b:
+			return 0
+		case a == head:
+			return -1
+		case b == head:
+			return 1
 		default:
-			return sorted[i].Name().String() < sorted[j].Name().String()
+			return strings.Compare(a.Name().String(), b.Name().String())
 		}
 	})
 	return sorted
@@ -529,7 +531,7 @@ func (p *objectWalker) walkObjectTree(hash plumbing.Hash) error {
 	// Fetch the object.
 	obj, err := object.GetObject(p.Storer, hash)
 	if err != nil {
-		return fmt.Errorf("getting object %s failed: %v", hash, err)
+		return fmt.Errorf("getting object %s failed: %w", hash, err)
 	}
 	// Walk all children depending on object type.
 	switch obj := obj.(type) {

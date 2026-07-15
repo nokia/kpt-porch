@@ -1,4 +1,4 @@
-// Copyright 2022-2025 The kpt Authors
+// Copyright 2022-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,14 +25,23 @@ import (
 func ReadPackage(t *testing.T, packageDir string) PackageResources {
 	results := map[string]string{}
 
-	if err := filepath.Walk(packageDir, func(p string, info fs.FileInfo, err error) error {
+	if err := filepath.WalkDir(packageDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
-		} else if !info.Mode().IsRegular() {
-			return fmt.Errorf("irregular file object detected: %q (%s)", p, info.Mode())
+		}
+		// d.Type() may return 0 (unknown) on some filesystems;
+		// fall back to Stat via d.Info() to avoid skipping regular files.
+		if !d.Type().IsRegular() {
+			info, infoErr := d.Info()
+			if infoErr != nil {
+				return infoErr
+			}
+			if !info.Mode().IsRegular() {
+				return fmt.Errorf("irregular file object detected: %q (%s)", p, info.Mode())
+			}
 		}
 		rel, err := filepath.Rel(packageDir, p)
 		if err != nil {

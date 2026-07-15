@@ -72,7 +72,7 @@ func TestGit(t *testing.T) {
 	}
 }
 
-func Run(suite interface{}, t *testing.T) {
+func Run(suite any, t *testing.T) {
 	sv := reflect.ValueOf(suite)
 	st := reflect.TypeOf(suite)
 
@@ -287,9 +287,7 @@ func (g GitSuite) TestGitPackageRoundTrip(t *testing.T) {
 
 		t.Logf("resources is %v", resources.Spec.Resources)
 
-		if !reflect.DeepEqual(resources.Spec.Resources, wantResources) {
-			t.Fatalf("resources did not match expected; got %v, want %v", resources.Spec.Resources, wantResources)
-		}
+		assert.Equal(t, wantResources, resources.Spec.Resources)
 	}
 }
 
