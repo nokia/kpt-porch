@@ -15,13 +15,16 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/kptdev/kpt/pkg/fn"
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
 	"github.com/kptdev/porch/controllers/functionconfigs/reconciler"
 	cachetypes "github.com/kptdev/porch/pkg/cache/types"
+	"github.com/kptdev/porch/pkg/engine/podevaluator"
 	"github.com/kptdev/porch/pkg/repository"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type EngineOption interface {
@@ -58,12 +61,26 @@ func WithBuiltinFunctionRuntime(functionConfigStore *reconciler.FunctionConfigSt
 	})
 }
 
-func WithGRPCFunctionRuntime(options GRPCRuntimeOptions) EngineOption {
+func WithGRPCFunctionRuntime(options GRPCRuntimeOptions, functionConfigStore *reconciler.FunctionConfigStore) EngineOption {
 	return EngineOptionFunc(func(engine *cadEngine) error {
-		runtime, err := newGRPCFunctionRuntime(options)
+		runtime, err := newGRPCFunctionRuntime(options, functionConfigStore)
 		if err != nil {
 			return fmt.Errorf("failed to create function runtime: %w", err)
 		}
+		if engine.taskHandler.GetRuntime() == nil {
+			engine.taskHandler.SetRuntime(runtime)
+		} else if mr, ok := engine.taskHandler.GetRuntime().(*fn.MultiRuntime); ok {
+			mr.Add(runtime)
+		} else {
+			engine.taskHandler.SetRuntime(fn.NewMultiRuntime([]fn.FunctionRuntime{engine.taskHandler.GetRuntime(), runtime}))
+		}
+		return nil
+	})
+}
+
+func WithPodEvaluatorRuntime(ctx context.Context, podEvaluatorOptions podevaluator.PodEvaluatorOptions, kubeClient client.WithWatch, functionConfigStore *reconciler.FunctionConfigStore) EngineOption {
+	return EngineOptionFunc(func(engine *cadEngine) error {
+		runtime := podevaluator.NewPodEvaluatorRuntime(ctx, podEvaluatorOptions, kubeClient, functionConfigStore)
 		if engine.taskHandler.GetRuntime() == nil {
 			engine.taskHandler.SetRuntime(runtime)
 		} else if mr, ok := engine.taskHandler.GetRuntime().(*fn.MultiRuntime); ok {

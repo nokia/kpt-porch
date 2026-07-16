@@ -43,8 +43,8 @@ func (t *PorchSuite) TestMetricsEndpoint() {
 		// "rpc_client_.*", //There is no way to force both function runners to have at least one connection, so no metrics
 	}
 	porchWrapperServerShouldHaveRegexList := []string{
-		"go_.*",
-		"rpc_server_.*",
+		"go_*",
+		"rpc_server_*",
 	}
 
 	// Create a package revision and update it with a mutator.

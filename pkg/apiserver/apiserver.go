@@ -31,6 +31,7 @@ import (
 	"github.com/kptdev/porch/pkg/cache"
 	cachetypes "github.com/kptdev/porch/pkg/cache/types"
 	"github.com/kptdev/porch/pkg/engine"
+	"github.com/kptdev/porch/pkg/engine/podevaluator"
 	"github.com/kptdev/porch/pkg/registry/porch"
 	pkgerrors "github.com/pkg/errors"
 	"google.golang.org/api/option"
@@ -91,6 +92,10 @@ type ExtraConfig struct {
 
 	GRPCRuntimeOptions engine.GRPCRuntimeOptions
 	CacheOptions       cachetypes.CacheOptions
+
+	PodEvaluatorOptions podevaluator.PodEvaluatorOptions
+
+	ExecEvaluatorOptions engine.ExecutableEvaluatorOptions
 
 	PodNameSpace  string
 	FunctionStore *reconciler.FunctionConfigStore
@@ -294,7 +299,36 @@ func (c completedConfig) buildFunctionConfigReconciler(ctx context.Context, sche
 
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme: scheme,
-		Cache:  cacheOpts,
+		Cache: ctrlcache.Options{
+			ByObject: map[client.Object]ctrlcache.ByObject{
+				&corev1.PodTemplate{}: {
+					Namespaces: map[string]ctrlcache.Config{
+						c.ExtraConfig.PodEvaluatorOptions.PodNamespace: {},
+					},
+				},
+				&corev1.Pod{}: {
+					Namespaces: map[string]ctrlcache.Config{
+						c.ExtraConfig.PodEvaluatorOptions.PodNamespace: {},
+					},
+				},
+				&corev1.Service{}: {
+					Namespaces: map[string]ctrlcache.Config{
+						c.ExtraConfig.PodEvaluatorOptions.PodNamespace: {},
+					},
+				},
+				//nolint:staticcheck
+				&corev1.Endpoints{}: {
+					Namespaces: map[string]ctrlcache.Config{
+						c.ExtraConfig.PodEvaluatorOptions.PodNamespace: {},
+					},
+				},
+				&configapi.ServiceTemplate{}: {
+					Namespaces: map[string]ctrlcache.Config{
+						c.ExtraConfig.PodEvaluatorOptions.PodNamespace: {},
+					},
+				},
+			},
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error at creating manager: %w", err)
@@ -314,7 +348,7 @@ func (c completedConfig) buildFunctionConfigReconciler(ctx context.Context, sche
 		}
 	}
 
-	functionConfigStore := reconciler.NewFunctionConfigStore(c.ExtraConfig.GRPCRuntimeOptions.DefaultImagePrefix, "")
+	functionConfigStore := reconciler.NewFunctionConfigStore(c.ExtraConfig.GRPCRuntimeOptions.DefaultImagePrefix, c.ExtraConfig.ExecEvaluatorOptions.FunctionCacheDir)
 
 	rec := &reconciler.FunctionConfigReconciler{
 		Client:              mgr.GetClient(),
@@ -416,13 +450,32 @@ func (c completedConfig) New(ctx context.Context) (*PorchServer, error) {
 		return runnerOptions
 	}
 
+	restConfig, err := c.getRestConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	scheme, err := buildCompleteScheme()
+	if err != nil {
+		return nil, err
+	}
+
+	coreClientWithoutCache, err := client.NewWithWatch(restConfig, client.Options{
+		Scheme: scheme,
+	})
+
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "error building watching client")
+	}
+
 	cad, err := engine.NewCaDEngine(
 		engine.WithCache(cacheImpl),
 		// The order of registering the function runtimes matters here. When
 		// evaluating a function, the runtimes will be tried in the same
 		// order as they are registered.
 		engine.WithBuiltinFunctionRuntime(c.ExtraConfig.FunctionStore),
-		engine.WithGRPCFunctionRuntime(c.ExtraConfig.GRPCRuntimeOptions),
+		engine.WithGRPCFunctionRuntime(c.ExtraConfig.GRPCRuntimeOptions, c.ExtraConfig.FunctionStore),
+		engine.WithPodEvaluatorRuntime(ctx, c.ExtraConfig.PodEvaluatorOptions, coreClientWithoutCache, c.ExtraConfig.FunctionStore),
 		engine.WithCredentialResolver(credentialResolver),
 		engine.WithRunnerOptionsResolver(runnerOptionsResolver),
 		engine.WithReferenceResolver(referenceResolver),

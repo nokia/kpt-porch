@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package podevaluator
 
 import (
 	"context"
@@ -34,6 +34,7 @@ import (
 
 const (
 	testImageName = "test-image"
+	defaultKRMImagePrefix = "ghcr.io/kptdev/krm-functions-catalog"
 )
 
 type fakeLister struct {

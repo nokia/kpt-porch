@@ -30,6 +30,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+type ExecutableEvaluatorOptions struct {
+	FunctionCacheDir string
+}
+
 type GRPCRuntimeOptions struct {
 	FunctionRunnerAddress string
 	MaxGrpcMessageSize    int
@@ -37,11 +41,21 @@ type GRPCRuntimeOptions struct {
 }
 
 type grpcRuntime struct {
-	cc     *grpc.ClientConn
-	client evaluator.FunctionEvaluatorClient
+	cc                  *grpc.ClientConn
+	client              evaluator.FunctionEvaluatorClient
+	functionConfigStore *reconciler.FunctionConfigStore
 }
 
-func newGRPCFunctionRuntime(options GRPCRuntimeOptions) (*grpcRuntime, error) {
+func (gr *grpcRuntime) getExecutablePath(fn *kptfilev1.Function) (string, bool) {
+	if fn.Tag != "" {
+		execPath, _, exists := gr.functionConfigStore.GetBinaryFromCacheByConstraint(fn.Image, fn.Tag)
+		return execPath, exists
+	}
+	klog.V(2).Infof("Image tag is empty, using the image with explicit tag: %q", fn.Image)
+	return gr.functionConfigStore.GetBinaryFromCache(fn.Image)
+}
+
+func newGRPCFunctionRuntime(options GRPCRuntimeOptions, functionConfigStore *reconciler.FunctionConfigStore) (*grpcRuntime, error) {
 	if options.FunctionRunnerAddress == "" {
 		return nil, fmt.Errorf("address is required to instantiate gRPC function runtime")
 	}
@@ -61,21 +75,31 @@ func newGRPCFunctionRuntime(options GRPCRuntimeOptions) (*grpcRuntime, error) {
 	}
 
 	return &grpcRuntime{
-		cc:     cc,
-		client: evaluator.NewFunctionEvaluatorClient(cc),
+		cc:                  cc,
+		client:              evaluator.NewFunctionEvaluatorClient(cc),
+		functionConfigStore: functionConfigStore,
 	}, err
 }
 
 var _ kptops.FunctionRuntime = &grpcRuntime{}
 
-func (gr *grpcRuntime) GetRunner(ctx context.Context, fn *kptfilev1.Function) (fn.FunctionRunner, error) {
-	// TODO: Check if the function is actually available?
+func (gr *grpcRuntime) GetRunner(ctx context.Context, function *kptfilev1.Function) (fn.FunctionRunner, error) {
+	klog.Infof("[grpcRuntime::GetRunner] Current state of client connection: %s", gr.cc.GetState().String())
+
+	if execPath, exists := gr.getExecutablePath(function); exists {
+		return &grpcRunner{
+			ctx:      ctx,
+			client:   gr.client,
+			image:    function.Image,
+			tag:      function.Tag,
+			execPath: execPath,
+		}, nil
+	}
 	return &grpcRunner{
-		ctx:    ctx,
-		client: gr.client,
-		image:  fn.Image,
-		tag:    fn.Tag,
-	}, nil
+			ctx: ctx,
+		}, &fn.NotFoundError{
+			Function: *function,
+		}
 }
 
 func (gr *grpcRuntime) Close() error {
@@ -90,10 +114,11 @@ func (gr *grpcRuntime) Close() error {
 }
 
 type grpcRunner struct {
-	ctx    context.Context
-	client evaluator.FunctionEvaluatorClient
-	image  string
-	tag    string
+	ctx      context.Context
+	client   evaluator.FunctionEvaluatorClient
+	image    string
+	tag      string
+	execPath string
 }
 
 var _ fn.FunctionRunner = &grpcRunner{}
@@ -108,6 +133,7 @@ func (gr *grpcRunner) Run(r io.Reader, w io.Writer) error {
 		ResourceList: in,
 		Image:        gr.image,
 		Tag:          gr.tag,
+		ExecPath:     gr.execPath,
 	})
 	if err != nil {
 		return fmt.Errorf("func eval %q failed: %w", gr.image, err)
@@ -130,7 +156,7 @@ func NewMultiFunctionRuntime(grpcAddress string, maxGrpcMessageSize int, functio
 	grpc, err := newGRPCFunctionRuntime(GRPCRuntimeOptions{
 		FunctionRunnerAddress: grpcAddress,
 		MaxGrpcMessageSize:    maxGrpcMessageSize,
-	})
+	}, functionConfigStore)
 	if err != nil {
 		return nil, err
 	}

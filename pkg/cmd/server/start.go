@@ -34,6 +34,7 @@ import (
 	"github.com/kptdev/porch/pkg/apiserver"
 	cachetypes "github.com/kptdev/porch/pkg/cache/types"
 	"github.com/kptdev/porch/pkg/engine"
+	"github.com/kptdev/porch/pkg/engine/podevaluator"
 	"github.com/kptdev/porch/pkg/externalrepo/git"
 	externalrepotypes "github.com/kptdev/porch/pkg/externalrepo/types"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,6 +52,8 @@ const (
 	defaultEtcdPathPrefix = "/registry/porch.kpt.dev"
 	OpenAPITitle          = "Porch"
 	OpenAPIVersion        = "0.1"
+
+	wrapperServerImageEnv = "WRAPPER_SERVER_IMAGE"
 )
 
 // PorchServerOptions contains state for master/api server
@@ -89,6 +92,10 @@ type PorchServerOptions struct {
 	UseUserDefinedCaBundle bool
 
 	PodNamespace string
+
+	PodEvaluatorOptions podevaluator.PodEvaluatorOptions
+
+	Exec engine.ExecutableEvaluatorOptions
 }
 
 // NewPorchServerOptions returns a new PorchServerOptions
@@ -296,6 +303,8 @@ func (o *PorchServerOptions) Config() (*apiserver.Config, error) {
 		return nil, fmt.Errorf("error creating self-signed certificates: %w", err)
 	}
 
+	o.PodEvaluatorOptions.WrapperServerImage = os.Getenv(wrapperServerImageEnv)
+
 	o.RecommendedOptions.ExtraAdmissionInitializers = func(c *genericapiserver.RecommendedConfig) ([]admission.PluginInitializer, error) {
 		client, err := clientset.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {
@@ -353,8 +362,26 @@ func (o *PorchServerOptions) Config() (*apiserver.Config, error) {
 				DbPushDraftsToGit: o.DbPushDrafsToGit,
 			},
 			PodNameSpace: o.PodNamespace,
+			PodEvaluatorOptions: podevaluator.PodEvaluatorOptions{
+				WrapperServerImage:         o.PodEvaluatorOptions.WrapperServerImage,
+				GcScanInterval:             o.PodEvaluatorOptions.GcScanInterval,
+				PodTTL:                     o.PodEvaluatorOptions.PodTTL,
+				WarmUpPodCacheOnStartup:    o.PodEvaluatorOptions.WarmUpPodCacheOnStartup,
+				EnablePrivateRegistries:    o.PodEvaluatorOptions.EnablePrivateRegistries,
+				RegistryAuthSecretPath:     o.PodEvaluatorOptions.RegistryAuthSecretPath,
+				RegistryAuthSecretName:     o.PodEvaluatorOptions.RegistryAuthSecretName,
+				EnablePrivateRegistriesTls: o.PodEvaluatorOptions.EnablePrivateRegistriesTls,
+				TlsSecretPath:              o.PodEvaluatorOptions.TlsSecretPath,
+				MaxWaitlistLength:          o.PodEvaluatorOptions.MaxWaitlistLength,
+				MaxParallelPodsPerFunction: o.PodEvaluatorOptions.MaxParallelPodsPerFunction,
+			},
+			ExecEvaluatorOptions: engine.ExecutableEvaluatorOptions{
+				FunctionCacheDir: o.Exec.FunctionCacheDir,
+			},
 		},
 	}
+	config.ExtraConfig.PodEvaluatorOptions.PodNamespace = o.PodNamespace
+	config.ExtraConfig.PodEvaluatorOptions.MaxGrpcMessageSize = o.MaxRequestBodySize
 	return config, nil
 }
 
@@ -416,4 +443,19 @@ func (o *PorchServerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&o.RetryableGitErrors, "retryable-git-errors", nil, "Additional retryable git error patterns. Can be specified multiple times or as comma-separated values.")
 	fs.DurationVar(&o.ListTimeoutPerRepository, "list-timeout-per-repo", 20*time.Second, "Maximum amount of time to wait for a repository list request.")
 	fs.IntVar(&o.MaxConcurrentLists, "max-parallel-repo-lists", 10, "Maximum number of repositories to list in parallel.")
+
+	// Pod evaluator related flags
+	fs.DurationVar(&o.PodEvaluatorOptions.GcScanInterval, "scan-interval", time.Minute, "The interval of GC between scans.")
+	fs.DurationVar(&o.PodEvaluatorOptions.PodTTL, "pod-ttl", 30*time.Minute, "TTL for pods before GC.")
+	fs.BoolVar(&o.PodEvaluatorOptions.WarmUpPodCacheOnStartup, "warm-up-pod-cache", true, "if true, pod-cache-config image pods will be deployed at startup")
+	fs.BoolVar(&o.PodEvaluatorOptions.EnablePrivateRegistries, "enable-private-registries", false, "if true enables the use of private registries and their authentication")
+	fs.StringVar(&o.PodEvaluatorOptions.RegistryAuthSecretPath, "registry-auth-secret-path", "/var/tmp/config-secret/.dockerconfigjson", "The path of the secret used for authenticating to custom registries")
+	fs.StringVar(&o.PodEvaluatorOptions.RegistryAuthSecretName, "registry-auth-secret-name", "auth-secret", "The name of the secret used for authenticating to custom registries")
+	fs.BoolVar(&o.PodEvaluatorOptions.EnablePrivateRegistriesTls, "enable-private-registries-tls", false, "if enabled, will prioritize use of user provided TLS secret when accessing registries")
+	fs.StringVar(&o.PodEvaluatorOptions.TlsSecretPath, "tls-secret-path", "/var/tmp/tls-secret/", "The path of the secret used in tls configuration")
+	fs.IntVar(&o.PodEvaluatorOptions.MaxWaitlistLength, "max-waitlist-length", 2, "Maximum waitlist length per pod")
+	fs.IntVar(&o.PodEvaluatorOptions.MaxParallelPodsPerFunction, "max-parallel-pods-per-function", 1, "Maximum parallel pods per function")
+
+	// executable evaluator flags
+	fs.StringVar(&o.Exec.FunctionCacheDir, "functions", "./functions", "Path to cached functions.")
 }
