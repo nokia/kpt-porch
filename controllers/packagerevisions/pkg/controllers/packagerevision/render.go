@@ -212,7 +212,7 @@ func (r *PackageRevisionReconciler) executeRender(ctx context.Context, pr *porch
 		return nil, err
 	}
 	log.V(1).Info("rendered resources written")
-	r.syncKptfileFields(ctx, pr, result.resources)
+	r.syncKptfileFields(ctx, pr, result.resources, repoKey)
 	log.Info("render complete")
 	return nil, nil
 }
@@ -248,15 +248,25 @@ func (r *PackageRevisionReconciler) persistAndSyncKptfile(ctx context.Context, p
 		log.FromContext(ctx).Error(err, "failed to write resources")
 		return
 	}
-	r.syncKptfileFields(ctx, pr, resources)
+	r.syncKptfileFields(ctx, pr, resources, repoKey)
 }
 
-func (r *PackageRevisionReconciler) syncKptfileFields(ctx context.Context, pr *porchv1alpha2.PackageRevision, resources map[string]string) {
-	kf, err := kptfileFromResources(resources)
+func (r *PackageRevisionReconciler) syncKptfileFields(ctx context.Context, pr *porchv1alpha2.PackageRevision, renderedResources map[string]string, repoKey repository.RepositoryKey) {
+	log := log.FromContext(ctx)
+
+	// Parse Kptfile from rendered resources
+	kf, err := kptfileFromResources(renderedResources)
 	if err != nil {
-		log.FromContext(ctx).Error(err, "failed to parse Kptfile for CRD sync")
+		log.Error(err, "failed to parse Kptfile for CRD sync")
 		return
 	}
+
+	// All packages must have a Kptfile (enforced by git layer during package creation).
+	if kf.Kind == "" {
+		log.Error(nil, "Kptfile missing from rendered resources")
+		return
+	}
+
 	r.updateKptfileFields(ctx, pr, kf)
 }
 

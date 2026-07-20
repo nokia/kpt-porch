@@ -95,6 +95,10 @@ func (r *PackageRevisionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return resultOrDefault(result), nil
 	}
 
+	if result, err := r.reconcilePackageMetadata(ctx, &pr, repoKey); err != nil || result != nil {
+		return resultOrDefault(result), nil
+	}
+
 	if result, err := r.reconcileRender(ctx, &pr, repoKey); err != nil || result != nil {
 		return resultOrDefault(result), nil
 	}

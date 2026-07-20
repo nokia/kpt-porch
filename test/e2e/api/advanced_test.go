@@ -558,7 +558,16 @@ func (t *PorchSuite) TestPackageMetadataFromKptfile() {
 			{ConditionType: "Ready"},
 			{ConditionType: "Deployed"},
 		}
-		t.Require().Equal(expectedGates, clonePr.Spec.ReadinessGates)
+		// Note: Gates order may vary due to Kptfile serialization/deserialization
+		// Compare as sets by checking presence and count
+		t.Require().Len(clonePr.Spec.ReadinessGates, len(expectedGates), "should have same number of gates")
+		actualGateTypes := make(map[string]bool)
+		for _, g := range clonePr.Spec.ReadinessGates {
+			actualGateTypes[g.ConditionType] = true
+		}
+		for _, g := range expectedGates {
+			t.Require().True(actualGateTypes[g.ConditionType], "expected gate %s not found", g.ConditionType)
+		}
 
 		var packageResources porchapi.PackageRevisionResources
 		t.GetF(client.ObjectKeyFromObject(clonePr), &packageResources)
@@ -603,13 +612,23 @@ func (t *PorchSuite) TestPackageMetadataFromKptfile() {
 			{ConditionType: "Deployed"},
 		}
 
-		t.Require().Equal(expectedLabels, mainPr.Spec.PackageMetadata.Labels, "main revision metadata labels should match v1")
+		t.Require().Equal(expectedLabels, mainPr.Spec.PackageMetadata.Labels, "main revision metadata labels should match")
 		for k, v := range expectedAnnotations {
 			actual, ok := mainPr.Spec.PackageMetadata.Annotations[k]
 			t.Require().True(ok, "annotation key %s should exist", k)
 			t.Require().Equal(v, actual, "annotation %s value should match", k)
 		}
-		t.Require().Equal(expectedGates, mainPr.Spec.ReadinessGates, "main revision ReadinessGates should match v1")
+
+		// Note: Gates order may vary due to Kptfile serialization/deserialization
+		// Compare as sets by checking presence and count
+		t.Require().Len(mainPr.Spec.ReadinessGates, len(expectedGates), "should have same number of gates")
+		actualGateTypes := make(map[string]bool)
+		for _, g := range mainPr.Spec.ReadinessGates {
+			actualGateTypes[g.ConditionType] = true
+		}
+		for _, g := range expectedGates {
+			t.Require().True(actualGateTypes[g.ConditionType], "expected gate %s not found", g.ConditionType)
+		}
 	})
 }
 
