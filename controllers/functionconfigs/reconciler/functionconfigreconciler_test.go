@@ -279,6 +279,77 @@ func TestFinalizersAdded(t *testing.T) {
 	}
 }
 
+func TestGetBinaryFromCacheByConstraint(t *testing.T) {
+	store := NewFunctionConfigStore(defaultImagePrefix, functionCacheDir)
+
+	obj := &configapi.FunctionConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "set-image", Namespace: testNamespace},
+		Spec: configapi.FunctionConfigSpec{
+			Image:    "set-image",
+			Prefixes: []string{""},
+			BinaryExecutor: &configapi.BinaryExecutorConfig{
+				Tags: []string{"v0.1.2", "v0.1.3"},
+				Path: "set-image",
+			},
+		},
+	}
+	store.UpdateBinaryCache(obj.Name, obj)
+
+	const expectedPath = "/functions/set-image"
+	const qualifiedImage = "ghcr.io/kptdev/krm-functions-catalog/set-image"
+
+	tests := map[string]struct {
+		image      string
+		constraint string
+		wantPath   string
+		wantFound  bool
+	}{
+		"selects highest matching version": {
+			image:      qualifiedImage,
+			constraint: ">= 0.1.2 < 0.2.0",
+			wantPath:   expectedPath,
+			wantFound:  true,
+		},
+		"prefix mismatch": {
+			image:      "evil.registry/set-image",
+			constraint: ">= 0.1.2 < 0.2.0",
+			wantFound:  false,
+		},
+		"unknown image basename": {
+			image:      "ghcr.io/kptdev/krm-functions-catalog/nonexistent",
+			constraint: ">= 0.1.0",
+			wantFound:  false,
+		},
+		"invalid semver constraint": {
+			image:      qualifiedImage,
+			constraint: ">> 1.0.0",
+			wantFound:  false,
+		},
+		"no matching version for valid constraint": {
+			image:      qualifiedImage,
+			constraint: "> 1.0.0",
+			wantFound:  false,
+		},
+		"short form without registry prefix": {
+			image:      "set-image",
+			constraint: ">= 0.1.2",
+			wantFound:  false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			path, found := store.GetBinaryFromCacheByConstraint(tc.image, tc.constraint)
+			assert.Equal(t, tc.wantFound, found)
+			if tc.wantFound {
+				assert.Equal(t, tc.wantPath, path)
+			} else {
+				assert.Empty(t, path)
+			}
+		})
+	}
+}
+
 func TestGetProcessorFromCache(t *testing.T) {
 	store := NewFunctionConfigStore(defaultImagePrefix, functionCacheDir)
 
