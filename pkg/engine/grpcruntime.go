@@ -95,11 +95,9 @@ func (gr *grpcRuntime) GetRunner(ctx context.Context, function *kptfilev1.Functi
 			execPath: execPath,
 		}, nil
 	}
-	return &grpcRunner{
-			ctx: ctx,
-		}, &fn.NotFoundError{
-			Function: *function,
-		}
+	return nil, &fn.NotFoundError{
+		Function: *function,
+	}
 }
 
 func (gr *grpcRuntime) Close() error {

@@ -48,14 +48,15 @@ func (e *executableEvaluator) EvaluateFunction(ctx context.Context, req *pb.Eval
 		}
 	}
 
+	execPath := filepath.Clean(req.ExecPath)
 	base := filepath.Clean(e.functionCacheDir) + string(os.PathSeparator)
-	if !strings.HasPrefix(req.ExecPath, base) {
+	if !strings.HasPrefix(execPath, base) {
 		return nil, fmt.Errorf("exec_path %q is outside functions dir", req.ExecPath)
 	}
 
 	klog.Infof("Evaluating %q in executable mode", req.Image)
 	var stdout, stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, req.ExecPath) // #nosec G204 -- variables controlled internally
+	cmd := exec.CommandContext(ctx, execPath) // #nosec G204 -- variables controlled internally
 	cmd.Stdin = bytes.NewReader(req.ResourceList)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

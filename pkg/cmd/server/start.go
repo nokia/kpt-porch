@@ -305,6 +305,10 @@ func (o *PorchServerOptions) Config() (*apiserver.Config, error) {
 
 	o.PodEvaluatorOptions.WrapperServerImage = os.Getenv(wrapperServerImageEnv)
 
+	if o.PodEvaluatorOptions.WrapperServerImage == "" {
+		return nil, fmt.Errorf("environment variable %s must be set to use pod evaluator runtime", wrapperServerImageEnv)
+	}
+
 	o.RecommendedOptions.ExtraAdmissionInitializers = func(c *genericapiserver.RecommendedConfig) ([]admission.PluginInitializer, error) {
 		client, err := clientset.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {
