@@ -22,7 +22,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -252,11 +251,12 @@ func TestHAFlagParsing(t *testing.T) {
 
 func TestDelegateAPIServerHealthStandby(t *testing.T) {
 	mgr := &stubProbeManager{elected: make(chan struct{})}
+	client := &http.Client{}
 
-	liveness := delegateAPIServerHealth(mgr, 4443, "livez", true)
+	liveness := delegateAPIServerHealth(mgr, client, "https://example.invalid", "livez", true)
 	assert.NoError(t, liveness(nil))
 
-	readiness := delegateAPIServerHealth(mgr, 4443, "readyz", false)
+	readiness := delegateAPIServerHealth(mgr, client, "https://example.invalid", "readyz", false)
 	assert.ErrorContains(t, readiness(nil), "not leader")
 }
 
@@ -396,7 +396,7 @@ users:
 
 func TestProxyHealthChecks(t *testing.T) {
 	mgr := &stubProbeManager{elected: make(chan struct{})}
-	require.NoError(t, proxyHealthChecks(mgr, 4443))
+	require.NoError(t, proxyHealthChecks(mgr, &http.Client{}, "https://example.invalid"))
 	assert.Equal(t, []string{"healthz", "livez"}, mgr.healthz)
 	assert.Equal(t, []string{"readyz"}, mgr.readyz)
 }
@@ -407,14 +407,14 @@ func TestProxyHealthChecksErrors(t *testing.T) {
 			elected:    make(chan struct{}),
 			failHealth: true,
 		}
-		assert.ErrorContains(t, proxyHealthChecks(mgr, 4443), "healthz boom")
+		assert.ErrorContains(t, proxyHealthChecks(mgr, &http.Client{}, "https://example.invalid"), "healthz error")
 	})
 	t.Run("readyz registration fails", func(t *testing.T) {
 		mgr := &stubProbeManager{
 			elected:   make(chan struct{}),
 			failReady: true,
 		}
-		assert.ErrorContains(t, proxyHealthChecks(mgr, 4443), "readyz boom")
+		assert.ErrorContains(t, proxyHealthChecks(mgr, &http.Client{}, "https://example.invalid"), "readyz error")
 	})
 }
 
@@ -442,16 +442,12 @@ func TestDelegateAPIServerHealthLeader(t *testing.T) {
 			}))
 			t.Cleanup(srv.Close)
 
-			_, portStr, err := net.SplitHostPort(srv.Listener.Addr().String())
-			require.NoError(t, err)
-			port, err := strconv.Atoi(portStr)
-			require.NoError(t, err)
-
 			mgr := &stubProbeManager{elected: make(chan struct{})}
 			close(mgr.elected)
 
-			checker := delegateAPIServerHealth(mgr, port, tc.path, true)
-			err = checker(nil)
+			// srv.Client() trusts the test server certificate (same pattern as LoopbackClientConfig).
+			checker := delegateAPIServerHealth(mgr, srv.Client(), srv.URL, tc.path, true)
+			err := checker(nil)
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
 			} else {

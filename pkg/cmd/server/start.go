@@ -16,7 +16,6 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -46,6 +45,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
@@ -391,7 +391,16 @@ func (o PorchServerOptions) RunPorchServer(ctx context.Context) error {
 	}
 
 	if o.ProbePort > 0 {
-		if err := proxyHealthChecks(mgr, o.RecommendedOptions.SecureServing.BindPort); err != nil {
+		loopback := config.GenericConfig.LoopbackClientConfig
+		if loopback == nil {
+			return fmt.Errorf("loopback client config is required to proxy health checks")
+		}
+		client, err := rest.HTTPClientFor(loopback)
+		if err != nil {
+			return fmt.Errorf("failed to create loopback health client: %w", err)
+		}
+		client.Timeout = 3 * time.Second
+		if err := proxyHealthChecks(mgr, client, loopback.Host); err != nil {
 			return err
 		}
 	}
@@ -405,19 +414,19 @@ type probeManager interface {
 	Elected() <-chan struct{}
 }
 
-func proxyHealthChecks(mgr probeManager, securePort int) error {
-	healthzDelegate := delegateAPIServerHealth(mgr, securePort, "healthz", true)
+func proxyHealthChecks(mgr probeManager, client *http.Client, baseURL string) error {
+	healthzDelegate := delegateAPIServerHealth(mgr, client, baseURL, "healthz", true)
 	if err := mgr.AddHealthzCheck("healthz", healthzDelegate); err != nil {
 		return err
 	}
 
 	// there is no livez on the controller-runtime manager, only healthz, so we proxy both to healthz
-	livezDelegate := delegateAPIServerHealth(mgr, securePort, "livez", true)
+	livezDelegate := delegateAPIServerHealth(mgr, client, baseURL, "livez", true)
 	if err := mgr.AddHealthzCheck("livez", livezDelegate); err != nil {
 		return err
 	}
 
-	readyzDelegate := delegateAPIServerHealth(mgr, securePort, "readyz", false)
+	readyzDelegate := delegateAPIServerHealth(mgr, client, baseURL, "readyz", false)
 	if err := mgr.AddReadyzCheck("readyz", readyzDelegate); err != nil {
 		return err
 	}
@@ -429,18 +438,13 @@ type electedManager interface {
 	Elected() <-chan struct{}
 }
 
-func delegateAPIServerHealth(mgr electedManager, port int, path string, okWhenStandby bool) healthz.Checker {
-	client := &http.Client{
-		Timeout: 3 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // #nosec G402 -- localhost health proxy to apiserver with self-signed cert
-		},
-	}
+func delegateAPIServerHealth(mgr electedManager, client *http.Client, baseURL, path string, okWhenStandby bool) healthz.Checker {
+	url := strings.TrimRight(baseURL, "/") + "/" + path
 
 	return func(*http.Request) error {
 		select {
 		case <-mgr.Elected():
-			resp, err := client.Get(fmt.Sprintf("https://localhost:%d/%s", port, path))
+			resp, err := client.Get(url)
 			if err != nil {
 				return err
 			}
