@@ -32,6 +32,11 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const k8sServHostEnv = "KUBERNETES_SERVICE_HOST"
+const k8sServPortEnv = "KUBERNETES_SERVICE_PORT"
+const loopbackAnyPort = "127.0.0.1:0"
+const loopbackPort1 = "127.0.0.1:1"
+
 func TestMain(m *testing.M) {
 	ctrllog.SetLogger(textlogger.NewLogger(textlogger.NewConfig()))
 	os.Exit(m.Run())
@@ -101,18 +106,18 @@ func TestBuildSchemeWithTypes(t *testing.T) {
 }
 
 func TestKubeConfig(t *testing.T) {
-	kubernetesServiceHost := os.Getenv("KUBERNETES_SERVICE_HOST")
-	kubernetesServicePort := os.Getenv("KUBERNETES_SERVICE_PORT")
-	_ = os.Unsetenv("KUBERNETES_SERVICE_HOST")
-	_ = os.Unsetenv("KUBERNETES_SERVICE_PORT")
+	kubernetesServiceHost := os.Getenv(k8sServHostEnv)
+	kubernetesServicePort := os.Getenv(k8sServPortEnv)
+	_ = os.Unsetenv(k8sServHostEnv)
+	_ = os.Unsetenv(k8sServPortEnv)
 
 	t.Cleanup(func() {
-		_ = os.Setenv("KUBERNETES_SERVICE_HOST", kubernetesServiceHost)
-		_ = os.Setenv("KUBERNETES_SERVICE_PORT", kubernetesServicePort)
+		_ = os.Setenv(k8sServHostEnv, kubernetesServiceHost)
+		_ = os.Setenv(k8sServPortEnv, kubernetesServicePort)
 	})
 
 	t.Run("path is empty", func(t *testing.T) {
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		ln, err := net.Listen("tcp", loopbackAnyPort)
 		require.NoError(t, err)
 		defer ln.Close()
 
@@ -136,7 +141,7 @@ func TestKubeConfig(t *testing.T) {
 	})
 
 	t.Run("failed to load config", func(t *testing.T) {
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		ln, err := net.Listen("tcp", loopbackAnyPort)
 		require.NoError(t, err)
 		defer ln.Close()
 
@@ -160,7 +165,7 @@ func TestKubeConfig(t *testing.T) {
 	})
 
 	t.Run("successful buildClient execution", func(t *testing.T) {
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		ln, err := net.Listen("tcp", loopbackAnyPort)
 		require.NoError(t, err)
 		defer ln.Close()
 
@@ -175,7 +180,7 @@ func TestKubeConfig(t *testing.T) {
 		}
 		completed := cfg.Complete()
 
-		restConfig := &rest.Config{Host: "https://127.0.0.1:1"}
+		restConfig := &rest.Config{Host: "https://" + loopbackPort1}
 		scheme, err := buildCompleteScheme()
 		require.NoError(t, err)
 
@@ -187,7 +192,7 @@ func TestKubeConfig(t *testing.T) {
 
 func TestGetCoreV1Client(t *testing.T) {
 	t.Run("getCoreV1Client without any error", func(t *testing.T) {
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		ln, err := net.Listen("tcp", loopbackAnyPort)
 		require.NoError(t, err)
 		defer ln.Close()
 
@@ -202,7 +207,7 @@ func TestGetCoreV1Client(t *testing.T) {
 		}
 		completed := cfg.Complete()
 
-		restConfig := &rest.Config{Host: "https://127.0.0.1:1"}
+		restConfig := &rest.Config{Host: "https://" + loopbackPort1}
 		corev1client, err := completed.getCoreV1Client(restConfig)
 		assert.NotNil(t, corev1client)
 		assert.NoError(t, err)
@@ -212,7 +217,7 @@ func TestGetCoreV1Client(t *testing.T) {
 func TestNew(t *testing.T) {
 	t.Run("uninitialized Serializer", func(t *testing.T) {
 		ctx := context.Background()
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		ln, err := net.Listen("tcp", loopbackAnyPort)
 		require.NoError(t, err)
 		defer ln.Close()
 
