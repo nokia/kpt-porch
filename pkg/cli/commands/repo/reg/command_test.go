@@ -187,7 +187,7 @@ func TestRepoReg(t *testing.T) {
 					t.Fatalf("unhandled content-encoding %q", r.Header.Get("Content-Encoding"))
 				}
 
-				var body interface{}
+				var body any
 				switch r.Header.Get("Content-Type") {
 				case "application/json":
 					if err := json.Unmarshal(requestBody, &body); err != nil {
@@ -213,7 +213,7 @@ func TestRepoReg(t *testing.T) {
 					}
 				}
 
-				var want interface{}
+				var want any
 				wantBytes, err := os.ReadFile(wantFile)
 				if err != nil {
 					t.Fatalf("Failed to reead golden file %q: %v", wantFile, err)
@@ -230,7 +230,7 @@ func TestRepoReg(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to read response file %q: %v", action.sendResponse, err)
 				}
-				var resp interface{}
+				var resp any
 				if err := yaml.Unmarshal(respData, &resp); err != nil {
 					t.Fatalf("Failed to unmarshal desired response %q: %v", action.sendResponse, err)
 				}

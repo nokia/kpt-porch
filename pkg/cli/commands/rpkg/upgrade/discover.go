@@ -1,4 +1,4 @@
-// Copyright 2022, 2025 The kpt Authors
+// Copyright 2022, 2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ func (r *runner) findUpstreamUpdates(prs []porchapi.PackageRevision, repositorie
 	for _, pr := range prs {
 		availableUpdates, upstreamName, _, err := r.availableUpdates(pr.Status.UpstreamLock, repositories)
 		if err != nil {
-			return fmt.Errorf("could not parse upstreamLock in Kptfile of package %q: %s", pr.Name, err.Error())
+			return fmt.Errorf("could not parse upstreamLock in Kptfile of package %q: %w", pr.Name, err)
 		}
 		if len(availableUpdates) == 0 {
 			upstreamUpdates = append(upstreamUpdates, []string{pr.Name, upstreamName, "No update available"})
@@ -89,7 +89,7 @@ func (r *runner) findDownstreamUpdates(prs []porchapi.PackageRevision, repositor
 	for _, pr := range prs {
 		availableUpdates, _, draftName, err := r.availableUpdates(pr.Status.UpstreamLock, repositories)
 		if err != nil {
-			return fmt.Errorf("could not parse upstreamLock in Kptfile of package %q: %s", pr.Name, err.Error())
+			return fmt.Errorf("could not parse upstreamLock in Kptfile of package %q: %w", pr.Name, err)
 		}
 		for _, update := range availableUpdates {
 			key := fmt.Sprintf("%s:%d:%s", update.Name, update.Spec.Revision, draftName)

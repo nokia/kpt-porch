@@ -66,7 +66,7 @@ func (e *executableEvaluator) EvaluateFunction(ctx context.Context, req *pb.Eval
 		}
 		selectedBinary = binary
 	} else {
-		klog.Infof("Image tag is empty, using the image with explicit tag: %q", req.Image)
+		klog.V(2).Infof("Image tag is empty, using the image with explicit tag: %q", req.Image)
 		binary, exists := e.FunctionConfigStore.GetBinaryFromCache(req.Image)
 		if !exists {
 			return nil, &fn.NotFoundError{

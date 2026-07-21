@@ -33,7 +33,7 @@ func NewTestLogger(t *testing.T) (*TestLogger, error) {
 	// Creates logs directory if it doesn't exist
 	logsDir := "logs"
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create logs directory: %v", err)
+		return nil, fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
 	// Create log file with timestamp
@@ -41,7 +41,7 @@ func NewTestLogger(t *testing.T) (*TestLogger, error) {
 	filename := filepath.Join(logsDir, fmt.Sprintf("porch-metrics-%s.log", timestamp))
 	file, err := os.Create(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create log file: %v", err)
+		return nil, fmt.Errorf("failed to create log file: %w", err)
 	}
 
 	logger := log.New(file, "", 0) // Remove timestamp from log entries
@@ -56,7 +56,7 @@ func (l *TestLogger) Close() error {
 	return l.file.Close()
 }
 
-func (l *TestLogger) LogResult(format string, args ...interface{}) {
+func (l *TestLogger) LogResult(format string, args ...any) {
 	if len(args) == 0 {
 		// If no args provided, treat format as plain string
 		l.logger.Println(format)

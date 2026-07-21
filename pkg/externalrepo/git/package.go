@@ -1,4 +1,4 @@
-// Copyright 2022, 2024-2025 The kpt Authors
+// Copyright 2022, 2024-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -231,7 +231,7 @@ func (p *gitPackageRevision) GetLock(ctx context.Context) (kptfilev1.Upstream, k
 
 	ref, err := refInRemoteFromRefInLocal(p.ref.Name())
 	if err != nil {
-		return kptfilev1.Upstream{}, kptfilev1.Locator{}, fmt.Errorf("cannot determine package lock for %q: %v", p.ref, err)
+		return kptfilev1.Upstream{}, kptfilev1.Locator{}, fmt.Errorf("cannot determine package lock for %q: %w", p.ref, err)
 	}
 
 	return kptfilev1.Upstream{

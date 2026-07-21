@@ -1,4 +1,4 @@
-// Copyright 2022 The kpt Authors
+// Copyright 2022, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -214,7 +214,7 @@ func str(i porchapi.ResultItem) string {
 	if i.Severity == "" {
 		severity = "info"
 	}
-	list := []interface{}{severity}
+	list := []any{severity}
 	if len(idStringList) > 0 {
 		formatString += " %s"
 		list = append(list, strings.Join(idStringList, "/"))
@@ -230,12 +230,23 @@ func str(i porchapi.ResultItem) string {
 
 func readFromDir(dir string) (map[string]string, error) {
 	resources := map[string]string{}
-	if err := filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+	if err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.Mode().IsRegular() {
+		if d.IsDir() {
 			return nil
+		}
+		// d.Type() may return 0 (unknown) on some filesystems;
+		// fall back to Stat via d.Info() to avoid skipping regular files.
+		if !d.Type().IsRegular() {
+			info, infoErr := d.Info()
+			if infoErr != nil {
+				return infoErr
+			}
+			if !info.Mode().IsRegular() {
+				return nil
+			}
 		}
 		rel, err := filepath.Rel(dir, path)
 		if err != nil {

@@ -1,4 +1,4 @@
-// Copyright 2023, 2025 The kpt Authors
+// Copyright 2023, 2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,8 @@ package packagevariantset
 
 import (
 	"context"
-	"sort"
+	"slices"
+	"strings"
 	"testing"
 
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
@@ -27,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 )
 
@@ -135,8 +137,8 @@ func TestEnsurePackageVariants(t *testing.T) {
 	require.Equal(t, "my-pvs-dnrepo2-dnpkg2", fc.updated[0].GetName())
 	require.Equal(t, 2, len(fc.created))
 	// ordering of calls to create is not stable (map iteration)
-	sort.Slice(fc.created, func(i, j int) bool {
-		return fc.created[i].GetName() < fc.created[j].GetName()
+	slices.SortFunc(fc.created, func(a, b client.Object) int {
+		return strings.Compare(a.GetName(), b.GetName())
 	})
 	require.Equal(t, "my-pvs-dnrepo3-dnpkg3", fc.created[0].GetName())
 	require.Equal(t, "my-pvs-dnrepo4-supersupersuperlooooooooooooooooooooooo-bec36506", fc.created[1].GetName())

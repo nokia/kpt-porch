@@ -1,4 +1,4 @@
-// Copyright 2025 The kpt Authors
+// Copyright 2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ func TestAddPackageApproval(t *testing.T) {
 	op := ops[0]
 	assert.Equal(t, "approval", op.opType)
 
-	data := op.data.(map[string]interface{})
+	data := op.data.(map[string]any)
 	assert.Equal(t, draft, data["draft"])
 	assert.Equal(t, tag, data["tag"])
 }
@@ -59,7 +59,7 @@ func TestAddPackageDeletion(t *testing.T) {
 	op := ops[0]
 	assert.Equal(t, "deletion", op.opType)
 
-	data := op.data.(map[string]interface{})
+	data := op.data.(map[string]any)
 	assert.Equal(t, branch, data["branch"])
 	assert.Equal(t, prKey, data["prKey"])
 }

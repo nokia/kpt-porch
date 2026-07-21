@@ -1,4 +1,4 @@
-// Copyright 2022, 2024-2025 The kpt Authors
+// Copyright 2022, 2024-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,9 @@
 package crcache
 
 import (
+	"cmp"
 	"context"
-	"sort"
+	"slices"
 	"strings"
 
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
@@ -69,30 +70,18 @@ func toPackageRevisionSlice(
 			result = append(result, p)
 		}
 	}
-	sort.Slice(result, func(i, j int) bool {
-		ki, kj := result[i].Key(), result[j].Key()
-		switch res := strings.Compare(ki.PkgKey.Package, kj.PkgKey.Package); {
-		case res < 0:
-			return true
-		case res > 0:
-			return false
-		default:
-			// Equal. Compare next element
+	slices.SortFunc(result, func(a, b repository.PackageRevision) int {
+		ka, kb := a.Key(), b.Key()
+		if res := strings.Compare(ka.PkgKey.Package, kb.PkgKey.Package); res != 0 {
+			return res
 		}
-		res := ki.Revision - kj.Revision
-		if res != 0 {
-			return res < 0
+		if res := cmp.Compare(ka.Revision, kb.Revision); res != 0 {
+			return res
 		}
-		switch res := strings.Compare(string(result[i].Lifecycle(ctx)), string(result[j].Lifecycle(ctx))); {
-		case res < 0:
-			return true
-		case res > 0:
-			return false
-		default:
-			// Equal. Compare next element
+		if res := strings.Compare(string(a.Lifecycle(ctx)), string(b.Lifecycle(ctx))); res != 0 {
+			return res
 		}
-
-		return strings.Compare(result[i].KubeObjectName(), result[j].KubeObjectName()) < 0
+		return strings.Compare(a.KubeObjectName(), b.KubeObjectName())
 	})
 	return result
 }
@@ -104,10 +93,8 @@ func toPackageSlice(cached map[repository.PackageKey]*cachedPackage, filter repo
 			result = append(result, p)
 		}
 	}
-	sort.Slice(result, func(i, j int) bool {
-		ki, kj := result[i].Key(), result[j].Key()
-		// We assume they all have the same repository
-		return ki.Package < kj.Package
+	slices.SortFunc(result, func(a, b repository.Package) int {
+		return strings.Compare(a.Key().Package, b.Key().Package)
 	})
 
 	return result

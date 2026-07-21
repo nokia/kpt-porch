@@ -17,6 +17,7 @@ package e2e
 import (
 	"bufio"
 	"bytes"
+	stdcmp "cmp"
 	"errors"
 	"io/fs"
 	"os"
@@ -24,7 +25,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"syscall"
 	"testing"
@@ -263,18 +263,18 @@ func (s *CliTestSuite) RunTestCase(t *testing.T, tc TestCaseConfig) {
 func (s *CliTestSuite) ScanTestCases(t *testing.T) []TestCaseConfig {
 	testCases := []TestCaseConfig{}
 
-	if err := filepath.Walk(s.TestDataPath, func(path string, info fs.FileInfo, err error) error {
+	if err := filepath.WalkDir(s.TestDataPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() {
+		if !d.IsDir() {
 			return nil
 		}
 		if path == s.TestDataPath {
 			return nil
 		}
 
-		tc := ReadTestCaseConfig(t, info.Name(), path)
+		tc := ReadTestCaseConfig(t, d.Name(), path)
 		testCases = append(testCases, tc)
 
 		return nil
@@ -361,8 +361,8 @@ func findColumnRanges(header string, columns []string) []colRange {
 			ranges = append(ranges, colRange{idx, end})
 		}
 	}
-	sort.Slice(ranges, func(i, j int) bool {
-		return ranges[i].start > ranges[j].start
+	slices.SortFunc(ranges, func(a, b colRange) int {
+		return stdcmp.Compare(b.start, a.start)
 	})
 	return ranges
 }
@@ -502,7 +502,7 @@ func reorderYamlStdout(t *testing.T, buf *bytes.Buffer) {
 		}
 	}
 
-	var data interface{}
+	var data any
 	if err := yaml.Unmarshal(newBuf.Bytes(), &data); err != nil {
 		// not yaml.
 		return
@@ -538,7 +538,7 @@ func reorderCommandStdout(t *testing.T, buf *bytes.Buffer) {
 	for scanner.Scan() {
 		bodyLines = append(bodyLines, scanner.Text())
 	}
-	sort.Strings(bodyLines)
+	slices.Sort(bodyLines)
 
 	newBuf.Write([]byte(headerLine))
 	newBuf.Write([]byte("\n"))

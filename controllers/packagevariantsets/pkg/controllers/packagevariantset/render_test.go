@@ -1,4 +1,4 @@
-// Copyright 2023, 2025 The kpt Authors
+// Copyright 2023, 2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -490,7 +490,7 @@ func TestRenderPackageVariantSpec(t *testing.T) {
 }
 
 func TestEvalExpr(t *testing.T) {
-	baseInputs := map[string]interface{}{
+	baseInputs := map[string]any{
 		"repoDefault":    "foo-repo",
 		"packageDefault": "bar-package",
 	}
@@ -502,7 +502,7 @@ func TestEvalExpr(t *testing.T) {
 
 	testCases := map[string]struct {
 		expr           string
-		target         interface{}
+		target         any
 		expectedResult string
 		expectedErr    string
 	}{
@@ -575,7 +575,7 @@ func TestEvalExpr(t *testing.T) {
 }
 
 func TestCopyAndOverlayMapExpr(t *testing.T) {
-	baseInputs := map[string]interface{}{
+	baseInputs := map[string]any{
 		"repoDefault":    "foo-repo",
 		"packageDefault": "bar-package",
 	}

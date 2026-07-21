@@ -1,4 +1,4 @@
-// Copyright 2023-2024 The kpt Authors
+// Copyright 2023-2024, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	api "github.com/kptdev/porch/api/porchconfig/v1alpha1"
@@ -149,7 +149,7 @@ func parseFiles(prr *porchapi.PackageRevisionResources) (map[string]fn.KubeObjec
 		// Convert to KubeObjects for easier processing
 		kos, err := fn.ParseKubeObjects([]byte(r))
 		if err != nil {
-			return nil, fmt.Errorf("%s: %s", file, err.Error())
+			return nil, fmt.Errorf("%s: %w", file, err)
 		}
 		result[file] = kos
 	}
@@ -341,7 +341,7 @@ func setInjectionPointConditionsAndGates(kptfileKubeObject *fn.KubeObject, injec
 	for k := range gateMap {
 		gates = append(gates, kptfilev1.ReadinessGate{ConditionType: k})
 	}
-	sort.SliceStable(gates, func(i, j int) bool { return gates[i].ConditionType < gates[j].ConditionType })
+	slices.SortStableFunc(gates, func(a, b kptfilev1.ReadinessGate) int { return strings.Compare(a.ConditionType, b.ConditionType) })
 
 	if gates != nil {
 		info.ReadinessGates = gates
@@ -353,7 +353,7 @@ func setInjectionPointConditionsAndGates(kptfileKubeObject *fn.KubeObject, injec
 
 	// update the status conditions
 	if conditions != nil {
-		sort.SliceStable(conditions, func(i, j int) bool { return conditions[i].Type < conditions[j].Type })
+		slices.SortStableFunc(conditions, func(a, b metav1.Condition) int { return strings.Compare(a.Type, b.Type) })
 		status.Conditions = convertConditionsFromMetaToKptfile(conditions)
 		err = kptfileKubeObject.SetNestedField(status, "status")
 		if err != nil {

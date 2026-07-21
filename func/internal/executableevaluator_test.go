@@ -16,8 +16,10 @@ package internal
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	kptfilev1 "github.com/kptdev/kpt/api/kptfile/v1"
@@ -25,7 +27,7 @@ import (
 	configapi "github.com/kptdev/porch/api/porchconfig/v1alpha1"
 	"github.com/kptdev/porch/controllers/functionconfigs/reconciler"
 	pb "github.com/kptdev/porch/func/evaluator"
-	"github.com/kptdev/porch/pkg/util"
+	imageutil "github.com/kptdev/porch/pkg/util/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
@@ -87,6 +89,10 @@ func TestNewExecutableEvaluator(t *testing.T) {
 }
 
 func TestEvaluateExecutableFunction(t *testing.T) {
+	flagSet := flag.NewFlagSet("log-level", flag.ContinueOnError)
+	klog.InitFlags(flagSet)
+	_ = flagSet.Parse([]string{"--v", "3"})
+
 	const tempCacheDir = "/tmp/func_cache"
 	t.Run("invalid semver constraint will cause function not found error", func(t *testing.T) {
 		ctx := t.Context()
@@ -96,7 +102,7 @@ func TestEvaluateExecutableFunction(t *testing.T) {
 
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte("req-rl"),
-			Image:        util.ImageJoin(defaultKRMImagePrefix, testImageName),
+			Image:        imageutil.Join(defaultKRMImagePrefix, testImageName),
 			Tag:          ">> 0.1.3 < 0.2.0", // Invalid semver constraint, '>>' is not a valid operator
 		}
 
@@ -118,7 +124,7 @@ func TestEvaluateExecutableFunction(t *testing.T) {
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte("req-rl"),
 			// This image is not included in the config.yaml -> function not found
-			Image: util.ImageJoin(defaultKRMImagePrefix, testImageName),
+			Image: imageutil.Join(defaultKRMImagePrefix, testImageName),
 			Tag:   "> 0.1.3 < 0.2.0", // This is a valid semver constraint syntax
 		}
 
@@ -135,7 +141,7 @@ func TestEvaluateExecutableFunction(t *testing.T) {
 
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte("req-rl"),
-			Image:        util.ImageJoin(defaultKRMImagePrefix, setImageFunction),
+			Image:        imageutil.Join(defaultKRMImagePrefix, setImageFunction),
 			Tag:          "> 0.1.3 < 0.2.0",
 		}
 
@@ -152,7 +158,7 @@ func TestEvaluateExecutableFunction(t *testing.T) {
 
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte("req-rl"),
-			Image:        util.ImageJoin(defaultKRMImagePrefix, setImageFunction),
+			Image:        imageutil.Join(defaultKRMImagePrefix, setImageFunction),
 			Tag:          ">= 0.1.2 < 0.2.0",
 		}
 
@@ -169,7 +175,7 @@ func TestEvaluateExecutableFunction(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create a simple test executable that echoes input as a valid KRM function
-		testBinary := util.ImageJoin(tmpDir, setImageFunction)
+		testBinary := filepath.Join(tmpDir, setImageFunction)
 		const testScript = `#!/bin/sh
 # Emulating the KRM function execution by running this shell script
 cat
@@ -192,7 +198,7 @@ items: []
 		// We expect v0.1.3 to be selected as it's the greatest version
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte(resourceList),
-			Image:        util.ImageJoin(defaultKRMImagePrefix, setImageFunction),
+			Image:        imageutil.Join(defaultKRMImagePrefix, setImageFunction),
 			Tag:          ">= 0.1.2 < 0.2.0",
 		}
 
@@ -221,9 +227,7 @@ items: []
 		assert.NotNil(t, resp)
 
 		// Verify the klog message contains the expected version selection
-		assert.Contains(t, logOutput, `Selected image "ghcr.io/kptdev/krm-functions-catalog/set-image:v0.1.3"`)
-		assert.Contains(t, logOutput, `(version "0.1.3")`)
-		assert.Contains(t, logOutput, `for request "ghcr.io/kptdev/krm-functions-catalog/set-image"`)
+		assert.Contains(t, logOutput, `Selected tag "v0.1.3"`)
 	})
 	t.Run("successful function execution with explicit tagging", func(t *testing.T) {
 		ctx := t.Context()
@@ -232,7 +236,7 @@ items: []
 		tmpDir := t.TempDir()
 
 		// Create a simple test executable that echoes input as a valid KRM function
-		testBinary := util.ImageJoin(tmpDir, setImageFunction)
+		testBinary := filepath.Join(tmpDir, setImageFunction)
 		const testScript = `#!/bin/sh
 # Emulating the KRM function execution by running this shell script
 cat
@@ -254,7 +258,7 @@ items: []
 		// Explicit tagging
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte(resourceList),
-			Image:        util.ImageJoin(defaultKRMImagePrefix, setImageFunction) + ":v0.1.3",
+			Image:        imageutil.Join(defaultKRMImagePrefix, setImageFunction) + ":v0.1.3",
 		}
 
 		// Capture klog output by redirecting stderr
@@ -291,7 +295,7 @@ items: []
 		tmpDir := t.TempDir()
 
 		// Create a simple test executable that echoes input as a valid KRM function
-		testBinary := util.ImageJoin(tmpDir, setImageFunction)
+		testBinary := filepath.Join(tmpDir, setImageFunction)
 		const testScript = `#!/bin/sh
 # Emulating the KRM function execution by running this shell script
 cat
@@ -312,7 +316,7 @@ items: []
 
 		req := &pb.EvaluateFunctionRequest{
 			ResourceList: []byte(resourceList),
-			Image:        util.ImageJoin(defaultKRMImagePrefix, setImageFunction) + ":v0.0.1",
+			Image:        imageutil.Join(defaultKRMImagePrefix, setImageFunction) + ":v0.0.1",
 			Tag:          ">= 0.1.2 < 0.2.0",
 		}
 
@@ -341,8 +345,6 @@ items: []
 		assert.NotNil(t, resp)
 
 		// Verify the klog message contains the expected version selection
-		assert.Contains(t, logOutput, `Selected image "ghcr.io/kptdev/krm-functions-catalog/set-image:v0.1.3"`)
-		assert.Contains(t, logOutput, `(version "0.1.3")`)
-		assert.Contains(t, logOutput, `for request "ghcr.io/kptdev/krm-functions-catalog/set-image"`)
+		assert.Contains(t, logOutput, `Selected tag "v0.1.3"`)
 	})
 }

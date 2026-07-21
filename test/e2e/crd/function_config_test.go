@@ -62,7 +62,7 @@ var _ = Describe("FunctionConfig", Ordered, Label("content"), func() {
 	It("should render using a dynamically-configured FunctionConfig tag", func() {
 		By("patching set-namespace FunctionConfig with a custom tag")
 		customTag := "v99.0.0"
-		patch := []map[string]interface{}{
+		patch := []map[string]any{
 			{"op": "add", "path": "/spec/goExecutor/tags/-", "value": customTag},
 		}
 		patchBytes, err := json.Marshal(patch)
@@ -106,7 +106,7 @@ var _ = Describe("FunctionConfig", Ordered, Label("content"), func() {
 		}).WithTimeout(defaultTimeout).WithPolling(defaultInterval).Should(Succeed())
 
 		By("cleaning up: removing custom tag from FunctionConfig")
-		restorePatch := []map[string]interface{}{
+		restorePatch := []map[string]any{
 			{"op": "replace", "path": "/spec/goExecutor/tags", "value": []string{"v0.4.1", "v0.4"}},
 		}
 		restoreBytes, err := json.Marshal(restorePatch)
@@ -117,7 +117,7 @@ var _ = Describe("FunctionConfig", Ordered, Label("content"), func() {
 	It("should remove tag from builtin runtime when FunctionConfig is updated", func() {
 		By("adding a custom tag to set-namespace")
 		ephemeralTag := "v88.0.0"
-		addPatch := []map[string]interface{}{
+		addPatch := []map[string]any{
 			{"op": "add", "path": "/spec/goExecutor/tags/-", "value": ephemeralTag},
 		}
 		addBytes, err := json.Marshal(addPatch)
@@ -138,7 +138,7 @@ var _ = Describe("FunctionConfig", Ordered, Label("content"), func() {
 		}).WithTimeout(defaultTimeout).WithPolling(defaultInterval).Should(Succeed())
 
 		By("removing the custom tag")
-		removePatch := []map[string]interface{}{
+		removePatch := []map[string]any{
 			{"op": "replace", "path": "/spec/goExecutor/tags", "value": []string{"v0.4.1", "v0.4"}},
 		}
 		removeBytes, err := json.Marshal(removePatch)

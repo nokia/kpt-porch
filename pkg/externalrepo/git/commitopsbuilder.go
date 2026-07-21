@@ -1,4 +1,4 @@
-// Copyright 2025 The kpt Authors
+// Copyright 2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 
 type commitOperation struct {
 	opType string
-	data   interface{}
+	data   any
 }
 
 type commitOperationBuilder struct {
@@ -33,17 +33,17 @@ func newCommitOperationBuilder() *commitOperationBuilder {
 	}
 }
 
-func (c *commitOperationBuilder) addPackageApproval(draft interface{}, tag plumbing.ReferenceName) {
+func (c *commitOperationBuilder) addPackageApproval(draft any, tag plumbing.ReferenceName) {
 	c.operations = append(c.operations, commitOperation{
 		opType: "approval",
-		data:   map[string]interface{}{"draft": draft, "tag": tag},
+		data:   map[string]any{"draft": draft, "tag": tag},
 	})
 }
 
-func (c *commitOperationBuilder) addPackageDeletion(branch plumbing.ReferenceName, prKey interface{}) {
+func (c *commitOperationBuilder) addPackageDeletion(branch plumbing.ReferenceName, prKey any) {
 	c.operations = append(c.operations, commitOperation{
 		opType: "deletion",
-		data:   map[string]interface{}{"branch": branch, "prKey": prKey},
+		data:   map[string]any{"branch": branch, "prKey": prKey},
 	})
 }
 

@@ -603,7 +603,7 @@ func (t *PorchSuite) TestPackageMetadataFromKptfile() {
 			{ConditionType: "Deployed"},
 		}
 
-		t.Require().Equal(expectedLabels, mainPr.Spec.PackageMetadata.Labels, "main revision metadata labels should match v1")
+		t.Require().Equal(expectedLabels, mainPr.Spec.PackageMetadata.Labels, "main revision metadata labels should match")
 		for k, v := range expectedAnnotations {
 			actual, ok := mainPr.Spec.PackageMetadata.Annotations[k]
 			t.Require().True(ok, "annotation key %s should exist", k)

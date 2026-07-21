@@ -25,7 +25,7 @@ import (
 	"github.com/kptdev/kpt/pkg/lib/kptops"
 	fnsdk "github.com/kptdev/krm-functions-sdk/go/fn"
 	"github.com/kptdev/porch/controllers/functionconfigs/reconciler"
-	"github.com/kptdev/porch/pkg/util"
+	imageutil "github.com/kptdev/porch/pkg/util/image"
 	regclientref "github.com/regclient/regclient/types/ref"
 	"k8s.io/klog/v2"
 )
@@ -64,12 +64,12 @@ func (br *builtinRuntime) GetRunner(ctx context.Context, funct *kptfilev1.Functi
 				funct.Image = stripped
 			}
 		}
-		baseName := util.GetImageName(funct.Image)
+		baseName := imageutil.Parse(funct.Image).BaseName
 
 		builtinEntry := cache[baseName]
 		cacheKeys := make([]string, 0, len(builtinEntry.Tags))
 		cacheKeys = append(cacheKeys, builtinEntry.Tags...)
-		_, err = util.FindBestSemverMatch(funct.Tag, funct.Image, cacheKeys)
+		_, err = imageutil.FindBestSemverMatch(funct.Tag, cacheKeys)
 		if err != nil {
 			return nil, &fn.NotFoundError{
 				Function: kptfilev1.Function{Image: funct.Image},

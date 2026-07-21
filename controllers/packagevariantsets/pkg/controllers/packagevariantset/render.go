@@ -1,4 +1,4 @@
-// Copyright 2023 The kpt Authors
+// Copyright 2023, 2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"sort"
+	"slices"
 
 	"github.com/google/cel-go/cel"
 	api "github.com/kptdev/porch/api/porchconfig/v1alpha2"
@@ -73,7 +73,7 @@ func renderPackageVariantSpec(ctx context.Context, pvs *api.PackageVariantSet, r
 		if pvt.Downstream.RepoExpr != nil && *pvt.Downstream.RepoExpr != "" {
 			repo, err = evalExpr(*pvt.Downstream.RepoExpr, inputs)
 			if err != nil {
-				return nil, fmt.Errorf("template.downstream.repoExpr: %s", err.Error())
+				return nil, fmt.Errorf("template.downstream.repoExpr: %w", err)
 			}
 		}
 
@@ -103,7 +103,7 @@ func renderPackageVariantSpec(ctx context.Context, pvs *api.PackageVariantSet, r
 		if pvt.Downstream.PackageExpr != nil && *pvt.Downstream.PackageExpr != "" {
 			spec.Downstream.Package, err = evalExpr(*pvt.Downstream.PackageExpr, inputs)
 			if err != nil {
-				return nil, fmt.Errorf("template.downstream.packageExpr: %s", err.Error())
+				return nil, fmt.Errorf("template.downstream.packageExpr: %w", err)
 			}
 		}
 	}
@@ -155,7 +155,7 @@ func renderPackageVariantSpec(ctx context.Context, pvs *api.PackageVariantSet, r
 		if injTemplate.NameExpr != nil && *injTemplate.NameExpr != "" {
 			injector.Name, err = evalExpr(*injTemplate.NameExpr, inputs)
 			if err != nil {
-				return nil, fmt.Errorf("template.injectors[%d].nameExpr: %s", i, err.Error())
+				return nil, fmt.Errorf("template.injectors[%d].nameExpr: %w", i, err)
 			}
 		}
 
@@ -180,7 +180,7 @@ func renderPackageVariantSpec(ctx context.Context, pvs *api.PackageVariantSet, r
 	return spec, nil
 }
 
-func renderFunctionTemplateList(field string, templateList []api.FunctionTemplate, inputs map[string]interface{}) ([]kptfilev1.Function, error) {
+func renderFunctionTemplateList(field string, templateList []api.FunctionTemplate, inputs map[string]any) ([]kptfilev1.Function, error) {
 	var results []kptfilev1.Function
 	for i, ft := range templateList {
 		var err error
@@ -195,8 +195,8 @@ func renderFunctionTemplateList(field string, templateList []api.FunctionTemplat
 	return results, nil
 }
 
-func buildBaseInputs(upstreamPR *porchapi.PackageRevision, downstream pvContext) (map[string]interface{}, error) {
-	inputs := make(map[string]interface{}, 5)
+func buildBaseInputs(upstreamPR *porchapi.PackageRevision, downstream pvContext) (map[string]any, error) {
+	inputs := make(map[string]any, 5)
 	inputs[RepoDefaultVarName] = downstream.repoDefault
 	inputs[PackageDefaultVarName] = downstream.packageDefault
 
@@ -222,9 +222,9 @@ func buildBaseInputs(upstreamPR *porchapi.PackageRevision, downstream pvContext)
 	return inputs, nil
 }
 
-func objectToInput(obj interface{}) (map[string]interface{}, error) {
+func objectToInput(obj any) (map[string]any, error) {
 
-	result := make(map[string]interface{})
+	result := make(map[string]any)
 
 	uo, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
@@ -243,7 +243,7 @@ func objectToInput(obj interface{}) (map[string]interface{}, error) {
 	return result, nil
 }
 
-func copyAndOverlayMapExpr(fieldName string, inMap map[string]string, mapExprs []api.MapExpr, inputs map[string]interface{}) (map[string]string, error) {
+func copyAndOverlayMapExpr(fieldName string, inMap map[string]string, mapExprs []api.MapExpr, inputs map[string]any) (map[string]string, error) {
 	outMap := make(map[string]string, len(inMap))
 	for k, v := range inMap {
 		outMap[k] = v
@@ -258,7 +258,7 @@ func copyAndOverlayMapExpr(fieldName string, inMap map[string]string, mapExprs [
 		if me.KeyExpr != nil {
 			k, err = evalExpr(*me.KeyExpr, inputs)
 			if err != nil {
-				return nil, fmt.Errorf("%s[%d].keyExpr: %s", fieldName, i, err.Error())
+				return nil, fmt.Errorf("%s[%d].keyExpr: %w", fieldName, i, err)
 			}
 		}
 		if me.Value != nil {
@@ -267,7 +267,7 @@ func copyAndOverlayMapExpr(fieldName string, inMap map[string]string, mapExprs [
 		if me.ValueExpr != nil {
 			v, err = evalExpr(*me.ValueExpr, inputs)
 			if err != nil {
-				return nil, fmt.Errorf("%s[%d].valueExpr: %s", fieldName, i, err.Error())
+				return nil, fmt.Errorf("%s[%d].valueExpr: %w", fieldName, i, err)
 			}
 		}
 		outMap[k] = v
@@ -280,7 +280,7 @@ func copyAndOverlayMapExpr(fieldName string, inMap map[string]string, mapExprs [
 	return outMap, nil
 }
 
-func copyAndOverlayStringSlice(fieldName string, in, exprs []string, inputs map[string]interface{}) ([]string, error) {
+func copyAndOverlayStringSlice(fieldName string, in, exprs []string, inputs map[string]any) ([]string, error) {
 	outMap := make(map[string]bool, len(in)+len(exprs))
 
 	for _, v := range in {
@@ -289,7 +289,7 @@ func copyAndOverlayStringSlice(fieldName string, in, exprs []string, inputs map[
 	for i, e := range exprs {
 		v, err := evalExpr(e, inputs)
 		if err != nil {
-			return nil, fmt.Errorf("%s[%d]: %s", fieldName, i, err.Error())
+			return nil, fmt.Errorf("%s[%d]: %w", fieldName, i, err)
 		}
 		outMap[v] = true
 	}
@@ -302,11 +302,11 @@ func copyAndOverlayStringSlice(fieldName string, in, exprs []string, inputs map[
 	for k := range outMap {
 		out = append(out, k)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out, nil
 }
 
-func evalExpr(expr string, inputs map[string]interface{}) (string, error) {
+func evalExpr(expr string, inputs map[string]any) (string, error) {
 	prog, err := compileExpr(expr)
 	if err != nil {
 		return "", err

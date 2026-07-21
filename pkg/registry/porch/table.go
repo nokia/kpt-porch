@@ -1,4 +1,4 @@
-// Copyright 2022, 2025 The kpt Authors
+// Copyright 2022, 2025-2026 The kpt Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 type tableConvertor struct {
 	resource schema.GroupResource
 	// cells creates a single row of cells of the table from a runtime.Object
-	cells func(obj runtime.Object) []interface{}
+	cells func(obj runtime.Object) []any
 	// columns stores column definitions for the table convertor
 	columns []metav1.TableColumnDefinition
 }
@@ -83,12 +83,12 @@ func (c tableConvertor) ConvertToTable(ctx context.Context, object runtime.Objec
 var (
 	packageTableConvertor = tableConvertor{
 		resource: porchapi.Resource("packages"),
-		cells: func(obj runtime.Object) []interface{} {
+		cells: func(obj runtime.Object) []any {
 			pr, ok := obj.(*porchapi.PorchPackage)
 			if !ok {
 				return nil
 			}
-			return []interface{}{
+			return []any{
 				pr.Name,
 				pr.Spec.PackageName,
 				pr.Spec.RepositoryName,
@@ -105,12 +105,12 @@ var (
 
 	packageRevisionTableConvertor = tableConvertor{
 		resource: porchapi.Resource("packagerevisions"),
-		cells: func(obj runtime.Object) []interface{} {
+		cells: func(obj runtime.Object) []any {
 			pr, ok := obj.(*porchapi.PackageRevision)
 			if !ok {
 				return nil
 			}
-			return []interface{}{
+			return []any{
 				pr.Name,
 				pr.Spec.PackageName,
 				pr.Spec.WorkspaceName,
@@ -133,12 +133,12 @@ var (
 
 	packageRevisionResourcesTableConvertor = tableConvertor{
 		resource: porchapi.Resource("packagerevisionresources"),
-		cells: func(obj runtime.Object) []interface{} {
+		cells: func(obj runtime.Object) []any {
 			pr, ok := obj.(*porchapi.PackageRevisionResources)
 			if !ok {
 				return nil
 			}
-			return []interface{}{
+			return []any{
 				pr.Name,
 				pr.Spec.PackageName,
 				pr.Spec.WorkspaceName,
