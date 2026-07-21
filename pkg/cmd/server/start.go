@@ -29,7 +29,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	clientset "github.com/kptdev/porch/api/generated/clientset/versioned"
 	informers "github.com/kptdev/porch/api/generated/informers/externalversions"
@@ -329,43 +328,46 @@ func (o *PorchServerOptions) Config() (*apiserver.Config, error) {
 		return nil, err
 	}
 
-	config := &apiserver.Config{
+	return &apiserver.Config{
 		GenericConfig: serverConfig,
-		ExtraConfig: apiserver.ExtraConfig{
-			CoreAPIKubeconfigPath: o.CoreAPIKubeconfigPath,
-			GRPCRuntimeOptions: engine.GRPCRuntimeOptions{
-				FunctionRunnerAddress: o.FunctionRunnerAddress,
-				MaxGrpcMessageSize:    o.MaxRequestBodySize,
-				DefaultImagePrefix:    o.DefaultImagePrefix,
-			},
-			CacheOptions: cachetypes.CacheOptions{
-				ExternalRepoOptions: externalrepotypes.ExternalRepoOptions{
-					LocalDirectory:         o.CacheDirectory,
-					UseUserDefinedCaBundle: o.UseUserDefinedCaBundle,
-					GoGitRepoCacheSize:     o.GoGitRepoCacheSize,
-					GoGitCacheMaxFileSize:  o.GoGitCacheMaxFileSize,
-				},
-				RepoOperationRetryAttempts: o.RepoOperationRetryAttempts,
-				CacheType:                  cachetypes.CacheType(o.CacheType),
-				CRCacheOptions: cachetypes.CRCacheOptions{
-					MaxConcurrentLists:       o.MaxConcurrentLists,
-					ListTimeoutPerRepository: o.ListTimeoutPerRepository,
-				},
-				DBCacheOptions: cachetypes.DBCacheOptions{
-					Driver:             o.DbCacheDriver,
-					DataSource:         o.DbCacheDataSource,
-					MaxConnections:     o.DbMaxConnections,
-					MaxIdleConnections: o.DbMaxIdleConnections,
-					MaxConnLifetime:    o.DbMaxConnLifetime,
-				},
-				DbPushDraftsToGit: o.DbPushDrafsToGit,
-			},
-			PodNameSpace: o.PodNamespace,
-			ProbePort:    o.ProbePort,
-			HAOptions:    o.HAOptions,
+		ExtraConfig:   o.buildExtraConfig(),
+	}, nil
+}
+
+func (o *PorchServerOptions) buildExtraConfig() apiserver.ExtraConfig {
+	return apiserver.ExtraConfig{
+		CoreAPIKubeconfigPath: o.CoreAPIKubeconfigPath,
+		GRPCRuntimeOptions: engine.GRPCRuntimeOptions{
+			FunctionRunnerAddress: o.FunctionRunnerAddress,
+			MaxGrpcMessageSize:    o.MaxRequestBodySize,
+			DefaultImagePrefix:    o.DefaultImagePrefix,
 		},
+		CacheOptions: cachetypes.CacheOptions{
+			ExternalRepoOptions: externalrepotypes.ExternalRepoOptions{
+				LocalDirectory:         o.CacheDirectory,
+				UseUserDefinedCaBundle: o.UseUserDefinedCaBundle,
+				GoGitRepoCacheSize:     o.GoGitRepoCacheSize,
+				GoGitCacheMaxFileSize:  o.GoGitCacheMaxFileSize,
+			},
+			RepoOperationRetryAttempts: o.RepoOperationRetryAttempts,
+			CacheType:                  cachetypes.CacheType(o.CacheType),
+			CRCacheOptions: cachetypes.CRCacheOptions{
+				MaxConcurrentLists:       o.MaxConcurrentLists,
+				ListTimeoutPerRepository: o.ListTimeoutPerRepository,
+			},
+			DBCacheOptions: cachetypes.DBCacheOptions{
+				Driver:             o.DbCacheDriver,
+				DataSource:         o.DbCacheDataSource,
+				MaxConnections:     o.DbMaxConnections,
+				MaxIdleConnections: o.DbMaxIdleConnections,
+				MaxConnLifetime:    o.DbMaxConnLifetime,
+			},
+			DbPushDraftsToGit: o.DbPushDrafsToGit,
+		},
+		PodNameSpace: o.PodNamespace,
+		ProbePort:    o.ProbePort,
+		HAOptions:    o.HAOptions,
 	}
-	return config, nil
 }
 
 // RunPorchServer starts a new PorchServer given PorchServerOptions
@@ -397,7 +399,13 @@ func (o PorchServerOptions) RunPorchServer(ctx context.Context) error {
 	return mgr.Start(ctx)
 }
 
-func proxyHealthChecks(mgr manager.Manager, securePort int) error {
+type probeManager interface {
+	AddHealthzCheck(name string, check healthz.Checker) error
+	AddReadyzCheck(name string, check healthz.Checker) error
+	Elected() <-chan struct{}
+}
+
+func proxyHealthChecks(mgr probeManager, securePort int) error {
 	healthzDelegate := delegateAPIServerHealth(mgr, securePort, "healthz", true)
 	if err := mgr.AddHealthzCheck("healthz", healthzDelegate); err != nil {
 		return err

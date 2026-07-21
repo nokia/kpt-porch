@@ -113,9 +113,32 @@ type Config struct {
 	ExtraConfig   ExtraConfig
 }
 
+// serverDeps holds injectable construction dependencies for unit testing.
+// Production uses defaultServerDeps(); tests override selected fields.
+type serverDeps struct {
+	newManager func(cfg *rest.Config, opts ctrl.Options) (manager.Manager, error)
+	getCache   func(ctx context.Context, opts cachetypes.CacheOptions) (cachetypes.Cache, error)
+	newSTS     func(ctx context.Context, opts ...option.ClientOption) (*sts.Service, error)
+	newEngine  func(opts ...engine.EngineOption) (engine.CaDEngine, error)
+	// registerFCController, when non-nil, replaces registerFunctionConfigController.
+	registerFCController func(mgr manager.Manager) error
+	cacheRetry           wait.Backoff
+}
+
+func defaultServerDeps() serverDeps {
+	return serverDeps{
+		newManager: ctrl.NewManager,
+		getCache:   cache.GetCacheImpl,
+		newSTS:     sts.NewService,
+		newEngine:  engine.NewCaDEngine,
+		cacheRetry: wait.Backoff{Duration: time.Second, Factor: 1.5, Steps: 20, Cap: 30 * time.Second},
+	}
+}
+
 type completedConfig struct {
 	GenericConfig genericapiserver.CompletedConfig
 	ExtraConfig   *ExtraConfig
+	deps          serverDeps
 }
 
 // CompletedConfig embeds a private pointer that cannot be instantiated outside of this package.
@@ -128,8 +151,9 @@ func (cfg *Config) Complete() CompletedConfig {
 	cfg.GenericConfig.EffectiveVersion = compatibility.NewEffectiveVersionFromString("1.0", "1.0", "1.0")
 
 	c := completedConfig{
-		cfg.GenericConfig.Complete(),
-		&cfg.ExtraConfig,
+		GenericConfig: cfg.GenericConfig.Complete(),
+		ExtraConfig:   &cfg.ExtraConfig,
+		deps:          defaultServerDeps(),
 	}
 
 	return CompletedConfig{&c}
@@ -235,7 +259,7 @@ func (c *completedConfig) buildManager(restConfig *rest.Config, scheme *runtime.
 		probePort = fmt.Sprintf(":%d", c.ExtraConfig.ProbePort)
 	}
 
-	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
+	mgr, err := c.deps.newManager(restConfig, ctrl.Options{
 		Scheme:           scheme,
 		LeaderElection:   c.ExtraConfig.HAOptions.LeaderElection,
 		LeaderElectionID: LeaderElectionID,
@@ -281,6 +305,10 @@ func zeroToNil(duration time.Duration) *time.Duration {
 }
 
 func (c *completedConfig) registerFunctionConfigController(mgr manager.Manager) error {
+	if c.deps.registerFCController != nil {
+		return c.deps.registerFCController(mgr)
+	}
+
 	functionConfigStore := reconciler.NewFunctionConfigStore(c.ExtraConfig.GRPCRuntimeOptions.DefaultImagePrefix, "")
 
 	controller := &reconciler.FunctionConfigReconciler{
@@ -352,7 +380,7 @@ func (c *completedConfig) New(ctx context.Context) (manager.Manager, *PorchServe
 		return nil, nil, err
 	}
 
-	stsClient, err := sts.NewService(context.Background(), option.WithoutAuthentication())
+	stsClient, err := c.deps.newSTS(context.Background(), option.WithoutAuthentication())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build sts client: %w", err)
 	}
@@ -379,14 +407,14 @@ func (c *completedConfig) New(ctx context.Context) (manager.Manager, *PorchServe
 
 	var cacheImpl cachetypes.Cache
 	err = retry.OnError(
-		wait.Backoff{Duration: time.Second, Factor: 1.5, Steps: 20, Cap: 30 * time.Second},
+		c.deps.cacheRetry,
 		func(err error) bool {
 			klog.Warningf("failed to create repository cache: %v; wait a sec...", err)
 			return true
 		},
 		func() error {
 			var err error
-			cacheImpl, err = cache.GetCacheImpl(ctx, c.ExtraConfig.CacheOptions)
+			cacheImpl, err = c.deps.getCache(ctx, c.ExtraConfig.CacheOptions)
 			return err
 		})
 
@@ -400,7 +428,7 @@ func (c *completedConfig) New(ctx context.Context) (manager.Manager, *PorchServe
 		return runnerOptions
 	}
 
-	cad, err := engine.NewCaDEngine(
+	cad, err := c.deps.newEngine(
 		engine.WithCache(cacheImpl),
 		engine.WithBuiltinFunctionRuntime(c.ExtraConfig.FunctionStore),
 		engine.WithGRPCFunctionRuntime(c.ExtraConfig.GRPCRuntimeOptions),

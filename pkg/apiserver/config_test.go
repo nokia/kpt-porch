@@ -21,10 +21,14 @@ import (
 	"testing"
 	"time"
 
+	sampleopenapi "github.com/kptdev/porch/api/generated/openapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 func completedConfigForTest(t *testing.T, extra ExtraConfig) CompletedConfig {
@@ -44,6 +48,26 @@ func completedConfigForTest(t *testing.T, extra ExtraConfig) CompletedConfig {
 		},
 		ExtraConfig: extra,
 	}).Complete()
+}
+
+func completedConfigForNewTest(t *testing.T, extra ExtraConfig) CompletedConfig {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { ln.Close() })
+
+	serverConfig := genericapiserver.NewRecommendedConfig(Codecs)
+	serverConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: ln}
+	serverConfig.LoopbackClientConfig = &rest.Config{Host: "https://127.0.0.1:1"}
+	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(sampleopenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(Scheme))
+	serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(sampleopenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(Scheme))
+
+	completed := (&Config{
+		GenericConfig: serverConfig,
+		ExtraConfig:   extra,
+	}).Complete()
+	return completed
 }
 
 func restConfigWithFakeAPIServer(t *testing.T) *rest.Config {
@@ -92,6 +116,10 @@ func TestBuildManager(t *testing.T) {
 				LeaseDuration: 15 * time.Second,
 			},
 		})
+		completed.deps.newManager = func(cfg *rest.Config, opts ctrl.Options) (manager.Manager, error) {
+			opts.HealthProbeBindAddress = "0"
+			return ctrl.NewManager(cfg, opts)
+		}
 
 		mgr, err := completed.buildManager(restConfig, scheme, true)
 		require.NoError(t, err)

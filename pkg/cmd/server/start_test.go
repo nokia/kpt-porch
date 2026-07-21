@@ -16,10 +16,12 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -27,13 +29,13 @@ import (
 
 	porchapi "github.com/kptdev/porch/api/porch/v1alpha1"
 	"github.com/kptdev/porch/pkg/apiserver"
+	cachetypes "github.com/kptdev/porch/pkg/cache/types"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -249,7 +251,7 @@ func TestHAFlagParsing(t *testing.T) {
 }
 
 func TestDelegateAPIServerHealthStandby(t *testing.T) {
-	mgr := &standbyManager{elected: make(chan struct{})}
+	mgr := &stubProbeManager{elected: make(chan struct{})}
 
 	liveness := delegateAPIServerHealth(mgr, 4443, "livez", true)
 	assert.NoError(t, liveness(nil))
@@ -292,13 +294,128 @@ func TestNewPorchServerOptionsDefaults(t *testing.T) {
 	assert.False(t, opts.HAOptions.LeaderElection)
 }
 
-func TestProxyHealthChecks(t *testing.T) {
-	mgr, err := ctrl.NewManager(&rest.Config{Host: "https://127.0.0.1:1"}, ctrl.Options{
-		Scheme: apiserver.Scheme,
-	})
-	require.NoError(t, err)
+func TestBuildExtraConfig(t *testing.T) {
+	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
+	opts.CoreAPIKubeconfigPath = "/tmp/kubeconfig"
+	opts.FunctionRunnerAddress = "function-runner:9445"
+	opts.MaxRequestBodySize = 1234
+	opts.DefaultImagePrefix = "example.com/"
+	opts.CacheDirectory = "/cache"
+	opts.UseUserDefinedCaBundle = true
+	opts.GoGitRepoCacheSize = 16
+	opts.GoGitCacheMaxFileSize = 1024
+	opts.RepoOperationRetryAttempts = 5
+	opts.CacheType = "DB"
+	opts.MaxConcurrentLists = 7
+	opts.ListTimeoutPerRepository = 30 * time.Second
+	opts.DbCacheDriver = "pgx"
+	opts.DbCacheDataSource = "postgres://x"
+	opts.DbMaxConnections = 10
+	opts.DbMaxIdleConnections = 5
+	opts.DbMaxConnLifetime = time.Minute
+	opts.DbPushDrafsToGit = true
+	opts.PodNamespace = "test-ns"
+	opts.ProbePort = 4453
+	opts.HAOptions = apiserver.HAConfig{LeaderElection: true, LeaseDuration: 15 * time.Second}
 
-	assert.NoError(t, proxyHealthChecks(mgr, 4443))
+	extra := opts.buildExtraConfig()
+
+	assert.Equal(t, "/tmp/kubeconfig", extra.CoreAPIKubeconfigPath)
+	assert.Equal(t, "function-runner:9445", extra.GRPCRuntimeOptions.FunctionRunnerAddress)
+	assert.Equal(t, 1234, extra.GRPCRuntimeOptions.MaxGrpcMessageSize)
+	assert.Equal(t, "example.com/", extra.GRPCRuntimeOptions.DefaultImagePrefix)
+	assert.Equal(t, "/cache", extra.CacheOptions.ExternalRepoOptions.LocalDirectory)
+	assert.True(t, extra.CacheOptions.ExternalRepoOptions.UseUserDefinedCaBundle)
+	assert.Equal(t, 16, extra.CacheOptions.ExternalRepoOptions.GoGitRepoCacheSize)
+	assert.Equal(t, int64(1024), extra.CacheOptions.ExternalRepoOptions.GoGitCacheMaxFileSize)
+	assert.Equal(t, 5, extra.CacheOptions.RepoOperationRetryAttempts)
+	assert.Equal(t, cachetypes.CacheType("DB"), extra.CacheOptions.CacheType)
+	assert.Equal(t, 7, extra.CacheOptions.CRCacheOptions.MaxConcurrentLists)
+	assert.Equal(t, 30*time.Second, extra.CacheOptions.CRCacheOptions.ListTimeoutPerRepository)
+	assert.Equal(t, "pgx", extra.CacheOptions.DBCacheOptions.Driver)
+	assert.Equal(t, "postgres://x", extra.CacheOptions.DBCacheOptions.DataSource)
+	assert.Equal(t, 10, extra.CacheOptions.DBCacheOptions.MaxConnections)
+	assert.Equal(t, 5, extra.CacheOptions.DBCacheOptions.MaxIdleConnections)
+	assert.Equal(t, time.Minute, extra.CacheOptions.DBCacheOptions.MaxConnLifetime)
+	assert.True(t, extra.CacheOptions.DbPushDraftsToGit)
+	assert.Equal(t, "test-ns", extra.PodNameSpace)
+	assert.Equal(t, 4453, extra.ProbePort)
+	assert.True(t, extra.HAOptions.LeaderElection)
+	assert.Equal(t, 15*time.Second, extra.HAOptions.LeaseDuration)
+}
+
+func TestConfigMapsExtraConfig(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { ln.Close() })
+
+	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
+	opts.RecommendedOptions.SecureServing.Listener = ln
+	opts.LocalStandaloneDebugging = true
+	opts.CacheType = "CR"
+	opts.ProbePort = 4453
+	opts.HAOptions = apiserver.HAConfig{LeaderElection: true}
+	opts.PodNamespace = "test-ns"
+	opts.MaxRequestBodySize = 1234
+	opts.CoreAPIKubeconfigPath = writeTempKubeconfig(t, "http://127.0.0.1:1")
+	opts.RecommendedOptions.CoreAPI.CoreAPIKubeconfigPath = opts.CoreAPIKubeconfigPath
+
+	require.NoError(t, opts.Complete())
+
+	config, err := opts.Config()
+	require.NoError(t, err)
+	assert.Equal(t, 4453, config.ExtraConfig.ProbePort)
+	assert.True(t, config.ExtraConfig.HAOptions.LeaderElection)
+	assert.Equal(t, "test-ns", config.ExtraConfig.PodNameSpace)
+	assert.Equal(t, 1234, config.ExtraConfig.GRPCRuntimeOptions.MaxGrpcMessageSize)
+	assert.Equal(t, int64(1234), config.GenericConfig.MaxRequestBodyBytes)
+}
+
+func writeTempKubeconfig(t *testing.T, server string) string {
+	t.Helper()
+	content := fmt.Sprintf(`apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+  name: test
+contexts:
+- context:
+    cluster: test
+    user: test
+  name: test
+current-context: test
+users:
+- name: test
+  user: {}
+`, server)
+	path := filepath.Join(t.TempDir(), "kubeconfig")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+	return path
+}
+
+func TestProxyHealthChecks(t *testing.T) {
+	mgr := &stubProbeManager{elected: make(chan struct{})}
+	require.NoError(t, proxyHealthChecks(mgr, 4443))
+	assert.Equal(t, []string{"healthz", "livez"}, mgr.healthz)
+	assert.Equal(t, []string{"readyz"}, mgr.readyz)
+}
+
+func TestProxyHealthChecksErrors(t *testing.T) {
+	t.Run("healthz registration fails", func(t *testing.T) {
+		mgr := &stubProbeManager{
+			elected:    make(chan struct{}),
+			failHealth: true,
+		}
+		assert.ErrorContains(t, proxyHealthChecks(mgr, 4443), "healthz boom")
+	})
+	t.Run("readyz registration fails", func(t *testing.T) {
+		mgr := &stubProbeManager{
+			elected:   make(chan struct{}),
+			failReady: true,
+		}
+		assert.ErrorContains(t, proxyHealthChecks(mgr, 4443), "readyz boom")
+	})
 }
 
 func TestDelegateAPIServerHealthLeader(t *testing.T) {
@@ -330,7 +447,7 @@ func TestDelegateAPIServerHealthLeader(t *testing.T) {
 			port, err := strconv.Atoi(portStr)
 			require.NoError(t, err)
 
-			mgr := &standbyManager{elected: make(chan struct{})}
+			mgr := &stubProbeManager{elected: make(chan struct{})}
 			close(mgr.elected)
 
 			checker := delegateAPIServerHealth(mgr, port, tc.path, true)
@@ -352,10 +469,30 @@ func TestNewCommandStartPorchServer(t *testing.T) {
 	assert.NotNil(t, cmd.Flags().Lookup("cache-type"))
 }
 
-type standbyManager struct {
-	elected chan struct{}
+type stubProbeManager struct {
+	elected    chan struct{}
+	healthz    []string
+	readyz     []string
+	failHealth bool
+	failReady  bool
 }
 
-func (m *standbyManager) Elected() <-chan struct{} {
+func (m *stubProbeManager) Elected() <-chan struct{} {
 	return m.elected
+}
+
+func (m *stubProbeManager) AddHealthzCheck(name string, _ healthz.Checker) error {
+	if m.failHealth {
+		return fmt.Errorf("healthz error")
+	}
+	m.healthz = append(m.healthz, name)
+	return nil
+}
+
+func (m *stubProbeManager) AddReadyzCheck(name string, _ healthz.Checker) error {
+	if m.failReady {
+		return fmt.Errorf("readyz error")
+	}
+	m.readyz = append(m.readyz, name)
+	return nil
 }
