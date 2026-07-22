@@ -351,6 +351,7 @@ func TestConfigMapsExtraConfig(t *testing.T) {
 
 	opts := NewPorchServerOptions(os.Stdout, os.Stderr)
 	opts.RecommendedOptions.SecureServing.Listener = ln
+	opts.RecommendedOptions.SecureServing.ServerCert.CertDirectory = t.TempDir()
 	opts.LocalStandaloneDebugging = true
 	opts.CacheType = "CR"
 	opts.ProbePort = 4453
