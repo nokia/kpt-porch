@@ -22,12 +22,14 @@ import (
 	"time"
 
 	"github.com/kptdev/kpt/pkg/lib/runneroptions"
+	"github.com/kptdev/porch/controllers/packagerevisions/pkg/webhooks"
 	"github.com/kptdev/porch/pkg/cache/contentcache"
 	"github.com/kptdev/porch/pkg/engine"
 	"github.com/kptdev/porch/pkg/engine/podevaluator"
 	porch "github.com/kptdev/porch/pkg/registry/porch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 const (
@@ -135,5 +137,18 @@ func (r *PackageRevisionReconciler) Init(mgr ctrl.Manager) error {
 	default:
 		log.Info("function runtime enabled (builtin only)")
 	}
+
+	// Register PackageRevision validating webhook.
+	// The validator implements admission.Handler interface via its Handle method.
+	// Webhook TLS certificates are mounted from Secret at /etc/webhook/certs (see deployment).
+	validator := webhooks.NewPackageRevisionValidator(coreClient)
+
+	mgr.GetWebhookServer().Register(
+		"/validate-porch-kpt-dev-v1alpha2-packagerevision",
+		&admission.Webhook{
+			Handler: validator,
+		})
+	log.Info("PackageRevision validating webhook registered")
+
 	return nil
 }
