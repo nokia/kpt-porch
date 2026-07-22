@@ -351,7 +351,10 @@ func (e *errorWriter) Write(p []byte) (n int, err error) {
 
 func TestNewMultiFunctionRuntime_BuiltinOnly(t *testing.T) {
 	store := newTestFunctionConfigStore()
-	runtime, err := NewMultiFunctionRuntime("", 1024, store)
+	runtime, err := NewMultiFunctionRuntime(t.Context(), MultiFunctionRuntimeOptions{
+		MaxGrpcMessageSize:  1024,
+		FunctionConfigStore: store,
+	})
 	require.NoError(t, err)
 	require.NotNil(t, runtime)
 
@@ -365,7 +368,11 @@ func TestNewMultiFunctionRuntime_WithGRPC(t *testing.T) {
 	defer stop()
 
 	store := newTestFunctionConfigStore()
-	runtime, err := NewMultiFunctionRuntime(addr, 1024, store)
+	runtime, err := NewMultiFunctionRuntime(t.Context(), MultiFunctionRuntimeOptions{
+		GRPCAddress:         addr,
+		MaxGrpcMessageSize:  1024,
+		FunctionConfigStore: store,
+	})
 	require.NoError(t, err)
 	require.NotNil(t, runtime)
 
@@ -375,7 +382,10 @@ func TestNewMultiFunctionRuntime_WithGRPC(t *testing.T) {
 }
 
 func TestNewMultiFunctionRuntime_NilStorePanics(t *testing.T) {
-	runtime, err := NewMultiFunctionRuntime("", 1024, nil)
+	runtime, err := NewMultiFunctionRuntime(t.Context(), MultiFunctionRuntimeOptions{
+		MaxGrpcMessageSize:  1024,
+		FunctionConfigStore: nil,
+	})
 	require.NoError(t, err)
 
 	// Panic occurs on lookup, not construction

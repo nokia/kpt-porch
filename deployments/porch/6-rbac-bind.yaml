@@ -52,5 +52,8 @@ subjects:
     name: porch-server
     namespace: porch-system
   - kind: ServiceAccount
+    name: porch-controllers
+    namespace: porch-system
+  - kind: ServiceAccount
     name: porch-fn-runner
     namespace: porch-system
